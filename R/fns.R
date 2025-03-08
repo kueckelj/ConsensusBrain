@@ -99,11 +99,13 @@ apply_erase_mask <- function(voxel_df,
 
   for(broi in names(erase_mask_mapping)){
 
+    print(broi)
+
     voxel_df <-
       refine3D_erase(
         voxel_df = voxel_df,
         broi = broi,
-        erase_mask = erase_mask,
+        erase_mask = erase_mask_mapping[[broi]],
         erase_mask_slice = erase_mask_slice,
         erase_mask_plane = erase_mask_plane
       )
@@ -256,18 +258,18 @@ circular_progress_plot <- function(progress, color_done = "forestgreen", region 
   # Define colors
   colors <- c("Done" = color_done, "Remaining" = "lightgray")
 
-  ggplot(data) +
-    geom_rect(
-      mapping = aes(ymax = ymax, ymin = ymin, xmax = 4, xmin = 3, fill = category),
+  ggplot2::ggplot(data) +
+    ggplot2::geom_rect(
+      mapping = ggplot2::aes(ymax = ymax, ymin = ymin, xmax = 4, xmin = 3, fill = category),
       color = "black"
     ) +  # Add border
-    scale_fill_manual(values = colors) +
-    theme_void() +
-    coord_polar(theta = "y", clip = "on") +  # Ensure full use of space
-    xlim(c(1.8, 4.2)) +  # Slightly extend range to maximize area
-    theme(
+    ggplot2::scale_fill_manual(values = colors) +
+    ggplot2::theme_void() +
+    ggplot2::coord_polar(theta = "y", clip = "on") +  # Ensure full use of space
+    ggplot2::xlim(c(1.8, 4.2)) +  # Slightly extend range to maximize area
+    ggplot2::theme(
       legend.position = "none",
-      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),  # Center title
+      plot.title = ggplot2::element_text(hjust = 0.5, size = 14, face = "bold"),  # Center title
       plot.margin = margin(t = 2, r = 2, b = 2, l = 2)  # Minimize margins for max plot space
     ) #+
     #labs(title = paste0(region, " Progress: ", round(progress,2)*100, "%"))
@@ -338,12 +340,38 @@ comp_selection_bb <- function(voxel_df, distance = NULL){
     .x = ccs_labels,
     .f = function(axis){
 
-      range(voxel_df[voxel_df$selected,][[axis]]) %>%
-        buffer_range(buffer = distance, max = max(voxel_df[[axis]]))
+      range(voxel_df[voxel_df$selected,][[axis]], na.rm = TRUE) %>%
+        buffer_range(buffer = distance, max = max(voxel_df[[axis]], na.rm = TRUE))
 
     }
   ) %>%
     purrr::set_names(nm = ccs_labels)
+
+}
+
+
+ConsensusBrain <- function(){
+
+  shiny::runApp(
+    appDir = shinyApp(ui = ConsensusBrainUI, ConsensusBrainServer)
+    )
+
+}
+
+
+CBscore_label_var <- function(voxel_df, score_set_up){
+
+  voxel_df$CBscore_label <- ""
+
+  for(choice in names(score_set_up$choices)){
+
+    val <- score_set_up$choices[choice]
+
+    voxel_df$CBscore_label[voxel_df$CBscore == val] <- choice
+
+  }
+
+  return(voxel_df)
 
 }
 
@@ -372,7 +400,7 @@ enter_refinement_mode <- function(voxel_df){
 
   dplyr::mutate(
     .data = voxel_df,
-    color = dplyr::if_else(selected, alpha(color, 0.65), alpha("steelblue", 0.45))
+    color = dplyr::if_else(selected, alpha(color, 0.55), alpha("steelblue", 0.45))
   )
 
 }
@@ -576,18 +604,34 @@ identify_brois <- function(voxel_df){
   voxel_df$broi <- NA_character_
   voxel_subset_sel <- dplyr::filter(voxel_df, selected)
 
-  dbscan_out <-
-    dbscan::dbscan(
-      x = as.matrix(voxel_subset_sel[,c("x", "y", "z")]),
-      minPts = 2,
-      eps = 2
-    )
+  hemispheres <- unique(voxel_subset_sel$hemisphere)
 
   voxel_subset_sel <-
-    dplyr::mutate(
-      .data = voxel_subset_sel,
-      broi = paste0("broi_", dbscan_out$cluster),
-      broi = dplyr::if_else(broi == "broi_o", true = NA, false = broi)
+    purrr::map_dfr(
+      .x = hemispheres,
+      .f = function(hem){
+
+        voxel_hem <- voxel_subset_sel[voxel_subset_sel$hemisphere == hem,]
+
+        dbscan_out <-
+          dbscan::dbscan(
+            x = as.matrix(voxel_hem[,c("x", "y", "z")]),
+            minPts = 2,
+            eps = 2
+          )
+
+        voxel_hem <-
+          dplyr::mutate(
+            .data = voxel_hem,
+            broi = paste0("broi_", dbscan_out$cluster),
+            broi = dplyr::if_else(broi == "broi_0", true = NA, false = broi)
+          ) %>%
+          dplyr::filter(!is.na(broi)) %>%
+          dplyr::mutate(broi = paste0(broi, "_", {{hem}}))
+
+        return(voxel_hem)
+
+      }
     )
 
   voxel_df <- rbind(voxel_subset_sel, voxel_df[!voxel_df$selected,])
@@ -713,6 +757,39 @@ leave_refinement_mode <- function(voxel_df){
   )
 
 }
+
+load_consensus_template <- function(as_df = TRUE){
+
+  data("consensus_template")
+
+  if(as_df){
+
+    consensus_template <-
+      cbind(
+        as.data.frame(consensus_template$numeric),
+        as.data.frame(consensus_template$labels)
+      ) %>%
+      dplyr::left_join(x = ., y = consensus_template$ann_macro, by = "ann_dk_adj") %>%
+      dplyr::mutate(
+        subcortical =
+          dplyr::case_when(
+            stringr::str_detect(ann_macro, pattern = "subcortical|corpus_callosum") ~ ann_dk_adj,
+            stringr::str_detect(ann_macro, pattern = "wm_tract") ~ ann_macro,
+            TRUE ~ "none"
+          ),
+        # ann_macro == "white_matter" -> subcortical structures hold priority (e.g. Thalamus > Radiatio thalamica)
+        is_tract = wm_tract != "none" & !stringr::str_detect(wm_tract, pattern = "wma_"),
+        hemisphere = dplyr::if_else(x > 127, true = "left", false = "right"),
+        id = paste0("x", x, "y", y, "z", z)
+      ) %>%
+      tibble::as_tibble()
+
+  }
+
+  return(consensus_template)
+
+}
+
 
 make_pretty_label <- function(labels){
 
@@ -909,79 +986,87 @@ refine3D_erase <- function(voxel_df,
   ra_ccs <- req_axes_2d(erase_mask_plane, mri = FALSE)
 
   slices_with_tissue <-
-    dplyr::filter(voxel_df, broi == {{broi}})[[ccs_axis]] %>%
-    unique()
-
-  slices_lower <- (erase_mask_slice-1):min(slices_with_tissue)
-  slices_higher <- (erase_mask_slice+1):max(slices_with_tissue)
+    unique(voxel_df[voxel_df$broi == broi & !is.na(voxel_df$broi),][[ccs_axis]])
 
   # use 1:max(slices_with_tissue), cause masks are picked by numeric slice idx!
   erase_masks <- vector(mode = "list", length = max(slices_with_tissue))
   erase_masks[[erase_mask_slice]] <- erase_mask[erase_mask$selected,]
 
   # slice input -> down to lowest
-  for(i in seq_along(slices_lower)){
+  if(erase_mask_slice != min(slices_with_tissue)){
 
-    slice_idx <- slices_lower[i]
+    slices_lower <- (erase_mask_slice-1):min(slices_with_tissue)
 
-    # get broi mask
-    slice_df <-
-      dplyr::select(
-        .data = voxel_df[voxel_df[[ccs_axis]] == slice_idx,],
-        id, broi, selected, !!!ra_ccs
-      )
+    for(i in seq_along(slices_lower)){
 
-    broi_mask <- slice_df[slice_df$selected & slice_df$broi == broi,]
+      slice_idx <- slices_lower[i]
 
-    # get erase mask of previous slice
-    # +1 to get from previous slice, cause the slice index decreases with the loop
-    erase_mask_prev <- erase_masks[[(slice_idx+1)]]
+      # get broi mask
+      slice_df <-
+        dplyr::select(
+          .data = voxel_df[voxel_df[[ccs_axis]] == slice_idx,],
+          id, broi, selected, !!!ra_ccs
+        )
 
-    # map broi voxels in current slice to the selection state in the previous slice
-    nn_out <-
-      RANN::nn2(
-        data = erase_mask_prev[, c("col", "row")],
-        query = broi_mask[, c("col", "row")],
-        searchtype = "priority",
-        k = 1
-      )
+      broi_mask <- slice_df[slice_df$selected & slice_df$broi == broi & !is.na(slice_df$broi),]
 
-    # transfer label, erased = TRUE -> erase
-    broi_mask$erased <- erase_mask_prev$erased[nn_out$nn.idx]
-    erase_masks[[slice_idx]] <- broi_mask
+      # get erase mask of previous slice
+      # +1 to get from previous slice, cause the slice index decreases with the loop
+      erase_mask_prev <- erase_masks[[(slice_idx+1)]]
+
+      # map broi voxels in current slice to the selection state in the previous slice
+      nn_out <-
+        RANN::nn2(
+          data = erase_mask_prev[, c("col", "row")],
+          query = broi_mask[, c("col", "row")],
+          searchtype = "priority",
+          k = 1
+        )
+
+      # transfer label, erased = TRUE -> erase
+      broi_mask$erased <- erase_mask_prev$erased[nn_out$nn.idx]
+      erase_masks[[slice_idx]] <- broi_mask
+
+    }
 
   }
 
   # slice input -> up to highest
-  for(i in seq_along(slices_higher)){
+  if(erase_mask_slice != max(slices_with_tissue)){
 
-    slice_idx <- slices_higher[i]
+    slices_higher <- (erase_mask_slice+1):max(slices_with_tissue)
 
-    # get broi mask
-    slice_df <-
-      dplyr::select(
-        .data = voxel_df[voxel_df[[ccs_axis]] == slice_idx,],
-        id, broi, selected, !!!ra_ccs
-      )
+    for(i in seq_along(slices_higher)){
 
-    broi_mask <- slice_df[slice_df$selected,]
+      slice_idx <- slices_higher[i]
 
-    # get erase mask of previous slice
-    # +1 to get from previous slice, cause the slice index decreases with the loop
-    erase_mask_prev <- erase_masks[[(slice_idx-1)]]
+      # get broi mask
+      slice_df <-
+        dplyr::select(
+          .data = voxel_df[voxel_df[[ccs_axis]] == slice_idx,],
+          id, broi, selected, !!!ra_ccs
+        )
 
-    # map broi voxels in current slice to the selection state in the previous slice
-    nn_out <-
-      RANN::nn2(
-        data = erase_mask_prev[, c("col", "row")],
-        query = broi_mask[, c("col", "row")],
-        searchtype = "priority",
-        k = 1
-      )
+      broi_mask <- slice_df[slice_df$selected & slice_df$broi == broi & !is.na(slice_df$broi),]
 
-    # transfer label, erased = TRUE -> erase
-    broi_mask$erased <- erase_mask_prev$erased[nn_out$nn.idx]
-    erase_masks[[slice_idx]] <- broi_mask
+      # get erase mask of previous slice
+      # +1 to get from previous slice, cause the slice index decreases with the loop
+      erase_mask_prev <- erase_masks[[(slice_idx-1)]]
+
+      # map broi voxels in current slice to the selection state in the previous slice
+      nn_out <-
+        RANN::nn2(
+          data = erase_mask_prev[, c("col", "row")],
+          query = broi_mask[, c("col", "row")],
+          searchtype = "priority",
+          k = 1
+        )
+
+      # transfer label, erased = TRUE -> erase
+      broi_mask$erased <- erase_mask_prev$erased[nn_out$nn.idx]
+      erase_masks[[slice_idx]] <- broi_mask
+
+    }
 
   }
 
@@ -1421,6 +1506,12 @@ saturate_colors <- function(cols, sat = 1.5) {
   names(out) <- names(cols)
 
   return(out)
+
+}
+
+score_label_colors <- function(score_set_up){
+
+  purrr::set_names(nm = names(score_set_up$choices), x = score_set_up$colors)
 
 }
 
