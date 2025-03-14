@@ -15,9 +15,8 @@ moduleMriPlaneUI <- function(id,
                              pd = 5, # padding
                              siamp = 30, # size items around mri plot
                              showValue = TRUE,
-                             wmp = 450, # width mri plot
-                             cf = F,
-                             show_plot = T) {
+                             wmp = 500, # width mri plot
+                             cf = F) {
 
   ns <- shiny::NS(id)
 
@@ -39,8 +38,8 @@ moduleMriPlaneUI <- function(id,
   # size around mri plot -> add padding
   samp <- pd*2 + siamp
 
-  # mri container width
-  wmc <- wmp + samp*2
+  # width mri container
+  wmc <- wmp + samp
 
   # HTML + CSS
   {shiny::tagList(
@@ -193,15 +192,16 @@ moduleMriPlaneUI <- function(id,
                     box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
                     display: flex;
                     flex-direction: column;
-                    width: {wmc}px;
-                    height: 100%;"),
+                    padding: 5px;
+                    width: {wmc+10}px;
+                    height:100%;"),
       #shiny::actionButton(ns("test"), label= "Test"),
       shiny::div( # Above MRI Plot
         style = glue::glue("
                       display: flex;
                       align-items: flex-end;
                       justify-content: center;
-                      height: {samp*2}px;
+                      height: {samp*1.5}px;
                       width: {wmc}px;
                       margin-bottom: -10px;
                       background-color: {bgc(cf)}"),
@@ -211,7 +211,7 @@ moduleMriPlaneUI <- function(id,
                              align-itmes: flex-end;
                              justify-content: center;
                              height: {samp};
-                             width: {samp*2};
+                             width: {samp*1.5};
                              margin: 10px;
                              margin-left: 5px;
                              margin-bottom: 20px;
@@ -260,7 +260,6 @@ moduleMriPlaneUI <- function(id,
             max = slider_max,
             value = round(slider_max/2),
             ticks = FALSE,
-            animate = shiny::animationOptions(interval = 450),
             width = "100%"
           ),
           shiny::div(
@@ -321,16 +320,6 @@ moduleMriPlaneUI <- function(id,
                             flex-direction: row;
                             height: {wmp}px;
                             width: {wmc}px;"),
-        shiny::div( # Buttons
-          style = glue::glue("
-                              width: {samp}px;
-                              display: flex;
-                              flex-direction: column; /* Align everything in a column */
-                              align-items: center; /* Center elements */
-                              background-color: {bgc(cf)}"),
-          class = "CB-control-group",
-          shiny::uiOutput(ns("interaction_buttons"))
-        ),
         shiny::div( # MRI Plot
           style = glue::glue("
                                   display: flex;
@@ -427,13 +416,6 @@ moduleMriPlaneUI <- function(id,
                             width: {wmc};
                             height: {samp};
                             background-color: black"),
-        shiny::div( # empty
-          style = glue::glue("
-                              display: flex;
-                              width: {samp}px;
-                              height: {samp}px;
-                              background-color: {bgc(cf)}")
-        ),
         shiny::div( # Horizontal Slider
           style = glue::glue("
                               display: flex;
@@ -534,9 +516,8 @@ moduleMriPlaneUI <- function(id,
 
 moduleMriPlaneServer <- function(id,
                                  plane,
-                                 mri_list,
+                                 nifti_input,
                                  mri_control,
-                                 mri_frame = NULL,
                                  mode = function(){ "inspection" },
                                  mode_init = "inspection"
                                  ){
@@ -565,8 +546,8 @@ moduleMriPlaneServer <- function(id,
         #assign(x = "data", value = reactiveValuesToList(data), envir = .GlobalEnv)
         print("-----------------------")
         print("Test")
-        print(mode())
-        print(selection_tool())
+        print(table(voxel_df()$color))
+        print(unique(voxel_df()$color))
 
       }, ignoreInit = TRUE)
 
@@ -577,205 +558,10 @@ moduleMriPlaneServer <- function(id,
 
 
       # 1. Global ---------------------------------------------------------------
-      # Dynamic UI --------------------------------------------------------------
-
-      output$enter_refinement <- shiny::renderUI({
-
-        shiny::req(selection3D())
-
-        shiny::actionButton(
-          inputId = ns("enter_refinement"),
-          label = NULL,
-          class = "CB-btn",
-          icon = shiny::icon(name = "wrench")
-        )
-
-      })
-
-      output$interaction_dims <- shiny::renderUI({
-
-        shinyWidgets::radioGroupButtons(
-          inputId = ns("interaction_dims"),
-          label = NULL,
-          selected = "3D",
-          choiceNames = list(
-            tags$span(style = "font-size: 18px;", "2D"),
-            tags$span(style = "font-size: 18px;", "3D")
-          ),
-          choiceValues = c("2D", "3D"),
-          direction = "vertical",
-          justified = FALSE,
-          individual = FALSE,
-          size = "sm",
-          width = "100%"
-        )
-
-      })
-
-      output$interaction_buttons <- shiny::renderUI({
-
-        if(mode() == "selection"){
-
-          shiny::tagList(
-            shiny::div(
-              style = "display: flex; flex-direction: column; justify-content: flex-start; width: 100%;",
-              shiny::div(
-                class = "CB-checkbox-group",
-                shiny::uiOutput(outputId = ns("interaction_dims")),
-                shinyWidgets::radioGroupButtons(
-                  inputId = ns("selection_tool"),
-                  label = NULL,
-                  selected = "region_click",
-                  choices = c(
-                    # Region-Click
-                    '<i class="fas fa-hand-pointer" style="font-size: 1.5em;" data-toggle="tooltip" title="Region-Click"></i>' = "region_click",
-                    # Outline
-                    '<i class="fas fa-circle-notch" style="font-size: 1.5em;" data-toggle="tooltip" title="Outline"></i>' = "outline",
-                    # Paintbrush
-                    '<i class="fas fa-paint-brush" style="font-size: 1.5em;" data-toggle="tooltip" title="Paintbrush"></i>' = "paintbrush"
-                  ),
-                  direction = "vertical",
-                  justified = FALSE,
-                  individual = FALSE,
-                  size = "sm",
-                  width = "100%"
-                ),
-                shiny::uiOutput(outputId = ns("selection_erase"))
-              )
-            ),
-            shiny::div(style = "flex-grow: 1;"),
-            # buttons_drawing at the bottom
-            shiny::div(
-              style = "display: flex; flex-direction: column; justify-content: flex-end; width: 100%;",
-              shiny::div( # Action-Buttons (modes)
-                class = "CB-btn-group",
-                shiny::uiOutput(outputId = ns("paintbrush_size")),
-                shiny::uiOutput(outputId = ns("enter_refinement")),
-                shiny::actionButton(
-                  inputId = ns("selection_backward"),
-                  label = NULL,
-                  class = "CB-btn",
-                  icon = shiny::icon("step-backward", lib = "glyphicon")
-                ),
-                shiny::actionButton(
-                  inputId = ns("selection_reset"),
-                  label = NULL,
-                  class = "CB-btn",
-                  icon = shiny::icon("trash", lib = "glyphicon")
-                )
-              )
-            )
-          )
-
-        } else if(mode() == "refinement"){
-
-          shiny::tagList(
-            shiny::div(
-              style = "display: flex; flex-direction: column; justify-content: flex-start; width: 100%;",
-              shiny::div(
-                class = "CB-checkbox-group",
-                shiny::uiOutput(outputId = ns("interaction_dims")),
-                shinyWidgets::radioGroupButtons(
-                  inputId = ns("refinement_tool"),
-                  label = NULL,
-                  selected = "region_click",
-                  choices = c(
-                    # Paintbrush
-                    '<i class="fas fa-paint-brush" style="font-size: 1.5em;" data-toggle="tooltip" title="Paintbrush"></i>' = "paintbrush",
-                    # Paintbrush + Eraser
-                    '<span class="fa-stack" style="font-size: 0.8em; width: 1.5em;" data-toggle="tooltip" title="Eraser-Paintbrush">
-                    <i class="fas fa-paint-brush fa-stack-1x" style="position: absolute; top: -2px; left: -3.5px; font-size: 1.5em;"></i>
-                    <i class="fas fa-eraser fa-stack-1x" style="position: absolute; bottom: -7.5px; left: 6.25px; font-size: 1.4em; color: black;"></i>
-                    </span>' = "paintbrush_erase"
-                  ),
-                  direction = "vertical",
-                  justified = FALSE,
-                  individual = FALSE,
-                  size = "sm",
-                  width = "100%"
-                )
-              )
-            ),
-            shiny::div(style = "flex-grow: 1;"),
-            # buttons_drawing at the bottom
-            shiny::div(
-              style = "display: flex; flex-direction: column; justify-content: flex-end; width: 100%;",
-              shiny::div( # Action-Buttons (modes)
-                class = "CB-btn-group",
-                shiny::uiOutput(outputId = ns("paintbrush_size")),
-                shiny::actionButton(
-                  inputId = ns("refinement_backward"), #!!!! add server logic
-                  label = NULL,
-                  class = "CB-btn",
-                  icon = shiny::icon("step-backward", lib = "glyphicon")
-                ),
-                shiny::actionButton(
-                  inputId = ns("refinement_reset"),
-                  label = NULL,
-                  class = "CB-btn",
-                  icon = shiny::icon("trash", lib = "glyphicon")
-                ), #!!!! add server logic
-                shiny::actionButton(
-                  inputId = ns("leave_refinement"),
-                  label = NULL,
-                  class = "CB-btn",
-                  icon = shiny::icon("arrow-left", lib = "glyphicon")
-                ) #!!!! add server logic
-              )
-            )
-          )
-
-        }
-
-      })
-
-      output$paintbrush_size <- shiny::renderUI({
-
-        shiny::req(stringr::str_detect(interaction_tool(), pattern = "paintbrush"))
-
-        shiny::tagList(
-          shiny::actionButton(
-            inputId = ns("pbr_increase"),
-            label = shiny::HTML('<span class="fa-stack" style="font-size: 0.8em; width: 1.5em;">
-                          <i class="fas fa-paint-brush fa-stack-1x" style="position: absolute; top: -1px; left: -2.5px; font-size: 1.2em;"></i>
-                          <i class="fas fa-plus fa-stack-1x" style="position: absolute; bottom: -7.5px; left: 6.25px; font-size: 0.9em; color: black;"></i>
-                        </span>'),
-            class = "CB-btn"
-          ),
-          shiny::actionButton(
-            inputId = ns("pbr_decrease"),
-            label = shiny::HTML('<span class="fa-stack" style="font-size: 0.8em; width: 1.5em;">
-                          <i class="fas fa-paint-brush fa-stack-1x" style="position: absolute; top: -1px; left: -2.5px; font-size: 1.2em;"></i>
-                          <i class="fas fa-minus fa-stack-1x" style="position: absolute; bottom: -7.5px; left: 6.25px; font-size: 0.8em; color: black;"></i>
-                        </span>'),
-            class = "CB-btn"
-          )
-        )
-
-      })
-
-      output$selection_erase <- shiny::renderUI({
-
-        if(length(selected_pixels()) != 0){
-
-          shinyWidgets::checkboxGroupButtons(
-            inputId = ns("selection_erase"),
-            label = NULL,
-            choices = c('<i class="fas fa-eraser" style="font-size: 1.5em;" data-toggle="tooltip" title="Erase-Mode"></i>' = "erase"),
-            selected = character(),
-            direction = "vertical",
-            justified = FALSE,
-            individual = FALSE,
-            size = "sm",
-            width = "100%"
-          )
-
-        }
-
-      })
-
 
       # Reactive Values ---------------------------------------------------------
+
+      stacks <- shiny::reactiveValues(zoom = list())
 
       drawing_active <- shiny::reactiveVal(value = FALSE)
 
@@ -799,23 +585,34 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      mri_range <- shiny::reactiveVal(value = list(col = mri_frame, row = mri_frame))
+      mri_range <- shiny::reactive({
+
+        shiny::req(stacks)
+
+        if(length(stacks$zoom) == 0){
+
+          shiny::req(nifti_input())
+
+          col_range <- c(1,dim(nifti_input())[which(mri_planes == unname(col_axis))])
+          row_range <- c(1,dim(nifti_input())[which(mri_planes == unname(row_axis))])
+
+          out <- list(col = col_range, row = row_range)
+
+        } else {
+
+          out <- dplyr::last(x = stacks$zoom)
+
+        }
+
+        return(out)
+
+      })
 
       mode <- shiny::reactiveVal(mode_init)
-
-      paintbrush_radius_fct <- shiny::reactiveVal(value = 0.025)
 
       reselect <- shiny::reactiveVal(value = "")
 
       slice_pos <- shiny::reactiveValues(sag = 128, axi = 128, cor = 128)
-
-      # for backwards compatibility
-      #.(selection stack is handled in the controller)
-      stacks <-
-        shiny::reactiveValues(
-          # a list of mri range lists (list(col = numeric(2), row = numeric(2)))
-          zoom = list(list(col = mri_frame, row = mri_frame))
-        )
 
       # is immediately updated by the controller input
       voxel_df <- shiny::reactiveVal(data.frame())
@@ -879,25 +676,17 @@ moduleMriPlaneServer <- function(id,
 
           selection_color()
 
-        } else if(mode() == "refinement"){
-
-          refinement_color()
-
         }
 
       })
 
-      interaction_dims <- shiny::reactive({ input$interaction_dims })
+      interaction_dims <- shiny::reactive({ mri_control()$interaction_dims })
 
       interaction_erase <- shiny::reactive({
 
         if(mode() == "selection"){
 
           selection_erase()
-
-        } else if(mode() == "refinement"){
-
-          refinement_erase()
 
         }
 
@@ -910,14 +699,9 @@ moduleMriPlaneServer <- function(id,
 
           selection_template()
 
-        } else if(mode() == "refinement"){
-
-          refinement_template()
-
         }
 
       })
-
 
       interaction_tool <- shiny::reactive({
 
@@ -925,22 +709,26 @@ moduleMriPlaneServer <- function(id,
 
           selection_tool()
 
-        } else if(mode() == "refinement"){
-
-          refinement_tool()
-
         }
 
       })
 
-      mri_slice <- shiny::reactive({ mri_slices()[[slice_idx()]] })
+      mri_slice <- shiny::reactive({
 
-      mri_slices <- shiny::reactive({ mri_list()[[plane]] })
+        shiny::req(nifti_input())
+        shiny::req(slice_idx())
+
+        get_slice(nifti_input(), plane = plane, slice = slice_idx())
+
+        })
 
       # (col and row are always equally long - pick col)
       mri_side_length <- shiny::reactive({ as.numeric(dist(mri_range()[["col"]])) })
 
+      n_slices <- shiny::reactive({ dim(nifti_input())[which(c("sag", "cor", "axi") == plane)] })
+
       paintbrush_radius <- shiny::reactive({ mri_side_length() * paintbrush_radius_fct() })
+      paintbrush_radius_fct <- shiny::reactive({ mri_control()$pbr_fct })
       paintbrush_selected <- shiny::reactive({ interaction_template()$id %in% paintbrush_selected_ids() })
       paintbrush_selected_ids <- shiny::reactive({ data$paintbrush })
 
@@ -1004,6 +792,16 @@ moduleMriPlaneServer <- function(id,
       # ----- Observers
 
       # Observe Events ----------------------------------------------------------
+
+      shiny::observeEvent(mri_control()$mode, {
+
+        if(!identical(x = mri_control()$mode, y = mode())){
+
+          mode({ mri_control()$mode })
+
+        }
+
+      })
 
       # --- automatically de-select localizers if on MRI
       shiny::observeEvent(cursor_on_mri(), { #!!!!global options?
@@ -1102,7 +900,7 @@ moduleMriPlaneServer <- function(id,
       # --- forward/backward
       shiny::observeEvent(input$mri_forward,{
 
-        if(slice_pos[[plane]] != max(length(mri_slices()))){
+        if(slice_pos[[plane]] != n_slices()){
 
           slice_pos[[plane]] <- slice_pos[[plane]]+1
 
@@ -1120,23 +918,10 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      # -- increase/decrease paintbrush radius
-      shiny::observeEvent(input$pbr_increase, {
-
-        paintbrush_radius_fct({ paintbrush_radius_fct()*1.1 })
-
-      })
-
-      shiny::observeEvent(input$pbr_decrease, {
-
-        paintbrush_radius_fct({ paintbrush_radius_fct()*0.9 })
-
-      })
-
       # --- zoom in
       shiny::observeEvent(input$zoom_in,{
 
-        fct <- 0.1
+        fct <- 0.05
         # new mri range
         nmr <-
           purrr::map(
@@ -1192,9 +977,6 @@ moduleMriPlaneServer <- function(id,
         # stack zoom ranges
         stacks <- add_to_stack(stacks, which = "zoom", what = nmr)
 
-        # adjust overal mri range
-        mri_range(nmr)
-
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
       shiny::observeEvent(input$mriPlot_brush, {
@@ -1245,50 +1027,32 @@ moduleMriPlaneServer <- function(id,
         # stack zoom ranges
         stacks <- add_to_stack(stacks, which = "zoom", what = nmr)
 
-        # adjust overal mri range
-        mri_range(nmr)
-
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
       # --- zoom out
       shiny::observeEvent(input$zoom_out,{
 
         # zoom stacks remaining?
-        # >1 cause first item corresponds to baseline mri frame
-        if(length(stacks$zoom) > 1){
+        if(length(stacks$zoom) != 0){
 
           stacks <- reduce_stack(stacks, which = "zoom")
 
-          mri_range(stacks$zoom[[length(stacks$zoom)]])
+          # update localizer
+          shinyWidgets::updateNoUiSliderInput(
+            session = session,
+            inputId = "mri_slider_row",
+            range = dplyr::last(stacks$zoom)$row
+          )
 
-        } else { # back to default
-
-          mri_range(list(col = mri_frame, row = mri_frame))
+          shinyWidgets::updateNoUiSliderInput(
+            session = session,
+            inputId = "mri_slider_col",
+            range = dplyr::last(stacks$zoom)$col
+          )
 
         }
 
-        # update localizer
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_row",
-          range = mri_range()$row
-        )
-
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_col",
-          range = mri_range()$col
-        )
-
-      })
-
-      # --- center MRI (currently not active)
-      shiny::observeEvent(input$center_mri, {
-
-        slice_pos[[plane]] <- round(mean(mri_frame))
-        mri_range(list(col = mri_frame, row = mri_frame))
-
-      })
+      }, ignoreInit = TRUE)
 
       # --- updates of slice_pos from the controller side
       shiny::observeEvent(slice_sag(), {
@@ -1487,7 +1251,7 @@ moduleMriPlaneServer <- function(id,
         shiny::req(cursor_pos())
 
         # use to visualize the interactive process/progress
-        if(mode() %in% c("selection", "refinement")){
+        if(mode() %in% c("selection")){
 
           # plotting context for all drawing options
           plot_mri_frame(col = col_seq(), row = row_seq())
@@ -1582,7 +1346,7 @@ moduleMriPlaneServer <- function(id,
             x = x_pos,
             y = y_pos,
             labels = hover_text(),
-            col = determine_color_theme(bg_colors),
+            col = "white",
             cex = 1,
             font = 2,
             adj = c(0, 0)
@@ -1756,16 +1520,12 @@ moduleMriPlaneServer <- function(id,
         x_pos <- max(mri_range()[["col"]]) - (side_length*0.0125)
         y_pos <- min(mri_range()[["row"]]) + (side_length*0.05)
 
-        bg_colors <-
-          mri_slice()[(max(mri_range()[["col"]])):x_pos, min(mri_range()[["row"]]):y_pos] %>%
-          as.character()
-
         # dist text
         graphics::text(
           x = x_pos,
           y = y_pos,
           labels = label,
-          col = determine_color_theme(bg_colors),
+          col = "white",
           cex = 1,
           font = 2,
           adj = c(1, 0.5)
@@ -1814,8 +1574,7 @@ moduleMriPlaneServer <- function(id,
 
       output$mriSlicePlot <- shiny::renderPlot({
 
-        shiny::req(slice_idx())
-        shiny::req(mri_slices())  # Ensure mri_slices() exists before proceeding
+        shiny::req(mri_slice())
 
         plot_mri_frame(col = col_seq(), row = row_seq())
 
@@ -1843,8 +1602,6 @@ moduleMriPlaneServer <- function(id,
         )
 
       selection_backward_count <- shiny::reactiveVal(value = 0)
-
-      selection_erase <- shiny::reactiveVal(value = FALSE)
 
       # is updated upon dbl_clicking when in selection mode to end drawing mode
       selection_mask <- shiny::reactiveVal(value = data.frame())
@@ -1887,15 +1644,13 @@ moduleMriPlaneServer <- function(id,
       # all voxels selected within this MRI plane -> given to the controller
       # -> distributed to the remaining MRI instances
       # updated after every selection/erasing instance
-      selected_voxels <- shiny::reactive({
-
-        voxel_df()$id[voxel_df()$selected]
-
-      })
+      selected_voxels <- shiny::reactive({ voxel_df()$id[voxel_df()$selected] })
 
       selected_voxels_control <- shiny::reactive({ mri_control()$selected_voxels })
 
       selection_color <- shiny::reactive({ ifelse(!selection_erase(), "forestgreen", "red") })
+
+      selection_erase <- shiny::reactive({ mri_control()$selection_erase })
 
       selection_template <- shiny::reactive({
 
@@ -1911,16 +1666,11 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      selection_tool <- shiny::reactive({
-
-        shiny::req(input$selection_tool)
-        stringr::str_remove(input$selection_tool, pattern = "_erase$")
-
-        })
+      selection_tool <- shiny::reactive({ mri_control()$selection_tool })
 
       show_selection_state <- shiny::reactive({
 
-        mode() %in% c("selection", "refinement") &
+        mode() %in% c("selection") &
         # if active paintbrushing, selection state is displayed dynamically by interaction plot
         !(stringr::str_detect(interaction_tool(), pattern = "paintbrush")  & drawing_active())
 
@@ -1935,22 +1685,6 @@ moduleMriPlaneServer <- function(id,
       # ensure that no erasing is possible if the current plane does not
       # have any selected pixels
 
-      shiny::observeEvent(input$selection_erase, {
-
-        selection_erase("erase" %in% input$selection_erase)
-
-      }, ignoreNULL = FALSE)
-
-      shiny::observeEvent(selected_pixels(), {
-
-        if(length(selected_pixels()) == 0 & shiny::isolate({selection_erase()})){
-
-          selection_erase(FALSE)
-
-        }
-
-      })
-
       # --- ensure that selection_backward increases linearly
       # (circumvent weird behavior in MRI control, where the AB value sometimes resets to 1)
       shiny::observeEvent(input$selection_backward,{
@@ -1962,7 +1696,7 @@ moduleMriPlaneServer <- function(id,
       # --- reset selection completely
       shiny::observeEvent(input$selection_reset,{
 
-        voxel_df({ dplyr::mutate(voxel_df(), selected = FALSE )})
+        voxel_df({ dplyr::mutate(voxel_df(), selected = FALSE) })
 
       })
 
@@ -2035,23 +1769,33 @@ moduleMriPlaneServer <- function(id,
 
             mask_ids <- setdiff(paintbrush_selected_ids(), selected_pixels())
 
+            selection_mask({
+
+              dplyr::filter(.data = selection_template(), id %in% {{mask_ids}})
+
+            })
+
           } else if(selection_erase()) {
 
             mask_ids <- setdiff(selected_pixels(), paintbrush_selected_ids())
 
+            selection_mask({
+
+              # selected stays as is, erased tells which voxels to erase
+              dplyr::mutate(
+                .data = selection_template(),
+                erased = id %in% {{mask_ids}}
+                )
+
+            })
+
           }
-
-          selection_mask({
-
-            dplyr::filter(.data = selection_template(), id %in% {{mask_ids}})
-
-          })
 
           drawing_active(FALSE)
 
         }
 
-      })
+      }, ignoreInit = TRUE)
 
       # --- dblclick + region_click -> updates voxel_df() immediately
       shiny::observeEvent(input$mriPlot_dblclick, {
@@ -2076,107 +1820,53 @@ moduleMriPlaneServer <- function(id,
         hemisphere <- slice_df_hover()[["hemisphere"]]
 
         # 1. scenario: not erasing
-        if(!selection_erase()){
+        # extract required data
+        if(interaction_dims() == "2D"){
 
-          # 1.1: not selected yet -> add to selected brain tissue
-          if(!slice_df_hover()$selected){
+          slice_indices <- slice_idx()
 
-            # extract required data
-            if(interaction_dims() == "2D"){
+          voxel_subset <-
+            slice_df()[slice_df()[[hover_var()]] == brain_region, ] %>%
+            dplyr::filter(hemisphere == {{hemisphere}})
 
-              slice_indices <- slice_idx()
+        } else if(interaction_dims() == "3D"){
 
-              voxel_subset <-
-                slice_df()[slice_df()[[hover_var()]] == brain_region, ] %>%
-                dplyr::filter(hemisphere == {{hemisphere}})
-
-            } else if(interaction_dims() == "3D"){
-
-              voxel_subset <-
-                dplyr::filter(
-                  .data = voxel_df(),
-                  !!rlang::sym(hvar) == {{brain_region}} & hemisphere == {{hemisphere}}
-                )
-
-            }
-
-            # apply
-            voxel_ids_area <- voxel_subset$id
-
-            voxel_df({
-
-              dplyr::mutate(
-                .data = voxel_df(),
-                selected = id %in% {{voxel_ids_area}} | selected
-              )
-
-            })
-
-            # Done. End of the observer updates slice position.
-
-          # 1.2: already selected -> go to refinement mode
-          } else if(slice_df_hover()$selected){
-
-            mode("refinement")
-
-          }
-
-        # 2. scenario: use dblclick for deselection
-        } else if(selection_erase()) {
-
-          # validity check
-          region_test <-
+          voxel_subset <-
             dplyr::filter(
-              .data = selected_brain_areas(),
-              hemisphere == {{hemisphere}} &  !!rlang::sym(hvar) == {{brain_region}}
+              .data = voxel_df(),
+              !!rlang::sym(hvar) == {{brain_region}} & hemisphere == {{hemisphere}}
             )
 
-          if(nrow(region_test) == 0){
+        }
 
-            shiny::showNotification(
-              ui = "You are trying to erase a brain area that has not been selected yet.",
-              duration = 5,
-              type = "warning"
-            )
+        # apply
+        voxel_ids_area <- voxel_subset$id
 
-            shiny::req(FALSE)
-
-          }
-
-          # extract required data
-          if(interaction_dims() == "2D"){
-
-            slice_indices <- slice_idx()
-
-            voxel_subset <-
-              slice_df()[slice_df()[[hover_var()]] == brain_region, ] %>%
-              dplyr::filter(hemisphere == {{hemisphere}})
-
-          } else if(interaction_dims() == "3D"){
-
-            voxel_subset <-
-              dplyr::filter(
-                .data = voxel_df(),
-                !!rlang::sym(hvar) == {{brain_region}} & hemisphere == {{hemisphere}}
-              )
-
-          }
-
-          # apply
-          voxel_ids_area <- voxel_subset$id
+        if(!slice_df_hover()$selected){
 
           voxel_df({
 
             dplyr::mutate(
               .data = voxel_df(),
-              selected = dplyr::if_else(id %in% {{voxel_ids_area}}, FALSE, selected)
+              selected = id %in% {{voxel_ids_area}} | selected
             )
 
           })
 
-          # Done. End of the observer updates slice position.
+        } else if(slice_df_hover()$selected){
+
+          voxel_df({
+
+            dplyr::mutate(
+              .data = voxel_df(),
+              selected = dplyr::if_else(id %in% {{voxel_ids_area}}, true = FALSE, false = selected)
+            )
+
+          })
 
         }
+
+        # Done. End of the observer updates slice position.
 
         # --- update slice position --- #
         slice_pos[[plane]] <- slice_idx()
@@ -2219,16 +1909,35 @@ moduleMriPlaneServer <- function(id,
 
         } else if(interaction_dims() == "3D"){
 
-          voxel_df({
+          if(!selection_erase()){
 
-            propagate_selection_3D(
-              voxel_df = voxel_df(),
-              selection_mask = selection_mask(),
-              selection_plane = plane,
-              erase = selection_erase()
-            )
+            voxel_df({
 
-          })
+              propagate_selection_3D(
+                voxel_df = voxel_df(),
+                selection_mask = selection_mask(),
+                selection_plane = plane,
+                erase = FALSE
+              )
+
+            })
+
+          } else {
+
+            voxel_df({
+
+              apply_erase_mask(
+                voxel_df = voxel_df(),
+                erase_mask = selection_mask(),
+                erase_mask_slice = slice_idx(),
+                erase_mask_plane = plane
+              )
+
+            })
+
+          }
+
+
 
         }
 
@@ -2247,188 +1956,11 @@ moduleMriPlaneServer <- function(id,
 
         selection_mask(data.frame())
 
-      })
-
-      # 3. Mode: Refinement -----------------------------------------------------
-
-      # refinement_voxel_id() via dblclick triggers refinement mode
-      # -> voxel is given to controler. Controler sets global mode to
-      # refinment, identifies brain
-      # region of interest in lgl variable broi of the voxel_df(),
-      # and adjusts color code to highlight brain region.
-
-      # ----- Reactive Values
-
-      refinement_mask <- shiny::reactiveVal(value = data.frame())
-
-      # initiate as reactiveVal to allow a switch to refinement
-      # mode via dbl click in selection mode without interfering
-      # with dbl click to start refine paintbrush
-      refinement_tool <- shiny::reactiveVal("region_click")
-
-      refinement_voxel_id <- shiny::reactiveVal(value = NULL)
-
-      # ----- Reactive (Expressions)
-
-      # voxels of the brain region of interest
-      broi_mask <- shiny::reactive({ dplyr::filter(voxel_df(), selected) })
-
-      broi_pixels <- shiny::reactive({
-
-        broi_mask()[["id"]][broi_mask()[[axis_ccs]] == slice_idx()]
-
-      })
-
-      broi_voxels <- shiny::reactive({ broi_mask()$id })
-
-      refinement_active <- shiny::reactive({ nrow(refinement_mask()) != 0 })
-
-      refinement_color <- shiny::reactive({ ifelse(!refinement_erase(), "steelblue", "red")})
-
-      refinement_erase <- shiny::reactive({ stringr::str_detect(refinement_tool(), pattern = "_erase$" )})
-
-      refinement_template <- shiny::reactive({
-
-        # remove selected non-broi voxels
-          dplyr::select(
-            .data = voxel_df()[voxel_df()[[axis_ccs]] == slice_idx(), ],
-            id,
-            selected,
-            color,
-            !!!ra_ccs
-          )
-
-      })
-
-      safety_margin <- shiny::reactive({ input$safety_margin })
-
-
-      # ----- Observers
-
-      # ----- Observe Events
-
-      shiny::observeEvent(input$enter_refinement, {
-
-        mode("refinement")
-
-      })
-
-      shiny::observeEvent(input$leave_refinement, {
-
-        refinement_voxel_id(NULL)
-
-        voxel_df({ leave_refinement_mode(voxel_df()) })
-
-        mode("selection")
-
-      })
-
-      shiny::observeEvent(input$refinement_tool, {
-
-        refinement_tool(input$refinement_tool)
-
-      })
-
-      # --- MRI interaction
-
-      # --- dblclick + paintbrush -> updates refinemnt_mask()
-      shiny::observeEvent(input$mriPlot_dblclick, {
-
-        shiny::req({
-          mode() == "refinement" &
-          stringr::str_detect(refinement_tool(), pattern = "paintbrush")
-          })
-
-        # initiate drawing logic for paintbrush
-        if(!drawing_active()){
-
-          # initiate with broi voxels of this slice (=pixels)
-          # see # -- drawing logic
-          # refinment_erase() -> reduced with setdiff()
-          # !refinement_erase() -> expanded with c()
-          data$paintbrush <- broi_pixels()
-
-          drawing_active(TRUE)
-
-          # from drawing to stop drawing: update refinement_mask()
-        } else if(drawing_active()){
-
-          if(!refinement_erase()){
-
-            # voxels that are selected after paintbrush run
-            # but are not broi pixels = margin pixels
-            mask_ids <- setdiff(paintbrush_selected_ids(), broi_pixels())
-
-            # make margin_mask with selected lgl variable ->
-            refinement_mask({
-
-              dplyr::mutate(
-                .data = interaction_template(),
-                margin = id %in% {{mask_ids}}
-                )
-
-            })
-
-          } else if(refinement_erase()) {
-
-            # pixels that are broi pixels but are not part of the pixels
-            # after the paintbrush run -> erase pixels
-            mask_ids <- setdiff(broi_pixels(), paintbrush_selected_ids())
-
-            # make erase_mask with erased lgl variable
-            refinement_mask({
-
-              dplyr::mutate(
-                .data = interaction_template(),
-                erased = selected & id %in% {{mask_ids}}
-              )
-
-            })
-
-
-          }
-
-          drawing_active(FALSE)
-
-        }
-
-      })
-
-      shiny::observeEvent(refinement_mask(), {
-
-        if(refinement_erase()){
-
-          voxel_df({
-
-            apply_erase_mask(
-              voxel_df = voxel_df(),
-              erase_mask = refinement_mask(),
-              erase_mask_slice = slice_idx(),
-              erase_mask_plane = plane
-            )
-
-          })
-
-        }
-
-      })
-
-
-
-      # ----- Outputs (Plot)
-
-      # ----- reactive values
-
-
+      }, ignoreInit = TRUE)
 
       # SORT --------------------------------------------------------------------
 
       # ----- observers MRI interaction
-
-      # --- dblclick #!!!! split into interaction modes -> dblclick switches to refinement
-
-
-
 
 
       # LAST: Module Output -----------------------------------------------------
@@ -2438,8 +1970,7 @@ moduleMriPlaneServer <- function(id,
         shiny::req("link" %in% input$mri_opts)
 
         list(
-          mode = mode(),
-          refinement_voxel_id = refinement_voxel_id(),
+          drawing_active = drawing_active(),
           selection_backward = selection_backward_count(),
           slice_pos = slice_pos,
           voxel_df = voxel_df()

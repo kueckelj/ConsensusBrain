@@ -2,9 +2,10 @@
 
 # objects -----------------------------------------------------------------
 
-ccs_labels <- c("x", "y", "z")
-mri_planes <- c("sag", "axi", "cor")
-mri_planes_pretty <- c("sag" = "Sagittal", "axi" = "Axial", "cor" = "Coronal")
+# do not change the order!
+ccs_labels <- c("x", "z", "y")
+mri_planes <- c("sag", "cor", "axi")
+mri_planes_pretty <- c("sag" = "Sagittal", "cor" = "Coronal",  "axi" = "Axial")
 
 # functions ---------------------------------------------------------------
 
@@ -98,8 +99,6 @@ apply_erase_mask <- function(voxel_df,
     )
 
   for(broi in names(erase_mask_mapping)){
-
-    print(broi)
 
     voxel_df <-
       refine3D_erase(
@@ -225,14 +224,10 @@ blend_colors <- function(color_list, weights = NULL) {
 
 }
 
-buffer_range <- function(r, buffer, max = 256){
+buffer_range <- function(r, buffer){
 
   r[1] <- r[1]-buffer
   r[2] <- r[2]+buffer
-
-  if(r[1] < 0){ r[1] <- 0}
-
-  if(r[2] > max){ r[2] <- max}
 
   return(r)
 
@@ -341,7 +336,7 @@ comp_selection_bb <- function(voxel_df, distance = NULL){
     .f = function(axis){
 
       range(voxel_df[voxel_df$selected,][[axis]], na.rm = TRUE) %>%
-        buffer_range(buffer = distance, max = max(voxel_df[[axis]], na.rm = TRUE))
+        buffer_range(buffer = distance)
 
     }
   ) %>%
@@ -350,13 +345,33 @@ comp_selection_bb <- function(voxel_df, distance = NULL){
 }
 
 
-ConsensusBrain <- function(){
+ConsensusBrain <- function(nifti_object = NULL){
+
+  # draw from package data
+  if(is.null(nifti_object)){ nifti_object <- mni_template }
+
+  print("Nifti Object:")
+  print(nifti_object)
 
   shiny::runApp(
-    appDir = shinyApp(ui = ConsensusBrainUI, ConsensusBrainServer)
+    appDir =
+      shinyApp(
+        ui = ConsensusBrainUI,
+        server = function(input, output, session){
+
+          ConsensusBrainServer(
+            input = input,
+            output = output,
+            session = session,
+            nifti_object = nifti_object
+            )
+
+        }
+      )
     )
 
 }
+
 
 
 CBscore_label_var <- function(voxel_df, score_set_up){
@@ -532,6 +547,24 @@ exchange_raster_colors <- function(mri_list,
 
       }
     )
+
+}
+
+get_slice <- function(nifti, plane, slice){
+
+  if(plane == "sag"){
+
+    t(nifti[slice,,])
+
+  } else if(plane == "axi"){
+
+    t(nifti[,,slice])
+
+  } else if(plane == "cor"){
+
+    t(nifti[,slice,])
+
+  }
 
 }
 
@@ -962,6 +995,65 @@ plane_to_ccs <- function(plane){
   unname(out)
 
 }
+
+prepare_margin_selection <- function(voxel_df, dist_max){
+
+  voxel_df <- identify_brois(voxel_df)
+
+  brois <- unique(voxel_df$broi)
+  brois <- brois[!is.na(brois)]
+
+  cand_df <-
+    purrr::map_df(
+      .x = brois,
+      .f = function(broi){
+
+        voxel_broi <- dplyr::filter(voxel_df, broi == {{broi}} & !is_margin)
+
+        voxel_margin <- dplyr::filter(voxel_df, !selected)
+
+        hemisphere_vals <-
+          dplyr::pull(voxel_broi, hemisphere) %>%
+          unique()
+
+        if(length(hemisphere_vals) == 1){
+
+          voxel_margin <- dplyr::filter(voxel_margin, hemisphere == hemisphere_vals)
+
+        }
+
+        bb <- comp_selection_bb(voxel_broi, distance = dist_max)
+
+        voxel_margin <-
+          dplyr::filter(
+            .data = voxel_margin,
+            # within bounding box of potential distance
+            x > bb$x[[1]] & x < bb$x[[2]] &
+            y > bb$y[[1]] & y < bb$y[[2]] &
+            z > bb$z[[1]] & z < bb$z[[2]]
+          )
+
+        voxel_margin <-
+          comp_dist_to_closest_voxel(voxel_margin, voxel_ref = voxel_broi) %>%
+          dplyr::filter(dist <= {{dist_max}})
+
+        return(voxel_margin[, c("id", "dist")])
+
+      }
+    ) %>%
+    dplyr::distinct()
+
+  out <-
+    dplyr::left_join(
+      x = dplyr::select(voxel_df, -dplyr::any_of("dist")),
+      y = cand_df,
+      by = "id"
+    )
+
+  return(out)
+
+}
+
 
 # goal: propagate the voxels to be erased along the slice levels by mapping
 # the selection state of the erase mask voxels
@@ -1486,7 +1578,19 @@ read_non_brain_template<- function(path = "data/meta/non_brain_template.RDS"){
 
 reduce_stack <- function(stacks, which){
 
-  stacks[[which]] <- stacks[[which]][1:(length(stacks[[which]])-1)]
+  if(length(stacks[[which]]) == 0){
+
+    # nothing
+
+  } else if(length(stacks[[which]]) == 1){
+
+    stacks[[which]] <- list()
+
+  } else {
+
+    stacks[[which]] <- stacks[[which]][1:(length(stacks[[which]])-1)]
+
+  }
 
   return(stacks)
 

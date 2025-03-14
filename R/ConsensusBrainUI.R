@@ -61,6 +61,10 @@ ConsensusBrainUI <- function(){
             tabName = "tab_corpus_callosum"
           ),
           shinydashboard::menuSubItem(
+            text = "Infratentorial",
+            tabName = "tab_infratentorial"
+          ),
+          shinydashboard::menuSubItem(
             text = "White Matter Tracts",
             tabName = "tab_wm_tracts"
           ),
@@ -150,6 +154,14 @@ ConsensusBrainUI <- function(){
           tabName = "tab_corpus_callosum",
 
           moduleWorkflowMacroAreaUI(id = "workflow_corpus_callosum")
+
+        ),
+
+        # Infratentorial
+        shinydashboard::tabItem(
+          tabName = "tab_infratentorial",
+
+          moduleWorkflowMacroAreaUI(id = "workflow_infratentorial")
 
         ),
 

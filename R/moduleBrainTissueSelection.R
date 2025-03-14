@@ -73,25 +73,12 @@ moduleBrainTissueSelectionUI <- function(id){
               selected = c("left", "right"),
               checkIcon = list(yes = shiny::icon("ok", lib = "glyphicon"))
             )
-          )
-        ),
-        shiny::HTML("<br>"),
-        shiny::fluidRow(
+          ),
           shiny::column(
             width = 6,
             align = "center",
-            shinyWidgets::switchInput(
-              inputId = ns("remaining_only"),
-              label = "Only Remaining Tissue",
-              size = "normal",
-              onLabel = "Yes",
-              offLabel = "No",
-              labelWidth = "120px",
-              value = TRUE,
-              width = "100%"
-            )
-          ),
-          shiny::uiOutput(ns("wm_assoc"))
+            shiny::uiOutput(outputId = ns("remaining_only"))
+          )
         )
       ),
 
@@ -228,23 +215,23 @@ moduleBrainTissueSelectionServer <- function(id,
 
       })
 
-      output$wm_assoc <- shiny::renderUI({
+      output$remaining_only <- shiny::renderUI({
 
-        shiny::req(macro_area != "wm_tract")
+        shiny::req({
 
-        shiny::column(
-          width = 6,
-          align = "center",
-          shinyWidgets::switchInput(
-            inputId = ns("wm_assoc"),
-            label = "Associated White Matter",
-            size = "normal",
-            onLabel = "Yes",
-            offLabel = "No",
-            labelWidth = "120px",
-            value = FALSE,
-            width = "100%"
-          )
+          any(voxel_df_input()[voxel_df_input()$ann_macro %in% macro_area,][["CBscore"]] != 0)
+
+
+        })
+
+        shinyWidgets::switchInput(
+          inputId = ns("remaining_only"),
+          label = "Scoring Filter",
+          size = "normal",
+          onLabel = "Unscored Only",
+          offLabel = "All Tissues",
+          value = FALSE,
+          width = "100%"
         )
 
       })
@@ -287,12 +274,22 @@ moduleBrainTissueSelectionServer <- function(id,
 
         } else {
 
-          choices_out <-
-            dplyr::filter(.data = voxel_df_input(), ann_macro %in% {{macro_area}})[[ann_var()]] %>%
-            unique() %>%
-            sort()
+          if(stringr::str_detect(macro_area, pattern = "lobe$")){
+
+            choices_out <- cortical_regions[[ann_var()]][[macro_area]]
+
+          } else {
+
+            choices_out <-
+              dplyr::filter(.data = voxel_df_input(), ann_macro %in% {{macro_area}})[[ann_var()]] %>%
+              unique() %>%
+              sort()
+
+          }
 
         }
+
+        choices_out <- sort(choices_out)
 
         names(choices_out) <- make_pretty_label(choices_out)
 
@@ -361,14 +358,18 @@ moduleBrainTissueSelectionServer <- function(id,
         }
 
         # by white matter
-        if(!input$wm_assoc){
+        if(is.logical(input$wm_assoc)){
 
-          out <- out[!out$is_wm,]
+          if(!input$wm_assoc){
+
+            out <- out[!out$is_wm,]
+
+          }
 
         }
 
         # only remaining score
-        if(shiny::isTrue(input$remaining_only)){
+        if(isTRUE(input$remaining_only)){
 
           out <- out[out$CBscore == 0,]
 

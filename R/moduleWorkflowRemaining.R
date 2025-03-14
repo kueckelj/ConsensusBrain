@@ -47,7 +47,7 @@ moduleWorkflowRemainingUI <- function(id){
 
 moduleWorkflowRemainingServer <- function(id,
                                           voxel_df_input,
-                                          mri_list_T1){
+                                          nifti_input){
 
   shiny::moduleServer(
     id = id,
@@ -275,7 +275,7 @@ moduleWorkflowRemainingServer <- function(id,
           id = "mri",
           mode_init = "inspection",
           voxel_df = shiny::reactive({ voxel_df_input() }),
-          mri_list = shiny::reactive({ mri_list_T1 }),
+          nifti_input = shiny::reactive({ nifti_input() }),
           external_selection = shiny::reactive({ selected_broi() }),
           external_selection_opts = list(use_colors = TRUE)
         )

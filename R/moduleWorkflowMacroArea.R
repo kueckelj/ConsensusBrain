@@ -32,7 +32,7 @@ moduleWorkflowMacroAreaUI <- function(id){
 moduleWorkflowMacroAreaServer <- function(id,
                                           macro_area,
                                           voxel_df_input,
-                                          mri_list_T1){
+                                          nifti_input){
 
   macro_color <- unname(consensus_clrps[["ann_macro"]][macro_area])
 
@@ -44,7 +44,7 @@ moduleWorkflowMacroAreaServer <- function(id,
 
       voxel_df <- shiny::reactive({
 
-        dplyr::mutate(voxel_df_input(), color = alpha({{macro_color}}, 0.45))
+        dplyr::mutate(voxel_df_input(), color = alpha({{macro_color}}, alpha_val))
 
       })
 
@@ -60,9 +60,9 @@ moduleWorkflowMacroAreaServer <- function(id,
       module_mri <-
         moduleMriServer(
           id = "mri",
-          mode_init = "inspection",
+          mode_init = "selection",
           voxel_df = shiny::reactive({ voxel_df() }),
-          mri_list = shiny::reactive({ mri_list_T1 }),
+          nifti_input = shiny::reactive({ nifti_input() }),
           external_selection = shiny::reactive({ mo_selection() })
         )
 

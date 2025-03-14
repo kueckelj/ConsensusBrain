@@ -1,7 +1,7 @@
 
 
 
-moduleMriUI <- function(id, ...){
+moduleMriUI <- function(id = "mri", ...){
 
   ns <- shiny::NS(id)
 
@@ -30,16 +30,23 @@ moduleMriUI <- function(id, ...){
         moduleMriPlaneUI(id = ns("mri_plane_cor"), plane = "cor", ...),
       )
 
+    ),
+
+    shiny::fluidRow(
+      shiny::column(
+        width = 12,
+        align = "center",
+        moduleMriControlUI(id = ns("mri_control"))
+      )
     )
   )
 
 
 }
 
-moduleMriServer <- function(id,
-                            voxel_df,
-                            mri_list,
-                            mri_frame = c(1, 256),
+moduleMriServer <- function(id = "mri",
+                            voxel_df = function(){ load_consensus_template() },
+                            nifti_input = function(){ mni_template },
                             mode_init = "inspection",
                             external_selection = function(){ NULL },
                             external_selection_opts = list()){
@@ -54,8 +61,7 @@ moduleMriServer <- function(id,
         moduleMriPlaneServer(
           id = "mri_plane_sag",
           mri_control = shiny::reactive({ mri_control() }),
-          mri_list = shiny::reactive({ mri_list() }),
-          mri_frame = mri_frame,
+          nifti_input = shiny::reactive({ nifti_input() }),
           plane = "sag"
         )
 
@@ -63,8 +69,7 @@ moduleMriServer <- function(id,
         moduleMriPlaneServer(
           id = "mri_plane_axi",
           mri_control = shiny::reactive({ mri_control() }),
-          mri_list = shiny::reactive({ mri_list() }),
-          mri_frame = mri_frame,
+          nifti_input = shiny::reactive({ nifti_input() }),
           plane = "axi"
         )
 
@@ -72,8 +77,7 @@ moduleMriServer <- function(id,
         moduleMriPlaneServer(
           id = "mri_plane_cor",
           mri_control = shiny::reactive({ mri_control() }),
-          mri_list = shiny::reactive({ mri_list() }),
-          mri_frame = mri_frame,
+          nifti_input = shiny::reactive({ nifti_input() }),
           plane = "cor"
         )
 
