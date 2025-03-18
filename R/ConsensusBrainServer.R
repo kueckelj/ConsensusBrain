@@ -1,6 +1,12 @@
 
 ConsensusBrainServer <- function(input, output, session, nifti_object){
 
+
+  # Global ------------------------------------------------------------------
+  shinyhelper::observe_helpers()
+
+
+
   cb_df <- shiny::reactiveVal({
 
     dplyr::mutate(
@@ -10,6 +16,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
       broi = FALSE,
       color = alpha("forestgreen", alpha_val),
       is_margin = FALSE,
+      is_margin_cand = FALSE,
       # variables for score assignment
       CBscore = 0
     )

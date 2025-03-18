@@ -27,6 +27,21 @@ abbr <- function(text){
 
 }
 
+add_helper <- function(shiny_tag, name){
+
+  help_info <- CB_help[[name]]
+
+  if(is.null(help_info$title)){ title <- make_pretty_label(name) }
+
+  shinyhelper::helper(
+    shiny_tag = shiny_tag,
+    title = title,
+    type = help_info$type,
+    content = help_info$content
+    )
+
+}
+
 add_to_stack <- function(stacks, which, what){
 
   stacks[[which]][[length(stacks[[which]])+1]] <- what
@@ -298,6 +313,40 @@ comp_dist_to_closest_voxel <- function(voxel_margin, voxel_ref){
   return(voxel_margin)
 
 }
+
+comp_outline_bb <- function(outlines){
+
+  prel <-
+    purrr::imap(
+      .x = outlines,
+      .f = function(outline, plane){
+
+        ra_ccs <- req_axes_2d(plane, ccs_val = FALSE)
+
+        dplyr::rename(outline, !!!ra_ccs) %>%
+          purrr::map(.f = ~ round(range(.x)))
+
+      }
+    )  %>% purrr::flatten()
+
+  out <- list()
+
+  out$x <-
+    purrr::flatten_int(prel[names(prel) == "x"]) %>%
+    range()
+
+  out$y <-
+    purrr::flatten_int(prel[names(prel) == "y"]) %>%
+    range()
+
+  out$z <-
+    purrr::flatten_int(prel[names(prel) == "z"]) %>%
+    range()
+
+  return(out)
+
+}
+
 
 comp_progress_values <- function(voxel_df, var, values){
 
@@ -673,6 +722,66 @@ identify_brois <- function(voxel_df){
 
 }
 
+identify_obs_in_outlines <- function(voxel_df, outlines){
+
+  outlines <- purrr::keep(outlines, .p = ~ nrow(.x) > 3)
+
+  bb <- comp_outline_bb(outlines)
+
+  outline_sub <-
+    dplyr::filter(
+      .data = voxel_df,
+      x > min(bb$x) & x < max(bb$x) &
+        y > min(bb$y) & y < max(bb$y) &
+        z > min(bb$z) & z < max(bb$z)
+    )
+
+  ids_all <-
+    purrr::imap(
+      .x = outlines,
+      .f = function(outline, plane){
+
+        axis_plane <- switch_axis_label(plane)
+        ra_ccs <- req_axes_2d(plane)
+
+        slices <- sort(unique(outline_sub[[axis_plane]]))
+
+        plane_ids <-
+          purrr::map(
+            .x = slices,
+            .f = function(slice){
+
+              slice_df <-
+                dplyr::filter(outline_sub, !!rlang::sym(axis_plane) == {{slice}}) %>%
+                dplyr::select(id, !!!ra_ccs)
+
+              identify_obs_in_polygon(
+                interaction_template = slice_df,
+                polygon_df = outline,
+                strictly = FALSE,
+                opt = "keep"
+              )[["id"]]
+
+            }
+          ) %>%
+          purrr::flatten_chr()
+
+        return(plane_ids)
+
+      }
+    ) %>%
+    purrr::flatten_chr()
+
+
+  ids_count <- table(ids_all)
+  ids_selected <- names(ids_count[ids_count == length(outlines)])
+
+  return(ids_selected)
+
+
+}
+
+
 identify_obs_in_polygon <- function(interaction_template,
                                     polygon_df,
                                     strictly,
@@ -813,7 +922,8 @@ load_consensus_template <- function(as_df = TRUE){
         # ann_macro == "white_matter" -> subcortical structures hold priority (e.g. Thalamus > Radiatio thalamica)
         is_tract = wm_tract != "none" & !stringr::str_detect(wm_tract, pattern = "wma_"),
         hemisphere = dplyr::if_else(x > 127, true = "left", false = "right"),
-        id = paste0("x", x, "y", y, "z", z)
+        id = paste0("x", x, "y", y, "z", z),
+        tissue_type = dplyr::if_else(condition = is_wm, true = "White Matter", false = "Grey Matter")
       ) %>%
       tibble::as_tibble()
 

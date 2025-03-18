@@ -60,6 +60,7 @@ moduleMriServer <- function(id = "mri",
       mri_plane_sag <-
         moduleMriPlaneServer(
           id = "mri_plane_sag",
+          mode_init = mode_init,
           mri_control = shiny::reactive({ mri_control() }),
           nifti_input = shiny::reactive({ nifti_input() }),
           plane = "sag"
@@ -68,6 +69,7 @@ moduleMriServer <- function(id = "mri",
       mri_plane_axi <-
         moduleMriPlaneServer(
           id = "mri_plane_axi",
+          mode_init = mode_init,
           mri_control = shiny::reactive({ mri_control() }),
           nifti_input = shiny::reactive({ nifti_input() }),
           plane = "axi"
@@ -76,6 +78,7 @@ moduleMriServer <- function(id = "mri",
       mri_plane_cor <-
         moduleMriPlaneServer(
           id = "mri_plane_cor",
+          mode_init = mode_init,
           mri_control = shiny::reactive({ mri_control() }),
           nifti_input = shiny::reactive({ nifti_input() }),
           plane = "cor"
