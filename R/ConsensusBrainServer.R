@@ -17,6 +17,12 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
       color = alpha("forestgreen", alpha_val),
       is_margin = FALSE,
       is_margin_cand = FALSE,
+      smart_label =
+        dplyr::case_when(
+          is_wm ~ "wm",
+          ann_macro == "corpus_callosum" ~ "cc",
+          TRUE ~ ann_dk_adj
+        ),
       # variables for score assignment
       CBscore = 0
     )
@@ -305,12 +311,9 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
   output$circular_progress_plot <- shiny::renderPlot({
 
-    progress <- sum(cb_df()$CBscore != 0)/nrow(cb_df())
-
-    circular_progress_plot(progress = progress)
+    circular_progress_plot(cb_df(), score_set_up = score_set_up)
 
   })
-
 
 
 }

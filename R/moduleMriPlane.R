@@ -500,9 +500,6 @@ moduleMriPlaneServer <- function(id,
   col_axis <- ra_mri["col"]
   row_axis <- ra_mri["row"]
 
-  # account for inversed y-representation of the axial row slider
-  #voxel_df[[ra_ccs["row"]]] <- (256 - voxel_df[[ra_ccs["row"]]])+1
-
   shiny::moduleServer(
     id = id,
     module = function(input, output, session){
@@ -515,11 +512,15 @@ moduleMriPlaneServer <- function(id,
         #assign(x = "data", value = reactiveValuesToList(data), envir = .GlobalEnv)
         print("-----------------------")
         print("Test")
-        voxel_df({ ctp_df })
 
       }, ignoreInit = TRUE)
 
       shiny::observe({
+
+      })
+
+      shiny::observe({
+
 
       })
 
@@ -553,21 +554,21 @@ moduleMriPlaneServer <- function(id,
                 label = "Confirm",
                 icon = shiny::icon(name = "check"),
                 width = "100%",
-                disabled = outline_btns_disabled()
+                disabled = btns_disabled_outline()
               ),
               shiny::actionButton(
                 inputId = ns("outline_backward"),
                 label = "Backwards",
                 icon = shiny::icon(name = "step-backward"),
                 width = "100%",
-                disabled = outline_btns_disabled()
+                disabled = btns_disabled_outline()
               ),
               shiny::actionButton(
                 inputId = ns("outline_reset"),
                 label = "Reset",
                 icon = shiny::icon(name = "trash"),
                 width = "100%",
-                disabled = outline_btns_disabled()
+                disabled = btns_disabled_outline()
               ),
               div(),  # Empty div creates spacing
               shiny::actionButton(
@@ -575,18 +576,77 @@ moduleMriPlaneServer <- function(id,
                 label = "Focus",
                 icon = shiny::icon(name = "crosshairs"),
                 width = "100%",
-                disabled = outline_btns_disabled()
+                disabled = btns_disabled_outline()
               )
             )
           )
 
-        } else if(selection_tool() == "paintbrush"){
+        } else if(mri_control_input$selection_tool == "paintbrush"){
 
           shiny::column(
             offset = 1,
             width = 10,
             align = "center",
-            shiny::helpText("Double click to start brushing. Double click again to stop and confirm.")
+            shiny::splitLayout(
+              cellWidths = "33%",
+              shiny::actionButton(
+                inputId = ns("paintbrush_confirm"),
+                label = "Select",
+                width = "100%",
+                disabled = btns_disabled_paintbrush()
+              ),
+              shiny::actionButton(
+                inputId = ns("paintbrush_backward"),
+                label = "Backward",
+                icon = shiny::icon(name = "step-backward"),
+                width = "100%",
+                disabled = btns_disabled_paintbrush()
+              ),
+              shiny::actionButton(
+                inputId = ns("paintbrush_reset"),
+                label = "Reset",
+                icon = shiny::icon(name = "trash"),
+                width = "100%",
+                disabled = btns_disabled_paintbrush()
+              )
+            )
+          )
+
+        } else if(mri_control_input$selection_tool == "paintbrush_erase"){
+
+          shiny::column(
+            offset = 1,
+            width = 10,
+            align = "center",
+            shiny::splitLayout(
+              cellWidths = "25%",
+              shiny::actionButton(
+                inputId = ns("paintbrush_erase_confirm2D"),
+                label = "Erase 2D",
+                width = "100%",
+                disabled = btns_disabled_paintbrush_erase()
+              ),
+              shiny::actionButton(
+                inputId = ns("paintbrush_erase_confirm3D"),
+                label = "Erase 3D",
+                width = "100%",
+                disabled = btns_disabled_paintbrush_erase()
+              ),
+              shiny::actionButton(
+                inputId = ns("paintbrush_erase_backward"),
+                label = "Backward",
+                icon = shiny::icon(name = "step-backward"),
+                width = "100%",
+                disabled = btns_disabled_paintbrush_erase()
+              ),
+              shiny::actionButton(
+                inputId = ns("paintbrush_erase_reset"),
+                label = "Reset",
+                icon = shiny::icon(name = "trash"),
+                width = "100%",
+                disabled = btns_disabled_paintbrush_erase()
+              )
+            )
           )
 
         } else if(selection_tool() == "safety_margin"){
@@ -604,6 +664,25 @@ moduleMriPlaneServer <- function(id,
 
 
       # Reactive Values ---------------------------------------------------------
+
+      mri_control_input <-
+        shiny::reactiveValues(
+          cursor_on_plane = character(1),
+          interaction_dims = character(1),
+          mode = character(1),
+          outlines = list(),
+          paintbrush_depth = numeric(1),
+          paintbrush_direction = character(1),
+          paintbrush_mode = character(1),
+          paintbrush_radius = numeric(1),
+          #pbr_fct = numeric(1),
+          slice_state = list(),
+          selected_voxels = character(1),
+          selection_erase = logical(1),
+          selection_scope = character(1),
+          selection_tool = character(1),
+          voxel_df = data.frame()
+        )
 
       stacks <- shiny::reactiveValues(zoom = list())
 
@@ -654,7 +733,9 @@ moduleMriPlaneServer <- function(id,
 
       mode <- shiny::reactiveVal(mode_init)
 
-      outline_btns_disabled <- shiny::reactiveVal(value = TRUE)
+      btns_disabled_outline <- shiny::reactiveVal(value = TRUE)
+      btns_disabled_paintbrush <- shiny::reactiveVal(value = TRUE)
+      btns_disabled_paintbrush_erase <- shiny::reactiveVal(value = TRUE)
 
       reselect <- shiny::reactiveVal(value = "")
 
@@ -663,11 +744,11 @@ moduleMriPlaneServer <- function(id,
       # is immediately updated by the controller input
       voxel_df <- shiny::reactiveVal(data.frame())
 
-      shiny::observeEvent(mri_control()$voxel_df, {
+      shiny::observeEvent(mri_control_input$voxel_df, {
 
-        if(!identical(x = shiny::isolate({ voxel_df() }), y = mri_control()$voxel_df)){
+        if(!identical(x = shiny::isolate({ voxel_df() }), y = mri_control_input$voxel_df)){
 
-          voxel_df({ mri_control()$voxel_df })
+          voxel_df({ mri_control_input$voxel_df })
 
         }
 
@@ -700,9 +781,19 @@ moduleMriPlaneServer <- function(id,
 
           } else {
 
-            text <-
-              make_pretty_label(slice_df_hover()[[hover_var()]]) %>%
-              paste0(" (", slice_df_hover()[["tissue_type"]], ")")
+            text <- make_pretty_label(slice_df_hover()[[selection_scope()]])
+
+            if(slice_df_hover()$is_wm){ text <- paste0("White Matter - ", text) }
+
+            if(slice_df_hover()$is_margin){
+
+              text <- paste0(text, " (Margin)")
+
+            } else if(slice_df_hover()$selected){
+
+              text <- paste0(text, " (Main Selection)")
+
+            }
 
           }
 
@@ -716,7 +807,20 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      hover_var <- shiny::reactive({ "ann_dk_adj" })
+      # none = NULL for identify_obs_within_radius2D/3D()
+      selection_scope <- shiny::reactive({
+
+        if(mri_control_input$selection_scope == "none"){
+
+          NULL
+
+        } else {
+
+          mri_control_input$selection_scope
+
+        }
+
+        })
 
       interaction_color <- shiny::reactive({
 
@@ -728,7 +832,7 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      interaction_dims <- shiny::reactive({ mri_control()$interaction_dims })
+      interaction_dims <- shiny::reactive({ mri_control_input$interaction_dims })
 
       interaction_erase <- shiny::reactive({
 
@@ -775,9 +879,21 @@ moduleMriPlaneServer <- function(id,
 
       n_slices <- shiny::reactive({ dim(nifti_input())[which(c("sag", "cor", "axi") == plane)] })
 
-      paintbrush_radius <- shiny::reactive({ mri_side_length() * paintbrush_radius_fct() })
-      paintbrush_radius_fct <- shiny::reactive({ mri_control()$pbr_fct })
-      paintbrush_selected <- shiny::reactive({ interaction_template()$id %in% paintbrush_selected_ids() })
+      paintbrush_radius <- shiny::reactive({
+
+        #round(mri_side_length() * paintbrush_radius_fct())
+        mri_control_input$paintbrush_radius
+
+        })
+      #paintbrush_radius_fct <- shiny::reactive({ mri_control_input$pbr_fct })
+
+      paintbrush_selected <- shiny::reactive({
+
+        interaction_template()$selected |
+        interaction_template()$id %in% paintbrush_selected_ids()
+
+        })
+
       paintbrush_selected_ids <- shiny::reactive({ data$paintbrush })
 
       row_min <- shiny::reactive({ min(mri_range()[["row"]]) })
@@ -804,9 +920,9 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      slice_axi <- shiny::reactive({ mri_control()$slice_state$axi })
-      slice_cor <- shiny::reactive({ mri_control()$slice_state$cor })
-      slice_sag <- shiny::reactive({ mri_control()$slice_state$sag })
+      slice_axi <- shiny::reactive({ mri_control_input$slice_state$axi })
+      slice_cor <- shiny::reactive({ mri_control_input$slice_state$cor })
+      slice_sag <- shiny::reactive({ mri_control_input$slice_state$sag })
 
       slice_df <- shiny::reactive({ voxel_df()[voxel_df()[[axis_ccs]] == slice_idx(),] })
       slice_df_hover <- shiny::reactive({
@@ -841,11 +957,27 @@ moduleMriPlaneServer <- function(id,
 
       # Observe Events ----------------------------------------------------------
 
-      shiny::observeEvent(mri_control()$mode, {
+      shiny::observeEvent(mri_control(), {
 
-        if(!identical(x = mri_control()$mode, y = mode())){
+        for(nm in names(mri_control())){
 
-          mode({ mri_control()$mode })
+          slot_data <- mri_control()[[nm]]
+
+          if(!identical(x = slot_data, y = mri_control_input[[nm]])){
+
+            mri_control_input[[nm]] <- slot_data
+
+          }
+
+        }
+
+      })
+
+      shiny::observeEvent(mri_control_input$mode, {
+
+        if(!identical(x = mri_control_input$mode, y = mode())){
+
+          mode({ mri_control_input$mode })
 
         }
 
@@ -901,31 +1033,38 @@ moduleMriPlaneServer <- function(id,
           data$outline$col <- c(data$outline$col, cursor_pos()[1])
           data$outline$row <- c(data$outline$row, cursor_pos()[2])
 
-        } else if(drawing_active() & stringr::str_detect(interaction_tool(), pattern = "paintbrush")){
+        } else if(drawing_active() & selection_tool() == "paintbrush"){
 
-          if(!interaction_erase()){
+          new_ids <-
+            identify_obs_within_radius2D(
+              cursor_pos = cursor_pos(),
+              radius = paintbrush_radius(),
+              interaction_template = interaction_template()[!interaction_template()$selected,],
+              preselected_ids = data$paintbrush,
+              selection_scope = selection_scope()
+            )
 
-            data$paintbrush <-
-              c(
-                data$paintbrush,
-                identify_obs_within_radius(
-                  cursor_pos = cursor_pos(),
-                  radius = paintbrush_radius(),
-                  interaction_template = interaction_template(),
-                  preselected_ids = data$paintbrush
-                )
-              )
+          if(length(new_ids) != 0){
 
-          } else if(interaction_erase()) { # do not select but erase
+            data$paintbrush <- c(data$paintbrush, new_ids)
+            data$cursor_pos[[length(data$cursor_pos)+1]] <- cursor_pos()
 
-            voxels_erase <-
-              identify_obs_within_radius(
-                cursor_pos = cursor_pos(),
-                radius = paintbrush_radius(),
-                interaction_template = interaction_template()
-              )
+          }
 
-            data$paintbrush <- setdiff(x = data$paintbrush, y = voxels_erase)
+        } else if(drawing_active() & selection_tool() == "paintbrush_erase"){
+
+          new_ids <-
+            identify_obs_within_radius2D(
+              cursor_pos = cursor_pos(),
+              radius = paintbrush_radius(),
+              interaction_template = interaction_template()[interaction_template()$selected,],
+              preselected_ids = data$paintbrush_erase
+            )
+
+          if(length(new_ids) != 0){
+
+            data$paintbrush_erase <- c(data$paintbrush_erase, new_ids)
+            data$cursor_pos[[length(data$cursor_pos)+1]] <- cursor_pos()
 
           }
 
@@ -934,21 +1073,20 @@ moduleMriPlaneServer <- function(id,
       })
 
       # --- update mode if it has changed within the controller
-      shiny::observeEvent(mri_control()$mode, {
+      shiny::observeEvent(mri_control_input$mode, {
 
-        if(!identical(mode(), mri_control()$mode)) {
+        if(!identical(mode(), mri_control_input$mode)) {
 
-          mode(mri_control()$mode)
+          mode(mri_control_input$mode)
 
         }
 
       }, ignoreNULL = TRUE)
 
-      # adjust outline from the controler side
-      shiny::observeEvent(mri_control()$outlines, {
-print("outlines usage")
-        print(mri_control()$outlines)
-        plane_outline <-  mri_control()$outlines[[plane]]
+      # adjust outline from the controller side
+      shiny::observeEvent(mri_control_input$outlines, {
+
+        plane_outline <- mri_control_input$outlines[[plane]]
 
         # use to reset everything
         if(nrow(plane_outline) == 0){
@@ -959,7 +1097,7 @@ print("outlines usage")
           drawing_outline_confirmed <- data.frame(col = numeric(), row = numeric())
 
         # use to adjust (currently not required)
-        } else if(!identical(x = mri_control()$outlines[[plane]], drawing_outline_confirmed())){
+        } else if(!identical(x = mri_control_input$outlines[[plane]], drawing_outline_confirmed())){
 
           data$outline$col <- plane_outline$col
           data$outline$row <- plane_outline$row
@@ -1135,30 +1273,108 @@ print("outlines usage")
       # --- updates of slice_pos from the controller side
       shiny::observeEvent(slice_sag(), {
 
-        shiny::req("link" %in% input$mri_opts)
-
         if(!is.null(slice_sag()) && shiny::isolate({slice_pos$sag}) != slice_sag()) {
+
           slice_pos$sag <- slice_sag()
+
+          # zoom out if new slice pos is not within current zoom range
+          if(plane != "sag" & length(stacks$zoom) != 0){
+
+            mri_side <- unname(req_axes_2d(plane, ccs_val = FALSE, mri = TRUE)["sag"])
+
+            if(!within_range(slice_pos$sag, mri_range()[[mri_side]])){
+
+              # update localizer
+              shinyWidgets::updateNoUiSliderInput(
+                session = session,
+                inputId = "mri_slider_row",
+                range = c(1, 256)
+              )
+
+              shinyWidgets::updateNoUiSliderInput(
+                session = session,
+                inputId = "mri_slider_col",
+                range = c(1, 256)
+              )
+
+              stacks$zoom <- list()
+
+            }
+
+          }
+
         }
 
       })
 
       shiny::observeEvent(slice_axi(), {
 
-        shiny::req("link" %in% input$mri_opts)
-
         if(!is.null(slice_axi()) && shiny::isolate({slice_pos$axi}) != slice_axi()) {
+
           slice_pos$axi <- slice_axi()
+
+          # zoom out if new slice pos is not within current zoom range
+          if(plane != "axi" & length(stacks$zoom) != 0){
+
+            mri_side <- unname(req_axes_2d(plane, ccs_val = FALSE, mri = TRUE)["axi"])
+
+            if(!within_range(slice_pos$axi, mri_range()[[mri_side]])){
+
+              # update localizer
+              shinyWidgets::updateNoUiSliderInput(
+                session = session,
+                inputId = "mri_slider_row",
+                range = c(1, 256)
+              )
+
+              shinyWidgets::updateNoUiSliderInput(
+                session = session,
+                inputId = "mri_slider_col",
+                range = c(1, 256)
+              )
+
+              stacks$zoom <- list()
+
+            }
+
+          }
+
         }
 
       })
 
       shiny::observeEvent(slice_cor(), {
 
-        shiny::req("link" %in% input$mri_opts)
-
         if(!is.null(slice_cor()) && shiny::isolate({slice_pos$cor}) != slice_cor()) {
+
           slice_pos$cor <- slice_cor()
+
+          # zoom out if new slice pos is not within current zoom range
+          if(plane != "cor" & length(stacks$zoom) != 0){
+
+            mri_side <- unname(req_axes_2d(plane, ccs_val = FALSE, mri = TRUE)["cor"])
+
+            if(!within_range(slice_pos$cor, mri_range()[[mri_side]])){
+
+              # update localizer
+              shinyWidgets::updateNoUiSliderInput(
+                session = session,
+                inputId = "mri_slider_row",
+                range = c(1, 256)
+              )
+
+              shinyWidgets::updateNoUiSliderInput(
+                session = session,
+                inputId = "mri_slider_col",
+                range = c(1, 256)
+              )
+
+              stacks$zoom <- list()
+
+            }
+
+          }
+
         }
 
       })
@@ -1326,10 +1542,40 @@ print("outlines usage")
 
       output$mriPaintbrushPlot <- shiny::renderPlot({
 
-        shiny::req(cursor_pos() & stringr::str_detect(selection_tool(), "paintbrush"))
+        shiny::req(stringr::str_detect(selection_tool(), "paintbrush"))
 
         # plotting context for all drawing options
         plot_mri_frame(col = col_seq(), row = row_seq())
+
+        if(drawing_active() & selection_tool() == "paintbrush"){
+
+          graphics::rect(
+            xleft = interaction_template()[paintbrush_selected(),]$col - 0.5,
+            xright = interaction_template()[paintbrush_selected(),]$col + 0.5,
+            ybottom = interaction_template()[paintbrush_selected(),]$row - 0.5,
+            ytop = interaction_template()[paintbrush_selected(),]$row + 0.5,
+            col = interaction_template()[paintbrush_selected(),]$color,
+            border = NA
+          )
+
+        } else if(drawing_active() & selection_tool() == "paintbrush_erase"){
+
+          graphics::rect(
+            xleft = interaction_template()[interaction_template()$selected,]$col - 0.5,
+            xright = interaction_template()[interaction_template()$selected,]$col + 0.5,
+            ybottom = interaction_template()[interaction_template()$selected,]$row - 0.5,
+            ytop = interaction_template()[interaction_template()$selected,]$row + 0.5,
+            col = dplyr::if_else(
+              condition =
+                interaction_template()[interaction_template()$selected,]$id %in%
+                data$paintbrush_erase,
+              true = alpha("red", 0.45),
+              false = interaction_template()[interaction_template()$selected,]$color
+            ),
+            border = NA
+          )
+
+        }
 
         if(shiny::isTruthy(cursor_pos())){
 
@@ -1342,23 +1588,6 @@ print("outlines usage")
             fg = interaction_color(),
             lwd = 2,
             lty = ifelse(drawing_active(), "solid", "dotted")
-          )
-
-        }
-
-        # paintbrush_selected() is updated live during paintbrushing and
-        # corresponds to a logical vector indicating is selected or not
-        # (paintbrushing is initiated with all selected_voxels() regardless
-        # of how they have been selected during the selection progress)
-        if(drawing_active()){
-
-          graphics::rect(
-            xleft = interaction_template()[paintbrush_selected(),]$col - 0.5,
-            xright = interaction_template()[paintbrush_selected(),]$col + 0.5,
-            ybottom = interaction_template()[paintbrush_selected(),]$row - 0.5,
-            ytop = interaction_template()[paintbrush_selected(),]$row + 0.5,
-            col = interaction_template()[paintbrush_selected(),]$color,
-            border = NA
           )
 
         }
@@ -1381,7 +1610,7 @@ print("outlines usage")
 
       output$mriOutlinePlot <- shiny::renderPlot({
 
-        shiny::req(nrow(drawing_outline()) != 0)
+        shiny::req(nrow(drawing_outline()) != 0 & selection_tool() == "outline")
 
         plot_mri_frame(
           col = drawing_outline()$col,
@@ -1409,7 +1638,6 @@ print("outlines usage")
 
       }, bg = "transparent")
 
-
       output$mriHoverInfoPlot <- shiny::renderPlot({
 
         shiny::req(mri_range())
@@ -1419,7 +1647,7 @@ print("outlines usage")
         plot_mri_frame(col = col_seq(), row = row_seq())
 
         # -- hover text
-        if(hover_show()){
+        if(isTRUE(hover_show())){
 
           shiny::req(hover_text())
 
@@ -1445,6 +1673,57 @@ print("outlines usage")
 
       }, bg = "transparent")
 
+      show_localizer_beam_vertical <- shiny::reactive({
+
+        if(is.null(mri_control_input$paintbrush_mode)){
+
+          FALSE
+
+        } else {
+
+          mri_control_input$selection_tool %in% c("paintbrush", "paintbrush_erase") &
+          mri_control_input$paintbrush_mode == "Beam" &
+          mri_control_input$cursor_on_plane == unname(ra_mri["col"])
+
+        }
+
+      })
+
+      show_localizer_beam_horizontal <- shiny::reactive({
+
+        if(is.null(mri_control_input$paintbrush_mode)){
+
+          FALSE
+
+        } else {
+
+          mri_control_input$selection_tool %in% c("paintbrush", "paintbrush_erase") &
+          mri_control_input$paintbrush_mode == "Beam" &
+          mri_control_input$cursor_on_plane == unname(ra_mri["row"])
+
+        }
+
+      })
+
+      beam_depth <- shiny::reactive({
+
+        pb_dir <- mri_control_input$paintbrush_direction
+        pb_depth <- mri_control_input$paintbrush_depth
+
+        if(pb_dir == "forward"){
+
+          out <- -pb_depth
+
+        } else if(pb_dir == "backward"){
+
+          out <- pb_depth
+
+        }
+
+        return(out)
+
+      })
+
       output$mriLocalizerPlot <- shiny::renderPlot({
 
         shiny::req(!cursor_on_mri())
@@ -1468,6 +1747,28 @@ print("outlines usage")
             col = "red", lwd = 1.5
           )
 
+          if(show_localizer_beam_vertical()){
+
+            # vertical
+            segments(
+              x0 = slice_pos$cor + beam_depth(), x1 = slice_pos$cor + beam_depth(),
+              y0 = row_min(), y1 = row_max(),
+              col = "red", lwd = 1.5, lty = "dotted"
+            )
+
+          }
+
+          if(show_localizer_beam_horizontal()){
+
+            # horizontal
+            segments(
+              x0 = col_min(), x1 = col_max(),
+              y0 = slice_pos$axi + beam_depth(), y1 = slice_pos$axi + beam_depth(),
+              col = "red", lwd = 1.5, lty = "dotted"
+            )
+
+          }
+
         } else if(plane == "axi"){
 
           # vertical
@@ -1484,6 +1785,28 @@ print("outlines usage")
             col = "red", lwd = 1.5
           )
 
+          if(show_localizer_beam_vertical()){
+
+            # vertical
+            segments(
+              x0 = slice_pos$sag + beam_depth(), x1 = slice_pos$sag + beam_depth(),
+              y0 = row_min(), y1 = row_max(),
+              col = "red", lwd = 1.5, lty = "dotted"
+            )
+
+          }
+
+          if(show_localizer_beam_horizontal()){
+
+            # horizontal
+            segments(
+              x0 = col_min(), x1 = col_max(),
+              y0 = slice_pos$cor + beam_depth(), y1 = slice_pos$cor + beam_depth(),
+              col = "red", lwd = 1.5, lty = "dotted"
+            )
+
+          }
+
         } else if(plane == "cor"){
 
           # vertical
@@ -1499,6 +1822,28 @@ print("outlines usage")
             y0 = slice_pos$axi, y1 = slice_pos$axi,
             col = "red", lwd = 1.5
           )
+
+          if(show_localizer_beam_vertical()){
+
+            # vertical
+            segments(
+              x0 = slice_pos$sag + beam_depth(), x1 = slice_pos$sag + beam_depth(),
+              y0 = row_min(), y1 = row_max(),
+              col = "red", lwd = 1.5, lty = "dotted"
+            )
+
+          }
+
+          if(show_localizer_beam_horizontal()){
+
+            # horizontal
+            segments(
+              x0 = col_min(), x1 = col_max(),
+              y0 = slice_pos$axi + beam_depth(), y1 = slice_pos$axi + beam_depth(),
+              col = "red", lwd = 1.5, lty = "dotted"
+            )
+
+          }
 
         }
 
@@ -1624,11 +1969,34 @@ print("outlines usage")
 
       output$mriSelectionStatePlot <- shiny::renderPlot({
 
+        # TRUE if not paintbrushing
         shiny::req(show_selection_state())
 
         if(selection_tool() == "margin"){
 
           voxels_show <- dplyr::filter(interaction_template(), selected | is_margin_cand)
+
+        } else if(selection_tool() == "paintbrush") {
+
+          voxels_show <-
+            dplyr::filter(
+              .data = interaction_template(),
+              selected | id %in% paintbrush_selected_ids()
+            )
+
+        } else if(selection_tool() == "paintbrush_erase"){
+
+          erased_ids <- data$paintbrush_erase
+
+          voxels_show <-
+            dplyr::mutate(
+              .data = dplyr::filter(interaction_template(), selected),
+              color = dplyr::if_else(
+                condition = id %in% {{erased_ids}},
+                true = alpha("red", alpha_val),
+                false = color
+              )
+            )
 
         } else {
 
@@ -1678,16 +2046,19 @@ print("outlines usage")
       # empty flexible data container for temporary progress
       data <-
         shiny::reactiveValues(
+          cursor_pos = list(),
           outline = list(col = numeric(0), row = numeric(0)),
-          paintbrush = character()
+          paintbrush = character(),
+          paintbrush_erase = character()
         )
 
       drawing_outline_confirmed <- shiny::reactiveVal(value = data.frame(col = numeric(), row = numeric()))
 
+      paintbrush_erase_mask <- shiny::reactiveVal(value = data.frame())
+
       selection_backward_count <- shiny::reactiveVal(value = 0)
 
-      # is updated upon dbl_clicking when in selection mode to end drawing mode
-      selection_mask <- shiny::reactiveVal(value = data.frame())
+      paintbrush_selection_mask <- shiny::reactiveVal(value = data.frame())
 
       selection_tool <- shiny::reactiveVal(value = "region_click")
 
@@ -1706,7 +2077,7 @@ print("outlines usage")
 
       selected_brain_areas <- shiny::reactive({
 
-        hvar <- hover_var()
+        hvar <- selection_scope()
 
         out <-
           dplyr::filter(voxel_df(), id %in% selected_voxels()) %>%
@@ -1725,38 +2096,98 @@ print("outlines usage")
 
       })
 
-      # all voxels selected within this MRI plane -> given to the controller
-      # -> distributed to the remaining MRI instances
-      # updated after every selection/erasing instance
       selected_voxels <- shiny::reactive({ voxel_df()$id[voxel_df()$selected] })
 
-      selected_voxels_control <- shiny::reactive({ mri_control()$selected_voxels })
+      selected_voxels_control <- shiny::reactive({ mri_control_input$selected_voxels })
 
       selection_color <- shiny::reactive({ ifelse(!selection_erase(), "forestgreen", "red") })
 
-      selection_erase <- shiny::reactive({ mri_control()$selection_erase })
+      selection_erase <- shiny::reactive({ mri_control_input$selection_erase })
+
+      selection_slices <- shiny::reactive({
+
+        if(mri_control_input$paintbrush_mode == "Beam"){
+
+          if(mri_control_input$paintbrush_direction == "forward") {
+
+            out <- (slice_idx()-mri_control_input$paintbrush_depth):slice_idx()
+
+          } else if(mri_control_input$paintbrush_direction == "backward"){
+
+            out <- slice_idx():(slice_idx()+mri_control_input$paintbrush_depth)
+
+          }
+
+        } else {
+
+          out <- NULL
+
+        }
+
+        return(out)
+
+      })
+
 
       selection_template <- shiny::reactive({
 
         shiny::req(nrow(voxel_df()) != 0)
 
-        dplyr::select(
-          .data = voxel_df()[voxel_df()[[axis_ccs]] == slice_idx(), ],
-          id,
-          selected,
-          color,
-          is_margin,
-          is_margin_cand,
+        out <-
+          dplyr::rename(
+            .data = voxel_df()[voxel_df()[[axis_ccs]] == slice_idx(), ],
+            !!!ra_ccs
+          )
+
+        # unscope white matter for paintbrush tools
+        if(stringr::str_detect(selection_tool(), "paintbrush") & !is.null(selection_scope())){
+
+          out[[selection_scope()]][out$is_wm] <- "white_matter"
+
+        }
+
+        return(out)
+
+      })
+
+      slices_paintbrush <- shiny::reactive({
+
+         c(
+           (slice_idx()-paintbrush_radius()):(slice_idx()-1),
+           slice_idx(),
+           (slice_idx()+1):(slice_idx()+paintbrush_radius())
+           )
+
+      })
+
+      paintbrush3D_template <- shiny::reactive({
+
+        shiny::req(nrow(voxel_df()) != 0)
+
+        dplyr::rename(
+          .data = voxel_df()[voxel_df()[[axis_ccs]] %in% slices_paintbrush(), ],
           !!!ra_ccs
         )
 
       })
 
-      shiny::observeEvent(mri_control()$selection_tool, {
+      shiny::observeEvent(mri_control_input$selection_tool, {
 
-        if(!identical(x = selection_tool(), y = mri_control()$selection_tool)){
+        if(!identical(x = selection_tool(), y = mri_control_input$selection_tool)){
 
-          selection_tool({ mri_control()$selection_tool })
+          # selection_tool() is not updated yet, reset things if required
+          if(stringr::str_detect(selection_tool(), pattern = "paintbrush")){
+
+            data[[selection_tool()]] <- character()
+
+          } else if(selection_tool() == "outline"){
+
+            drawing_outline_confirmed({ data.frame() })
+
+          }
+
+          # update value
+          selection_tool({ mri_control_input$selection_tool })
 
         }
 
@@ -1797,6 +2228,97 @@ print("outlines usage")
 
       # Observe Events (MRI Interaction) ----------------------------------------
 
+      # --- (de-)selection by region click
+      # --- dblclick + region_click -> updates voxel_df() immediately
+      shiny::observeEvent(input$mriPlot_dblclick, {
+
+        shiny::req(mode() == "selection" & selection_tool() == "region_click")
+
+        # validity check
+        if(!cursor_on_brain_tissue()){
+
+          shiny::showNotification(
+            ui = "Can not select non-brain tissue.",
+            duration = 5,
+            type = "error"
+          )
+
+          shiny::req(FALSE)
+
+        }
+
+        hvar <- selection_scope()
+        brain_region <- slice_df_hover()[[hvar]]
+        hemisphere <- slice_df_hover()[["hemisphere"]]
+
+        # 1. scenario: not erasing
+        # extract required data
+        if(FALSE){ #interaction_dims() == "2D"
+
+          slice_indices <- slice_idx()
+
+          voxel_subset <-
+            slice_df()[slice_df()[[selection_scope()]] == brain_region, ] %>%
+            dplyr::filter(hemisphere == {{hemisphere}})
+
+        } else if(TRUE){ # interaction_dims() == "3D"
+
+          voxel_subset <-
+            dplyr::filter(
+              .data = voxel_df(),
+              !!rlang::sym(hvar) == {{brain_region}} & hemisphere == {{hemisphere}}
+            )
+
+        }
+
+        # apply
+        voxel_ids_area <- voxel_subset$id
+
+        if(!slice_df_hover()$selected){
+
+          voxel_df({
+
+            dplyr::mutate(
+              .data = voxel_df(),
+              selected = id %in% {{voxel_ids_area}} | selected
+            )
+
+          })
+
+        } else if(slice_df_hover()$selected){
+
+          voxel_df({
+
+            dplyr::mutate(
+              .data = voxel_df(),
+              selected = dplyr::if_else(id %in% {{voxel_ids_area}}, true = FALSE, false = selected)
+            )
+
+          })
+
+        }
+
+        # Done. End of the observer updates slice position.
+
+        # --- update slice position --- #
+        slice_pos[[plane]] <- slice_idx()
+
+        shinyWidgets::updateNoUiSliderInput(
+          session = session,
+          inputId = "mri_slider_col",
+          value = round(input$mriPlot_dblclick$x)
+        )
+
+        shinyWidgets::updateNoUiSliderInput(
+          session = session,
+          inputId = "mri_slider_row",
+          value = round(input$mriPlot_dblclick$y)
+        )
+
+        # Observer done.
+
+      })
+
       # --- selection by outline
       shiny::observeEvent(input$mriPlot_dblclick, {
 
@@ -1812,14 +2334,14 @@ print("outlines usage")
 
           if(nrow(drawing_outline()) > 3){
 
-            outline_btns_disabled({ FALSE })
+            btns_disabled_outline({ FALSE })
 
             for(outline_btn in c("confirm", "backward", "reset")){
 
               shiny::updateActionButton(
                 session = session,
                 inputId = paste0("outline_", outline_btn),
-                disabled = outline_btns_disabled()
+                disabled = btns_disabled_outline()
               )
 
             }
@@ -1906,7 +2428,7 @@ print("outlines usage")
         data$outline$row <- numeric()
 
         drawing_outline_confirmed({ data.frame() })
-        outline_btns_disabled({ TRUE })
+        btns_disabled_outline({ TRUE })
 
         for(outline_btn in c("confirm", "backward", "reset", "focus")){
 
@@ -1923,7 +2445,7 @@ print("outlines usage")
           shiny::updateActionButton(
             session = session,
             inputId = paste0("outline_", outline_btn),
-            disabled = outline_btns_disabled(),
+            disabled = btns_disabled_outline(),
             icon = icon
           )
 
@@ -1938,7 +2460,7 @@ print("outlines usage")
 
       })
 
-      # --- dblclick + paintbrush -> updates selection_mask()
+      # --- selection by paintbrush
       shiny::observeEvent(input$mriPlot_dblclick, {
 
         shiny::req(mode() == "selection" & selection_tool() == "paintbrush")
@@ -1946,41 +2468,114 @@ print("outlines usage")
         # initiate drawing logic for selection + paintbrush
         if(!drawing_active()){
 
-          # initiate with selected voxels of this slice (=pixels)
-          # selection_erase() -> reduced with setdiff()
-          # !selection_erase() -> expanded with c()
-          data$paintbrush <- selected_pixels()
+          data$cursor_pos <- list()
+
+          slice_pos[[col_axis]] <- round(cursor_pos()[1])
+          slice_pos[[row_axis]] <- round(cursor_pos()[2])
 
           drawing_active(TRUE)
 
-          # from drawing to stop drawing: update selection_mask()
+          # from drawing to stop drawing: update paintbrush_selection_mask()
         } else if(drawing_active()){
 
-          if(!selection_erase()){
+          drawing_active(FALSE)
 
-            mask_ids <- setdiff(paintbrush_selected_ids(), selected_pixels())
+          if(length(data$paintbrush) != 0){
 
-            selection_mask({
-
-              dplyr::filter(.data = selection_template(), id %in% {{mask_ids}})
-
-            })
-
-          } else if(selection_erase()) {
-
-            mask_ids <- setdiff(selected_pixels(), paintbrush_selected_ids())
-
-            selection_mask({
-
-              # selected stays as is, erased tells which voxels to erase
-              dplyr::mutate(
-                .data = selection_template(),
-                erased = id %in% {{mask_ids}}
-                )
-
-            })
+            btns_disabled_paintbrush(FALSE)
 
           }
+
+          slice_pos[[col_axis]] <- round(cursor_pos()[1])
+          slice_pos[[row_axis]] <- round(cursor_pos()[2])
+
+        }
+
+      }, ignoreInit = TRUE)
+
+
+      # apply buttons
+      shiny::observeEvent(input$paintbrush_confirm, {
+
+        if(mri_control_input$paintbrush_mode == "Sphere"){
+
+          voxel_df({
+
+            # rename to apply_paintbrush_Sphere?
+            apply_paintbrush3D(
+              voxel_df = voxel_df(),
+              cp_list = data$cursor_pos,
+              plane = plane,
+              slice = slice_idx(),
+              radius = paintbrush_radius(),
+              selection_scope = selection_scope(),
+              erase = FALSE
+            )
+
+          })
+
+        } else if(mri_control_input$paintbrush_mode == "Beam"){
+
+          voxel_df({
+
+            propagate_selection_3D(
+              voxel_df = voxel_df(),
+              selection_mask = dplyr::mutate(selection_template(), selected = id %in% data$paintbrush),
+              selection_plane = plane,
+              selection_scope = selection_scope(),
+              selection_slice = slice_idx(),
+              selection_slices = selection_slices(),
+              erase = FALSE
+            )
+
+          })
+
+        }
+
+        # disable buttons
+        data$paintbrush <- character()
+        btns_disabled_paintbrush(TRUE)
+
+      })
+
+      shiny::observeEvent(input$paintbrush_backward, {
+
+        n <- round(length(data$paintbrush)*0.9)
+
+        data$paintbrush <- data$paintbrush[1:n]
+
+      })
+
+      shiny::observeEvent(input$paintbrush_reset, {
+
+        data$paintbrush <- character()
+        btns_disabled_paintbrush(TRUE)
+
+      })
+
+      # --- deselection by paintbrush
+      shiny::observeEvent(input$mriPlot_dblclick, {
+
+        shiny::req(mode() == "selection" & selection_tool() == "paintbrush_erase")
+
+        # initiate drawing logic for selection + paintbrush
+        if(!drawing_active()){
+
+          drawing_active(TRUE)
+
+        } else if(drawing_active()){
+
+          erased_ids <- data$paintbrush_erase
+
+          paintbrush_erase_mask({
+
+            # selected stays as is, erased tells which voxels to erase
+            dplyr::mutate(
+              .data = selection_template(),
+              erased = id %in% {{erased_ids}}
+            )
+
+          })
 
           drawing_active(FALSE)
 
@@ -1988,166 +2583,83 @@ print("outlines usage")
 
       }, ignoreInit = TRUE)
 
-      # --- dblclick + region_click -> updates voxel_df() immediately
-      shiny::observeEvent(input$mriPlot_dblclick, {
+      # enable/disable buttons
+      shiny::observeEvent(paintbrush_erase_mask(), {
 
-        shiny::req(mode() == "selection" & selection_tool() == "region_click")
+        if(nrow(paintbrush_erase_mask()) == 0){
 
-        # validity check
-        if(!cursor_on_brain_tissue()){
+          btns_disabled_paintbrush_erase(TRUE)
 
-          shiny::showNotification(
-            ui = "Can not select non-brain tissue.",
-            duration = 5,
-            type = "error"
-          )
+        } else if(sum(paintbrush_erase_mask()$erased) != 0){
 
-          shiny::req(FALSE)
+          btns_disabled_paintbrush_erase(FALSE)
 
         }
-
-        hvar <- hover_var()
-        brain_region <- slice_df_hover()[[hvar]]
-        hemisphere <- slice_df_hover()[["hemisphere"]]
-
-        # 1. scenario: not erasing
-        # extract required data
-        if(FALSE){ #interaction_dims() == "2D"
-
-          slice_indices <- slice_idx()
-
-          voxel_subset <-
-            slice_df()[slice_df()[[hover_var()]] == brain_region, ] %>%
-            dplyr::filter(hemisphere == {{hemisphere}})
-
-        } else if(TRUE){ # interaction_dims() == "3D"
-
-          voxel_subset <-
-            dplyr::filter(
-              .data = voxel_df(),
-              !!rlang::sym(hvar) == {{brain_region}} & hemisphere == {{hemisphere}}
-            )
-
-        }
-
-        # apply
-        voxel_ids_area <- voxel_subset$id
-
-        if(!slice_df_hover()$selected){
-
-          voxel_df({
-
-            dplyr::mutate(
-              .data = voxel_df(),
-              selected = id %in% {{voxel_ids_area}} | selected
-            )
-
-          })
-
-        } else if(slice_df_hover()$selected){
-
-          voxel_df({
-
-            dplyr::mutate(
-              .data = voxel_df(),
-              selected = dplyr::if_else(id %in% {{voxel_ids_area}}, true = FALSE, false = selected)
-            )
-
-          })
-
-        }
-
-        # Done. End of the observer updates slice position.
-
-        # --- update slice position --- #
-        slice_pos[[plane]] <- slice_idx()
-
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_col",
-          value = round(input$mriPlot_dblclick$x)
-        )
-
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_row",
-          value = round(input$mriPlot_dblclick$y)
-        )
-
-        # Observer done.
 
       })
 
-      # transfer changes from the selection mask to the voxel_df()
-      shiny::observeEvent(selection_mask(), {
+      # apply buttons
+      shiny::observeEvent(input$paintbrush_erase_confirm2D, {
 
-        shiny::req(nrow(selection_mask()) != 0)
+        erased_ids <- paintbrush_erase_mask()[paintbrush_erase_mask()$erased,]$id
 
-        if(interaction_dims() == "2D"){
+        voxel_df({
 
-          voxel_df({
+          dplyr::mutate(
+            .data = voxel_df(),
+            selected = dplyr::if_else(id %in% {{erased_ids}}, true = FALSE, false = selected)
+          )
 
-            dplyr::mutate(
-              .data = voxel_df(),
-              selected = dplyr::if_else(
-                condition = id %in% selection_mask()$id,
-                true = !selection_erase(),
-                false = selected
-                )
-            )
+        })
 
-          })
+        data$paintbrush_erase <- character()
+        paintbrush_erase_mask({ data.frame() })
 
-        } else if(interaction_dims() == "3D"){
-
-          if(!selection_erase()){
-
-            voxel_df({
-
-              propagate_selection_3D(
-                voxel_df = voxel_df(),
-                selection_mask = selection_mask(),
-                selection_plane = plane,
-                erase = FALSE
-              )
-
-            })
-
-          } else {
-
-            voxel_df({
-
-              apply_erase_mask(
-                voxel_df = voxel_df(),
-                erase_mask = selection_mask(),
-                erase_mask_slice = slice_idx(),
-                erase_mask_plane = plane
-              )
-
-            })
-
-          }
+      })
 
 
+      shiny::observeEvent(input$paintbrush_erase_confirm3D, {
 
-        }
+        voxel_df({
 
-        # update localizers
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_row",
-          value = round(mean(selection_mask()$row))
-        )
+          apply_erase_mask(
+            voxel_df = voxel_df(),
+            erase_mask = paintbrush_erase_mask(),
+            erase_mask_slice = slice_idx(),
+            erase_mask_plane = plane
+          )
 
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_col",
-          value = round(mean(selection_mask()$col))
-        )
+        })
 
-        selection_mask(data.frame())
+        data$paintbrush_erase <- character()
+        paintbrush_erase_mask({ data.frame() })
 
       }, ignoreInit = TRUE)
+
+      shiny::observeEvent(input$paintbrush_erase_backward, {
+
+        n <- round(length(data$paintbrush_erase)*0.9)
+        data$paintbrush_erase <- data$paintbrush_erase[1:n]
+
+        paintbrush_erase_mask({
+
+          dplyr::mutate(
+            .data = paintbrush_erase_mask(),
+            erased = id %in% data$paintbrush_erase
+          )
+
+        })
+
+      }, ignoreInit = TRUE)
+
+      shiny::observeEvent(input$paintbrush_erase_reset, {
+
+        data$paintbrush_erase <- character()
+
+        paintbrush_erase_mask({ data.frame() })
+
+      }, ignoreInit = TRUE)
+
 
       # SORT --------------------------------------------------------------------
 
@@ -2156,6 +2668,7 @@ print("outlines usage")
       module_output <- shiny::reactive({
 
         list(
+          cursor_on_mri = cursor_on_mri(),
           drawing_outline_confirmed = drawing_outline_confirmed(),
           slice_pos = slice_pos,
           voxel_df = voxel_df()

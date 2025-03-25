@@ -21,8 +21,7 @@ ann_var_names_rev <- purrr::set_names(x = names(ann_var_names), nm = unname(ann_
 
 css_styles <-
   list(
-    CB_action_button = ".CB-action-btn {
-                        background-color: rgba(200, 200,  200, 0.2);
+    CB_action_button = "background-color: rgba(200, 200,  200, 0.2);
                         color: black;
                         border: 1px solid #ccc;
                         border-radius: 5px;
@@ -85,6 +84,15 @@ cortical_regions_dk <-
       c("Amygdala", "entorhinal", "fusiform", "Hippocampus", "inferiortemporal", "middletemporal", "parahippocampal", "superiortemporal", "transversetemporal"),
     insular_lobe = "insula",
     cingulate_lobe = c("caudalanteriorcingulate", "isthmuscingulate", "posteriorcingulate", "rostralanteriorcingulate")
+  ) %>%
+  purrr::map(
+    .f = function(labels){
+
+      labels[!labels %in% c("Amygdala", "Hippocampus")] <- paste0(labels[!labels %in% c("Amygdala", "Hippocampus")], "_gyrus")
+
+      return(labels)
+
+    }
   )
 
 cortical_regions_dt <- list(

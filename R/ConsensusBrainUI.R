@@ -97,7 +97,10 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_frontal_lobe",
 
-          moduleWorkflowMacroAreaUI(id = "workflow_frontal_lobe")
+          moduleWorkflowMacroAreaUI(
+            id = "workflow_frontal_lobe",
+            macro_area = "frontal_lobe"
+            )
 
         ),
 
@@ -105,7 +108,10 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_temporal_lobe",
 
-          moduleWorkflowMacroAreaUI(id = "workflow_temporal_lobe")
+          moduleWorkflowMacroAreaUI(
+            id = "workflow_temporal_lobe",
+            macro_area = "temporal_lobe"
+            )
 
         ),
 
@@ -113,7 +119,10 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_parietal_lobe",
 
-          moduleWorkflowMacroAreaUI(id = "workflow_parietal_lobe")
+          moduleWorkflowMacroAreaUI(
+            id = "workflow_parietal_lobe",
+            macro_area = "parietal_lobe"
+            )
 
         ),
 
@@ -121,7 +130,10 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_occipital_lobe",
 
-          moduleWorkflowMacroAreaUI(id = "workflow_occipital_lobe")
+          moduleWorkflowMacroAreaUI(
+            id = "workflow_occipital_lobe",
+            macro_area = "occipital_lobe"
+            )
 
         ),
 
@@ -129,7 +141,10 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_insular_lobe",
 
-          moduleWorkflowMacroAreaUI(id = "workflow_insular_lobe")
+          moduleWorkflowMacroAreaUI(
+            id = "workflow_insular_lobe",
+            macro_area = "insular_lobe"
+            )
 
         ),
 
@@ -137,7 +152,10 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_cingulate_lobe",
 
-          moduleWorkflowMacroAreaUI(id = "workflow_cingulate_lobe")
+          moduleWorkflowMacroAreaUI(
+            id = "workflow_cingulate_lobe",
+            macro_area = "cingulate_lobe"
+            )
 
         ),
 
@@ -145,7 +163,10 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_subcortical",
 
-          moduleWorkflowMacroAreaUI(id = "workflow_subcortical")
+          moduleWorkflowMacroAreaUI(
+            id = "workflow_subcortical",
+            macro_area = "subcortical"
+            )
 
         ),
 
@@ -153,7 +174,10 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_corpus_callosum",
 
-          moduleWorkflowMacroAreaUI(id = "workflow_corpus_callosum")
+          moduleWorkflowMacroAreaUI(
+            id = "workflow_corpus_callosum",
+            macro_area = "corpus_callosum"
+            )
 
         ),
 
@@ -161,7 +185,10 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_infratentorial",
 
-          moduleWorkflowMacroAreaUI(id = "workflow_infratentorial")
+          moduleWorkflowMacroAreaUI(
+            id = "workflow_infratentorial",
+            macro_area = "infratentorial"
+            )
 
         ),
 
@@ -169,7 +196,10 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_wm_tracts",
 
-          moduleWorkflowMacroAreaUI(id = "workflow_wm_tracts")
+          moduleWorkflowMacroAreaUI(
+            id = "workflow_wm_tracts",
+            macro_area = "white_matter_tracts"
+            )
 
         ),
 
@@ -177,7 +207,9 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_remaining",
 
-          moduleWorkflowRemainingUI(id = "workflow_remaining")
+          moduleWorkflowRemainingUI(
+            id = "workflow_remaining"
+            )
 
         ),
 

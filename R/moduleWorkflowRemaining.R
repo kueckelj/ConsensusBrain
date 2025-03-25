@@ -18,7 +18,7 @@ moduleWorkflowRemainingUI <- function(id){
             "border: 1px solid #ccc;",
             "max-width: 100%;",
             "flex-wrap: wrap;",
-            "height: 350px;",
+            "height: 300px;",
             "align-items: center;",  # <-- Added to center horizontally
             "justify-content: center;",  # <-- Updated to center vertically
             sep = " "

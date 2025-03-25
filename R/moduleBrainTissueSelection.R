@@ -4,9 +4,19 @@
 
 # Lobes -------------------------------------------------------------------
 
-moduleBrainTissueSelectionUI <- function(id){
+moduleBrainTissueSelectionUI <- function(id, macro_area = NULL){
 
   ns <- shiny::NS(id)
+
+  if(is.character(macro_area)){
+
+    macro_area_label <- make_pretty_label(macro_area)
+
+  } else {
+
+    macro_area_label <- NULL
+
+  }
 
   shiny::tagList(
     tags$head(
@@ -41,13 +51,16 @@ moduleBrainTissueSelectionUI <- function(id){
         "border: 1px solid #ccc;",
         "max-width: 100%;",
         "flex-wrap: wrap;",
-        "height: 350px;",
+        "height: 300px;",
         "justify-content: space-between;",  # Ensures even distribution
         sep = " "
       ),
 
       # Title at the top
-      shiny::h4(shiny::strong("Selection Criteria"), style = "margin-bottom: 10px; text-align: left;"),
+      shiny::h4(
+        shiny::strong(glue::glue("Selection Criteria: {macro_area_label}")),
+        style = "margin-bottom: 10px; text-align: left;"
+        ) %>% add_helper("selection_criteria"),
 
       # Brain area selection at the top
       shiny::div(
@@ -72,7 +85,7 @@ moduleBrainTissueSelectionUI <- function(id){
               justified = TRUE,
               selected = c("left", "right"),
               checkIcon = list(yes = shiny::icon("ok", lib = "glyphicon"))
-            )
+            ) %>% add_helper("hemisphere")
           ),
           shiny::column(
             width = 6,
@@ -87,22 +100,12 @@ moduleBrainTissueSelectionUI <- function(id){
         style = "flex-grow: 0;",
         shiny::fluidRow(
           shiny::column(
-            width = 6,
+            width = 12,
             align = "center",
             shiny::actionButton(
               inputId = ns("applyVS"),
               label = "Select",
-              width = "80%",
-              class = "CB-action-btn"
-            )
-          ),
-          shiny::column(
-            width = 6,
-            align = "center",
-            shiny::actionButton(
-              inputId = ns("resetVS"),
-              label = "Reset",
-              width = "80%",
+              width = "40%",
               class = "CB-action-btn"
             )
           )
@@ -169,7 +172,7 @@ moduleBrainTissueSelectionServer <- function(id,
             label = "Cortex Parcellation:",
             choices = c("Desikan-Kiliany" = "ann_dk_adj", "Destrieux" = "ann_dt_adj"),
             selected = "ann_dk_adj"
-          )
+          ) %>% add_helper("parcellation_atlas")
         )
 
       })
@@ -190,11 +193,12 @@ moduleBrainTissueSelectionServer <- function(id,
             selected = character(),
             multiple = TRUE,
             options = picker_options
-          )
+          ) %>% add_helper("brain_area")
         )
 
       })
 
+      # currently not active
       output$specific_score <- shiny::renderUI({
 
         shiny::req(input$remaining_only)
@@ -221,7 +225,6 @@ moduleBrainTissueSelectionServer <- function(id,
 
           any(voxel_df_input()[voxel_df_input()$ann_macro %in% macro_area,][["CBscore"]] != 0)
 
-
         })
 
         shinyWidgets::switchInput(
@@ -232,7 +235,8 @@ moduleBrainTissueSelectionServer <- function(id,
           offLabel = "All Tissues",
           value = FALSE,
           width = "100%"
-        )
+        ) %>%
+          add_helper("remaining_only")
 
       })
 

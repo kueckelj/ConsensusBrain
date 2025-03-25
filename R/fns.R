@@ -132,6 +132,83 @@ apply_erase_mask <- function(voxel_df,
 
 }
 
+apply_paintbrush3D <- function(voxel_df,
+                               cp_list,
+                               plane,
+                               slice,
+                               radius,
+                               selection_scope = NULL,
+                               erase = FALSE){
+
+  plane_ccs <- switch_axis_label(plane)
+
+  left <- slice-radius
+  right <- slice+radius
+
+  paintbrush3D_template <-
+    dplyr::filter(
+      .data = voxel_df,
+      dplyr::between(!!rlang::sym(plane_ccs), left = {{left}}, right = {{right}})
+    )
+
+  if(erase){
+
+    paintbrush3D_template <- dplyr::filter(paintbrush3D_template, selected)
+
+  } else if(!erase){
+
+    paintbrush3D_template <- dplyr::filter(paintbrush3D_template, !selected)
+
+  }
+
+  nm <- c(unname(req_axes_2d(plane)), plane_ccs)
+
+  cp_list <-
+    purrr::map(
+      .x = cp_list,
+      .f = ~ purrr::set_names(x = c(.x, slice), nm = nm)
+    )
+
+  selected_ids <- vector(mode = "list", length = length(cp_list))
+
+  for(i in seq_along(cp_list)){
+
+    presel_ids <- purrr::flatten_chr(selected_ids)
+
+    selected_ids[[i]] <-
+      identify_obs_within_radius3D(
+        cursor_pos = cp_list[[i]],
+        radius = radius,
+        interaction_template = paintbrush3D_template[!paintbrush3D_template$id %in% presel_ids,],
+        selection_scope = selection_scope
+      )
+
+  }
+
+  selected_ids_flat <- purrr::flatten_chr(selected_ids)
+
+  if(erase){
+
+    voxel_df <-
+      dplyr::mutate(
+        .data = voxel_df,
+        selected = selected & !id %in% {{selected_ids_flat}}
+      )
+
+  } else if(!erase){
+
+    voxel_df <-
+      dplyr::mutate(
+        .data = voxel_df,
+        selected = selected | id %in% {{selected_ids_flat}}
+      )
+
+  }
+
+  return(voxel_df)
+
+}
+
 ccs_to_plane <- function(axis){
 
   out <- c("x" = "sag", "y" = "axi", "z" = "cor")[axis]
@@ -249,42 +326,57 @@ buffer_range <- function(r, buffer){
 }
 
 
-circular_progress_plot <- function(progress, color_done = "forestgreen", region = NULL) {
 
-  # Ensure progress is within valid range
-  progress <- max(0, min(1, progress))
+circular_progress_plot <- function(voxel_df, score_set_up) {
 
-  # Create data frame for the donut chart
-  data <- data.frame(
-    category = c("Done", "Remaining"),
-    count = c(progress, 1 - progress)
-  )
+  voxel_df <- make_CBscore_label(voxel_df, score_set_up)
 
-  # Compute fractions and cumulative sums
-  data$fraction <- data$count / sum(data$count)
-  data$ymax <- cumsum(data$fraction)
-  data$ymin <- c(0, head(data$ymax, n=-1))
+  df_summary <- voxel_df %>%
+    dplyr::count(CBscore_label) %>%
+    dplyr::mutate(
+      fraction = n / sum(n),
+      cumulative = cumsum(fraction),
+      ymin = lag(cumulative, default = 0),
+      ymax = cumulative
+    )
 
-  # Define colors
-  colors <- c("Done" = color_done, "Remaining" = "lightgray")
+  # Add missing factor levels explicitly (ensures unused labels still show in legend)
+  missing_levels <- setdiff(names(score_set_up$choices), df_summary$CBscore_label)
+  if (length(missing_levels) > 0) {
+    df_summary <- dplyr::bind_rows(
+      df_summary,
+      tibble::tibble(CBscore_label = missing_levels, fraction = 0, ymin = 0, ymax = 0, n = 0)
+    )
+  }
 
-  ggplot2::ggplot(data) +
-    ggplot2::geom_rect(
-      mapping = ggplot2::aes(ymax = ymax, ymin = ymin, xmax = 4, xmin = 3, fill = category),
-      color = "black"
-    ) +  # Add border
-    ggplot2::scale_fill_manual(values = colors) +
-    ggplot2::theme_void() +
-    ggplot2::coord_polar(theta = "y", clip = "on") +  # Ensure full use of space
-    ggplot2::xlim(c(1.8, 4.2)) +  # Slightly extend range to maximize area
+  # Ensure correct ordering of factor levels in df_summary
+  df_summary$CBscore_label <- factor(df_summary$CBscore_label, levels = names(score_set_up$choices))
+
+  perc <- sum(voxel_df$CBscore_label != names(score_set_up$choices)[1]) / nrow(voxel_df)
+  perc <- paste0(round(perc * 100, 0), "%")  # Ensures percentage formatting
+
+  # Create the optimized donut plot with ordered legend and center text
+  ggplot2::ggplot(
+    data = df_summary,
+    mapping = ggplot2::aes(ymin = ymin, ymax = ymax, xmin = 0.8, xmax = 1.6, fill = CBscore_label)
+  ) +
+    ggplot2::geom_rect(color = "black") +
+    ggplot2::coord_polar(theta = "y") +  # Convert to polar coordinates
+    ggplot2::theme_void() +  # Remove background, axis, and grid
+    ggplot2::scale_fill_manual(
+      values = set_names(nm = names(score_set_up$choices), x = score_set_up$colors),
+      drop = FALSE,  # Ensures unused levels appear in the legend
+      limits = names(score_set_up$choices),  # Ensures correct order in legend
+      guide = ggplot2::guide_legend(override.aes = list(alpha = 1, color = NA))  # Ensure visibility
+    ) +
     ggplot2::theme(
-      legend.position = "none",
-      plot.title = ggplot2::element_text(hjust = 0.5, size = 14, face = "bold"),  # Center title
-      plot.margin = margin(t = 2, r = 2, b = 2, l = 2)  # Minimize margins for max plot space
-    ) #+
-    #labs(title = paste0(region, " Progress: ", round(progress,2)*100, "%"))
-
-
+      legend.position = "right",
+      legend.text = ggplot2::element_text(size = 14),  # Increase legend text size
+      legend.title = ggplot2::element_text(size = 16, face = "bold"),  # Increase legend title size
+      plot.margin = ggplot2::margin(0, 0, 0, 0, "cm")  # Minimize outer margins
+    ) +
+    ggplot2::labs(fill = "Score", caption = perc) +
+    ggplot2::xlim(0, 2)
 }
 
 
@@ -722,6 +814,32 @@ identify_brois <- function(voxel_df){
 
 }
 
+identify_edge_voxels <- function(selection_mask, slice_template, selection_scope = "smart_label"){
+
+  nn_out <-
+    RANN::nn2(
+      data = slice_template[,c("col", "row")],
+      query = selection_mask[,c("col", "row")],
+      k = 9
+    )
+
+  label_mtr <-
+    matrix(
+      data = as.numeric(is.na(slice_template[[selection_scope]][nn_out$nn.idx])),
+      nrow = nrow(nn_out$nn.idx),
+      ncol = 9
+    )
+
+  label_mtr <- label_mtr[,2:9]
+
+  rownames(label_mtr) <- selection_mask$id
+
+  selection_mask$is_edge <- selection_mask$id %in% rownames(label_mtr)[rowSums(label_mtr) >=2]
+
+  return(selection_mask)
+
+}
+
 identify_obs_in_outlines <- function(voxel_df, outlines){
 
   outlines <- purrr::keep(outlines, .p = ~ nrow(.x) > 3)
@@ -815,18 +933,69 @@ identify_obs_in_polygon <- function(interaction_template,
 
 }
 
-identify_obs_within_radius <- function(cursor_pos,
-                                       radius,
-                                       interaction_template,
-                                       preselected_ids = character()) {
+identify_obs_within_radius2D <- function(cursor_pos,
+                                         radius,
+                                         interaction_template,
+                                         preselected_ids = character(),
+                                         selection_scope = NULL) {
 
-  interaction_template <-
-    interaction_template[!interaction_template$id %in% preselected_ids, ]
+  interaction_template[!interaction_template$id %in% preselected_ids, ]
 
   distances <-
-    (interaction_template$col - cursor_pos[1])^2 + (interaction_template$row - cursor_pos[2])^2
+    (interaction_template$col - cursor_pos[1])^2 +
+    (interaction_template$row - cursor_pos[2])^2
 
-  return(interaction_template$id[which(distances <= radius^2)])
+  if(is.character(selection_scope)){
+
+    current_label <- interaction_template[which(round(distances)==0)[1], ][[selection_scope]]
+    current_hem <- interaction_template[which(round(distances) ==0)[1], ][["hemisphere"]]
+
+    same_label <- interaction_template[[selection_scope]] == current_label
+    same_hem <- interaction_template$hemisphere == current_hem
+    within_rad <- distances <= radius^2
+
+    indices_ret <- which((same_label & same_hem & within_rad) | distances == 0)
+
+    return(interaction_template$id[indices_ret])
+
+  } else {
+
+    return(interaction_template$id[which(distances <= radius^2)])
+
+  }
+
+}
+
+
+identify_obs_within_radius3D <- function(cursor_pos,
+                                         radius,
+                                         interaction_template,
+                                         selection_scope = NULL) {
+
+  distances <-
+    (interaction_template[["x"]] - cursor_pos["x"])^2 +
+    (interaction_template[["y"]] - cursor_pos["y"])^2 +
+    (interaction_template[["z"]] - cursor_pos["z"])^2
+
+  if(is.character(selection_scope)){
+
+    current_label <- interaction_template[which(round(distances)==0)[1], ][[selection_scope]]
+    current_hem <- interaction_template[which(round(distances) ==0)[1], ][["hemisphere"]]
+
+    same_label <- interaction_template[[selection_scope]] == current_label
+    same_hem <- interaction_template$hemisphere == current_hem
+    within_rad <- distances <= radius^2
+
+    indices_ret <- which((same_label & same_hem & within_rad) | distances == 0)
+
+    return(interaction_template$id[indices_ret])
+
+
+  } else {
+
+    return(interaction_template$id[which(distances <= radius^2)])
+
+  }
 
 }
 
@@ -933,6 +1102,23 @@ load_consensus_template <- function(as_df = TRUE){
 
 }
 
+make_CBscore_label <- function(voxel_df, score_set_up){
+
+  voxel_df$CBscore_label <- ""
+
+  for(i in seq_along(score_set_up$choices)){
+
+    value <- score_set_up$choices[i]
+    name <- names(score_set_up$choices)[i]
+    voxel_df$CBscore_label[voxel_df$CBscore == value] <- name
+
+  }
+
+  voxel_df$CBscore_label <- factor(voxel_df$CBscore_label, levels = names(score_set_up$choices))
+
+  return(voxel_df)
+
+}
 
 make_pretty_label <- function(labels){
 
@@ -1163,6 +1349,212 @@ prepare_margin_selection <- function(voxel_df, dist_max){
   return(out)
 
 }
+
+
+# no edge
+propagate_selection_3D <- function(voxel_df,
+                                   selection_mask,
+                                   selection_plane,
+                                   selection_slice,
+                                   selection_slices = NULL,
+                                   selection_scope = NULL,
+                                   unscope_white_matter = TRUE,
+                                   erase = FALSE){
+
+  assign("voxel_df", voxel_df, envir = .GlobalEnv)
+  assign("selection_mask", selection_mask, envir = .GlobalEnv)
+  assign("selection_plane", selection_plane, envir = .GlobalEnv)
+  assign("selection_slice", selection_slice, envir = .GlobalEnv)
+  assign("selection_slices", selection_slices, envir = .GlobalEnv)
+  assign("selection_scope", selection_scope, envir = .GlobalEnv)
+
+
+  # at the beginning
+  empty_slice_template <- tidyr::expand_grid(col = 1:256, row = 1:256)
+  ccs_axis <- switch_axis_label(selection_plane)
+  ra_ccs <- req_axes_2d(selection_plane, mri = FALSE)
+
+  selection_mask <- dplyr::filter(selection_mask, selected)
+  selected_hemispheres <- unique(selection_mask$hemisphere)
+
+  if(!is.character(selection_scope)){
+
+    selection_scope <- "EmptyScope"
+    selection_mask[[selection_scope]] <- "none"
+    voxel_df[[selection_scope]] <- "none"
+
+  } else if(isTRUE(unscope_white_matter)){
+
+    # selection mask already has white_matter values
+    scope_var_orig <- voxel_df[[selection_scope]]
+    voxel_df[[selection_scope]][voxel_df$is_wm] <- "white_matter"
+
+  }
+
+  scope_labels <- unique(selection_mask[[selection_scope]])
+
+  ids_by_scope_label <-
+    purrr::map(
+      .x = scope_labels,
+      .f = function(scope_label){
+
+        print(scope_label)
+
+        scope_label_df <-
+          voxel_df[voxel_df[[selection_scope]] == scope_label & voxel_df$hemisphere %in% selected_hemispheres,] %>%
+          dplyr::rename(!!!ra_ccs)
+
+        scope_label_mask <- selection_mask[selection_mask[[selection_scope]] == scope_label,]
+
+        # prepare upper and lower lists
+        # use max(slices_with_tissue), cause masks are picked by numeric slice idx!
+        if(!is.numeric(selection_slices)){
+
+          selection_slices_iter <- sort(unique(scope_label_df[[ccs_axis]]))
+
+        } else {
+
+          selection_slices_iter <- selection_slices
+
+          # prevent hemisphere-transgression in case of preselected selection_slices
+          # by paintbrush mode 'Beam' with depth > hemisphere end
+          if(selection_plane == "sag"){
+
+            selection_slices_iter <-
+              # scope_label_df is subsetted by 'selected_hemispheresÄ
+              # in sagital plane you can only draw on one hemisphere at a time
+              selection_slices_iter[selection_slices_iter %in% scope_label_df$x]
+
+          }
+
+        }
+
+        stopifnot(selection_slice %in% selection_slices_iter)
+
+        selection_masks <- vector(mode = "list", length = max(selection_slices_iter))
+        selection_masks[[selection_slice]] <- scope_label_mask
+
+        # iterate over lower list
+        # slice input -> down to lowest
+        if(selection_slice != min(selection_slices_iter)){
+print("lower")
+          slices_lower <- (selection_slice-1):min(selection_slices_iter)
+
+          for(i in seq_along(slices_lower)){
+
+            slice_idx <- slices_lower[i]
+            print(slice_idx)
+
+            ## prepare current candidates df
+            cand_df <- scope_label_df[scope_label_df[[ccs_axis]] == slice_idx, ]
+
+            if(nrow(cand_df) == 0){ break }
+
+            ## get previous selection_mask
+            prev_smask <- selection_masks[[slice_idx+1]]
+
+            nn_out <-
+              RANN::nn2(
+                data = cand_df[,c("col", "row", ccs_axis)],
+                query = prev_smask[,c("col", "row", ccs_axis)],
+                k = 1
+              )
+
+            ids <- unique(cand_df$id[nn_out$nn.idx][nn_out$nn.dists < 1.5])
+
+            ### assemble current selection_mask
+            cand_df$selected <- cand_df$id %in% ids
+
+            new_selection_mask <- cand_df[cand_df$selected,]
+
+            if(nrow(new_selection_mask) == 0){ break }
+
+            selection_masks[[slice_idx]] <- new_selection_mask
+
+          }
+
+        }
+
+        # iterate over upper list
+        # slice input -> up to highest
+        if(selection_slice != max(selection_slices_iter)){
+print("higher")
+          slices_higher <- (selection_slice+1):max(selection_slices_iter)
+
+          for(i in seq_along(slices_higher)){
+
+            slice_idx <- slices_higher[i]
+            print(slice_idx)
+
+            ## prepare current candidates df
+            cand_df <- scope_label_df[scope_label_df[[ccs_axis]] == slice_idx, ]
+
+            if(nrow(cand_df) == 0){ break }
+
+            ## get previous selection_mask
+            prev_smask <- selection_masks[[slice_idx-1]]
+
+            nn_out <-
+              RANN::nn2(
+                data = cand_df[,c("col", "row", ccs_axis)],
+                query = prev_smask[,c("col", "row", ccs_axis)],
+                k = 1
+              )
+
+            ids <- unique(cand_df$id[nn_out$nn.idx][nn_out$nn.dists < 1.5])
+
+            ### assemble current selection_mask
+            cand_df$selected <- cand_df$id %in% ids
+
+            new_selection_mask <- cand_df[cand_df$selected,]
+
+            if(nrow(new_selection_mask) == 0){ break }
+
+            selection_masks[[slice_idx]] <- new_selection_mask
+
+          }
+
+        }
+
+        ids_out <-
+          purrr::discard(selection_masks, .p = is.null) %>%
+          purrr::map(.f = ~ .x[["id"]]) %>%
+          purrr::flatten_chr()
+
+        return(ids_out)
+
+      }
+    )
+
+  # remove temporary var if required
+  if(selection_scope == "EmptyScope"){
+
+    voxel_df$EmptyScope <- NULL
+
+  } else if(unscope_white_matter){
+
+    voxel_df[[selection_scope]] <- scope_var_orig
+
+  }
+
+  # extract and apply selection
+  ids_all <- purrr::flatten_chr(ids_by_scope_label)
+
+  if(erase){
+
+    voxel_df$selected <- voxel_df$selected & !voxel_df$id %in% ids_all
+
+  } else {
+
+    voxel_df$selected <- voxel_df$selected | voxel_df$id %in% ids_all
+
+  }
+
+  return(voxel_df)
+
+}
+
+
 
 
 # goal: propagate the voxels to be erased along the slice levels by mapping
@@ -1607,31 +1999,7 @@ plot_color_legend <- function(colors){
 
 
 
-#' @param selection_mask Data.frame of selected in the selection plane (=pixels).
-#' Must contain integer variables *col* and *row*.
-propagate_selection_3D <- function(voxel_df,
-                                   selection_mask,
-                                   selection_plane,
-                                   erase){
 
-  rename_inp <- req_axes_2d(selection_plane, ccs_val = FALSE)
-
-  selection_value <- !erase
-
-  selection_mask_merge <-
-    dplyr::select(selection_mask, dplyr::all_of(rename_inp)) %>%
-    dplyr::mutate(selection_flag = {{selection_value}})
-
-  voxel_df <-
-    dplyr::left_join(x = voxel_df, y = selection_mask_merge, by = names(rename_inp)) %>%
-    dplyr::mutate(
-      selected = dplyr::if_else(is.na(selection_flag), selected, selection_flag),
-      selection_flag = NULL
-    )
-
-  return(voxel_df)
-
-}
 
 
 
@@ -1771,8 +2139,12 @@ update_CBscore <- function(cb_df, update_df){
 }
 
 
-
-
 us <- function(x){ unique(x) %>% sort() }
 
+
+within_range <- function(x, r){
+
+  x > min(r) & x < max(r)
+
+}
 
