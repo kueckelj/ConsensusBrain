@@ -45,6 +45,7 @@ moduleMriUI <- function(id = "mri", ...){
 }
 
 moduleMriServer <- function(id = "mri",
+                            non_brain_template = data.frame(),
                             voxel_df = function(){ load_consensus_template() },
                             nifti_input = function(){ mni_template },
                             mode_init = "inspection",
@@ -60,6 +61,7 @@ moduleMriServer <- function(id = "mri",
       mri_plane_sag <-
         moduleMriPlaneServer(
           id = "mri_plane_sag",
+          non_brain_template = non_brain_template,
           mode_init = mode_init,
           mri_control = shiny::reactive({ mri_control() }),
           nifti_input = shiny::reactive({ nifti_input() }),
@@ -69,6 +71,7 @@ moduleMriServer <- function(id = "mri",
       mri_plane_axi <-
         moduleMriPlaneServer(
           id = "mri_plane_axi",
+          non_brain_template = non_brain_template,
           mode_init = mode_init,
           mri_control = shiny::reactive({ mri_control() }),
           nifti_input = shiny::reactive({ nifti_input() }),
@@ -78,6 +81,7 @@ moduleMriServer <- function(id = "mri",
       mri_plane_cor <-
         moduleMriPlaneServer(
           id = "mri_plane_cor",
+          non_brain_template = non_brain_template,
           mode_init = mode_init,
           mri_control = shiny::reactive({ mri_control() }),
           nifti_input = shiny::reactive({ nifti_input() }),

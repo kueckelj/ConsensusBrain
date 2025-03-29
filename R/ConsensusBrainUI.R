@@ -11,22 +11,12 @@ ConsensusBrainUI <- function(){
       collapsed = FALSE,
       shinydashboard::sidebarMenu(
         shinydashboard::menuItem(
-          text = "Brain Template",
-          tabName = "tab_brain_template",
-          shinydashboard::menuSubItem(
-            text = "3D",
-            tabName = "tab_brain_template_3D",
-            selected = FALSE
-          ),
-          shinydashboard::menuSubItem(
-            text = "MRI",
-            tabName = "tab_brain_template_MRI",
-            selected = FALSE
-          )
+          text = "Welcome",
+          tabName = "tab_welcome"
         ),
         shinydashboard::menuItem(
-          text = "Score Assignment",
-          tabName = "tab_score_assignment",
+          text = "Worfklow",
+          tabName = "tab_workflow",
           selected = TRUE,
           shinydashboard::menuSubItem(
             text = "Frontal Lobe",
@@ -219,12 +209,48 @@ ConsensusBrainUI <- function(){
           tabName = "tab_progress",
           shiny::fluidRow(
             shiny::column(
-              width = 6,
-              plotly::plotlyOutput("brain3D_progress_plot", height = "500px")
+              width = 5,
+              shiny::div(
+                style = paste0(
+                  "background-color: white;",
+                  "box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);",
+                  "border: 1px solid #ccc;",
+                  "height: 400px;",
+                  "position: relative;"
+                ),
+                # Header positioned in the first 50px
+                shiny::div(
+                  style = paste0(
+                    "position: absolute;",
+                    "padding-top: 7.5px;",
+                    "padding-left: 7.5px;",
+                    "width: 100%",
+                    "text-align: left;",
+                    "z-index: 2;",
+                    "font-size: 16px;",
+                    "font-weight: bold;"
+                  ),
+                  shiny::uiOutput("header_progress")
+                ),
+                # Plot positioned below the header
+                shiny::div(
+                  style = paste0(
+                    "position: absolute;",
+                    "left: 0;",
+                    "width: 100%;",
+                    "height: 300px;",  # Fills remaining space
+                    "z-index: 1;"
+                  ),
+                  shiny::plotOutput(outputId = "circular_progress_plot", width = "100%", height = "400px")
+                )
+              )
             ),
             shiny::column(
-              width = 6,
-              shiny::plotOutput(outputId = "circular_progress_plot", height = "500px")
+              width = 5,
+              shinycssloaders::withSpinner(
+                ui_element = plotly::plotlyOutput("brain3D_progress_plot", height = "400px"),
+                id = "brain3D_progress_plot_spinner"
+              )
             )
           ),
           shiny::fluidRow(

@@ -26,15 +26,15 @@ CB_help <-
           "Use the slider to define the margin distance from the selected structure.
           Click 'Confirm Margin' to finalize the margin as part of your selection.
           A successful confirmation results in a color change and enables score
-          assignment in the 'Score Assignment' box.",
+          assignment in the 'Score Assignment' box - specifically for margin selections.",
           "",
           "Once confirmed, the margin becomes part of your selection and can be
           refined using the paintbrush-eraser tool.",
           "",
           "The 'Trash' button removes all margins from the current selection.",
           "",
-          "If you make an unintended selection or deselection, you can undo
-          changes using the 'Undo' button on the left."
+          "(Confirmation of a margin counts as a selection and you can undo
+          margin confirmations using the 'Undo' under selection controls.)"
         ),
         type = "inline"
       ),
@@ -137,6 +137,23 @@ CB_help <-
         type = "inline"
       ),
 
+    "score_description" =
+      list(
+        content = c(
+          "The resectability score reflects the surgical risk associated with removing tissue in a specific region. It guides the planning and use of intraoperative techniques such as neuromonitoring or awake mapping.",
+          "",
+          "**1 — Safely resectable**: The region can be removed without significant risk to function. Standard resection is expected to be safe.",
+          "",
+          "**2 — Resectable with low to medium risk**: The region is resectable, but functional risk is present. Resection should involve intraoperative neuromonitoring or mapping techniques. Awake surgery may be considered depending on the functional anatomy.",
+          "",
+          "**3 — Resectable with medium to high risk**: Resection may still be possible, but the risk to critical functions is higher. Advanced neuromonitoring and awake mapping are typically required.",
+          "",
+          "**4 — Not resectable**: The region cannot be safely resected due to its functional importance or anatomical constraints. Surgery should avoid this area."
+        ),
+        type = "inline"
+      ),
+
+
     "selection_criteria" =
       list(
         content = c(
@@ -145,6 +162,18 @@ CB_help <-
           "This selection can be refined interactively using the toolbox below
           the three MRI planes. Note: Updating the selection criteria here will
           overwrite any refinements."
+        ),
+        type = "inline"
+      ),
+
+    "selection_control" =
+      list(
+        content = c(
+          "**Undo**: Reverts the most recent selection or deselection action. Useful for correcting accidental edits.",
+          "",
+          "**Clean Debris**: Identifies and removes small groups of spatially isolated voxels that are not part of any meaningful structure.",
+          "",
+          "**Trash All**: Clears the entire current selection, including manually and automatically selected voxels. This action cannot be undone."
         ),
         type = "inline"
       ),
@@ -194,8 +223,21 @@ CB_help <-
 
     "selection_tool" =
       list(
-        content =
-          "Select a tool for interactive (de-)selection of brain tissue.",
+        content = c(
+          "Choose a tool to interactively define, refine, or erase tissue selections in the MRI viewer.",
+          "",
+          "**Outline**: Draw a freehand outline directly on a 2D MRI slice to define a custom region. The shape can be confirmed and used to select all underlying voxels. Useful for irregular or non-anatomical structures.",
+          "",
+          "**Paintbrush**: Use a circular brush to paint voxels on the current slice. Depending on the selected brush mode (Sphere or Beam), the selection is extended across slices. Ideal for marking localized or tube-like regions.",
+          "",
+          "**Eraser (Paintbrush + Eraser)**: Works like the paintbrush but in erase mode. You can remove previously selected voxels using the same brush-based interaction. ⚠️ A selection must exist to use this tool.",
+          "",
+          "**Region-Click**: Double-click a voxel to select its entire anatomical region across the brain, based on the selected selection scope (e.g., a gyrus or white matter region). This is a quick way to select meaningful structures in 3D.",
+          "",
+          "**Margin**: Once a selection exists, this tool allows you to add a safety margin around it. The margin thickness can be adjusted, and margins can be confirmed or deleted. ⚠️ Requires an existing selection.",
+          "",
+          "Use 'Undo' to step back through previous selections and 'Trash' to clear all selections. The chosen tool will define the interaction logic until changed."
+        ),
         type = "inline"
       ),
 

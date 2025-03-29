@@ -46,6 +46,7 @@ moduleWorkflowRemainingUI <- function(id){
 }
 
 moduleWorkflowRemainingServer <- function(id,
+                                          non_brain_template,
                                           voxel_df_input,
                                           nifti_input){
 
@@ -274,6 +275,7 @@ moduleWorkflowRemainingServer <- function(id,
         moduleMriServer(
           id = "mri",
           mode_init = "inspection",
+          non_brain_template = non_brain_template,
           voxel_df = shiny::reactive({ voxel_df_input() }),
           nifti_input = shiny::reactive({ nifti_input() }),
           external_selection = shiny::reactive({ selected_broi() }),

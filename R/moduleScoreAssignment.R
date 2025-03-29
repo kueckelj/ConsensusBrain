@@ -6,12 +6,23 @@ moduleScoreAssignmentUI <- function(id) {
   # Output UI with improved layout
   shiny::tagList(
     shiny::div(
-      style = glue::glue("{css_styles$CB_box} height: 300px;"),
+      style = c("
+              background-color: white;
+              box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+              display: flex;
+              flex-direction: column;
+              padding: 10px;
+              border: 1px solid #ccc;
+              flex-wrap: wrap;
+              height: 300px;
+              width: 550px;
+              border-radius: 5px;"),
 
       # Header (Always at the Top)
       shiny::div(
-        style = "flex-shrink: 0;",
-        shiny::h4(shiny::strong(paste0(score_set_up$label, " - Score Assignment")))
+        style = "flex-shrink: 0; text-align: left;",
+        shiny::h4(shiny::strong(paste0(score_set_up$label, " - Score Assignment"))) %>%
+          add_helper("score_description")
       ),
 
       # Main Content (Centered)

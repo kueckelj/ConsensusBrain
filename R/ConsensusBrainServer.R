@@ -4,6 +4,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
   # Global ------------------------------------------------------------------
   shinyhelper::observe_helpers()
+  shinyalert::useShinyalert()
 
 
 
@@ -11,28 +12,24 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
     dplyr::mutate(
       .data = ctp_df,
+      # variables for score assignment
+      CBscore = 0,
+      CBscore_label = "Missing",
       # variables for interactive selection + refinement
       selected = FALSE,
       broi = FALSE,
       color = alpha("forestgreen", alpha_val),
       is_margin = FALSE,
-      is_margin_cand = FALSE,
-      smart_label =
-        dplyr::case_when(
-          is_wm ~ "wm",
-          ann_macro == "corpus_callosum" ~ "cc",
-          TRUE ~ ann_dk_adj
-        ),
-      # variables for score assignment
-      CBscore = 0
-    )
+      is_margin_cand = FALSE
+      )
 
   })
+
+  non_brain_template <- load_non_brain_template()
 
   global_settings <- global_settings_default
 
   nifti_input <- shiny::reactiveVal(value = nifti_object)
-
 
   # debug
   shiny::observeEvent(input$test, {
@@ -49,6 +46,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     moduleWorkflowMacroAreaServer(
       id = "workflow_frontal_lobe",
       macro_area = "frontal_lobe",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -69,6 +67,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     moduleWorkflowMacroAreaServer(
       id = "workflow_temporal_lobe",
       macro_area = "temporal_lobe",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -89,6 +88,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     moduleWorkflowMacroAreaServer(
       id = "workflow_parietal_lobe",
       macro_area = "parietal_lobe",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -109,6 +109,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     moduleWorkflowMacroAreaServer(
       id = "workflow_occipital_lobe",
       macro_area = "occipital_lobe",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -129,6 +130,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     moduleWorkflowMacroAreaServer(
       id = "workflow_insular_lobe",
       macro_area = "insular_lobe",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -149,6 +151,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     moduleWorkflowMacroAreaServer(
       id = "workflow_cingulate_lobe",
       macro_area = "cingulate_lobe",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -169,6 +172,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     moduleWorkflowMacroAreaServer(
       id = "workflow_subcortical",
       macro_area = "subcortical",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -189,6 +193,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     moduleWorkflowMacroAreaServer(
       id = "workflow_corpus_callosum",
       macro_area = "corpus_callosum",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -209,6 +214,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     moduleWorkflowMacroAreaServer(
       id = "workflow_infratentorial",
       macro_area = "infratentorial",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -229,6 +235,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     moduleWorkflowMacroAreaServer(
       id = "workflow_wm_tracts",
       macro_area = "wm_tract",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -250,6 +257,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
   mo_score_remaining <-
     moduleWorkflowRemainingServer(
       id = "workflow_remaining",
+      non_brain_template = non_brain_template,
       voxel_df_input = shiny::reactive({ cb_df() }),
       nifti_input = shiny::reactive({ nifti_input() })
     )
@@ -269,38 +277,44 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
 # Tab Progress ----------------------------------------------------------------
 
-  output$brain3D_progress_plot <- plotly::renderPlotly({
+  output$header_progress <- shiny::renderUI({
 
-    CBscore_label_colors <- c(
-      "Missing"      = "lightgrey",  # Gray
-      "Low"          = "#4CAF50",  # Green
-      "Low-Medium"   = "#8BC34A",  # Light Green
-      "Medium"       = "#FFC107",  # Yellow
-      "Medium-High"  = "#FF9800",  # Orange
-      "High"         = "#F44336"   # Red
+    progress <- ceiling((sum(cb_df()$CBscore != 0)/nrow(cb_df()))*100)
+
+    header <- paste0("Progress: ", progress, "%" )
+
+    shiny::h3(shiny::strong(header))
+
+  })
+
+  module_mri <-
+    moduleMriServer(
+      id = "progress",
+      mode_init = "inspection",
+      non_brain_template = non_brain_template,
+      voxel_df = shiny::reactive({ cb_df() }),
+      nifti_input = shiny::reactive({ nifti_input() })
     )
 
-    cb_df_plot <-
-      dplyr::mutate(
-        .data = cb_df(),
-        CBscore_label =
-          dplyr::case_when(
-            CBscore == 0 ~ "Missing",
-            CBscore == 1 ~ "Low",
-            CBscore == 2 ~ "Low-Medium",
-            CBscore == 3 ~ "Medium",
-            CBscore == 4 ~ "Medium-High",
-            CBscore == 5 ~ "High"
-          )
+
+  output$brain3D_progress_plot <- plotly::renderPlotly({
+
+    CBscore_label_colors <-
+      purrr::set_names(
+        x = score_set_up$colors,
+        nm = names(score_set_up$choices)
       )
+
+    cb_df_plot <-
+      trim_brain_3d(cb_df(), var = "CBscore_label", val_missing = "Missing", fct = 0.35)
 
     plot_brain_3d(
       voxel_df = cb_df_plot,
       color_by = "CBscore_label",
-      group_highlight = c("Low", "Low-Medium", "Medium", "Medium-High", "High"),
+      group_highlight = names(score_set_up$choices[-1]),
       clrp_adjust = CBscore_label_colors,
-      opacity_hide = 0.05,
-      pt_size = 2.5,
+      opacity_hide = 0.025,
+      pt_size = 1.5,
       show_legend = FALSE,
       hoverinfo = c("CBscore_label"),
       paper_bgcolor = "black"

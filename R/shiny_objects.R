@@ -38,7 +38,6 @@ css_styles <-
               flex-direction: column;
               padding: 10px;
               border: 1px solid #ccc;
-              max-width: 100%;
               flex-wrap: wrap;"
   )
 
@@ -50,12 +49,11 @@ css_styles <-
 score_set_up = list(
   label = "Resection Risk",
   choices = c("Missing" = 0,
-              "Low" = 1,
+              "Safely " = 1,
               "Low-Medium" = 2,
-              "Medium" = 3,
-              "Medium-High" = 4,
-              "High" = 5),
-  colors = c("lightgrey", "#4CAF50", "#8BC34A", "#FFC107", "#FF9800", "#F44336")
+              "Medium-High" = 3,
+              "Not Resectable" = 4),
+  colors = c("lightgrey", "#8BC34A", "#FFEB3B", "#FF9800", "#F44336")
 )
 
 

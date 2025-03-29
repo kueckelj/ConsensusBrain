@@ -132,13 +132,23 @@ apply_erase_mask <- function(voxel_df,
 
 }
 
-apply_paintbrush3D <- function(voxel_df,
-                               cp_list,
-                               plane,
-                               slice,
-                               radius,
-                               selection_scope = NULL,
-                               erase = FALSE){
+apply_paintbrush_sphere <- function(voxel_df,
+                                    cp_list,
+                                    plane,
+                                    slice,
+                                    radius,
+                                    selection_scope = NULL,
+                                    erase = FALSE){
+
+  if(TRUE){
+
+    assign("cp_list", cp_list, envir = .GlobalEnv)
+    assign("voxel_df", voxel_df, envir = .GlobalEnv)
+    assign("radius", radius, envir = .GlobalEnv)
+    assign("selection_scope", selection_scope, envir = .GlobalEnv)
+    print("assigned paintbrush sphere")
+
+  }
 
   plane_ccs <- switch_axis_label(plane)
 
@@ -375,7 +385,7 @@ circular_progress_plot <- function(voxel_df, score_set_up) {
       legend.title = ggplot2::element_text(size = 16, face = "bold"),  # Increase legend title size
       plot.margin = ggplot2::margin(0, 0, 0, 0, "cm")  # Minimize outer margins
     ) +
-    ggplot2::labs(fill = "Score", caption = perc) +
+    ggplot2::labs(fill = "Score") +
     ggplot2::xlim(0, 2)
 }
 
@@ -814,6 +824,35 @@ identify_brois <- function(voxel_df){
 
 }
 
+identify_debris <- function(voxel_df, eps = 1.5, minPts = 8, min_size = 250){
+
+  voxel_selection <- dplyr::filter(voxel_df, selected)
+
+  dbscan_out <- dbscan::dbscan(x = voxel_selection[,c("x", "y", "z")], eps = eps, minPts = minPts)
+
+  voxel_selection$debris <- as.character(dbscan_out$cluster)
+
+  debris_cluster <-
+    dplyr::filter(voxel_selection, debris != "0") %>%
+    dplyr::group_by(debris) %>%
+    dplyr::summarise(count = dplyr::n()) %>%
+    dplyr::filter(count <= {{min_size}}) %>%
+    dplyr::pull(debris)
+
+  voxel_selection <-
+    dplyr::mutate(
+      .data = voxel_selection,
+      debris = dplyr::if_else(debris %in% {{debris_cluster}}, "0", debris)
+    )
+
+  dplyr::left_join(
+    x = voxel_df,
+    y = voxel_selection[,c("id", "debris")],
+    by = "id"
+  )
+
+}
+
 identify_edge_voxels <- function(selection_mask, slice_template, selection_scope = "smart_label"){
 
   nn_out <-
@@ -1102,6 +1141,18 @@ load_consensus_template <- function(as_df = TRUE){
 
 }
 
+load_non_brain_template <- function(){
+
+  data("non_brain_template")
+
+  dplyr::mutate(
+    .data = tibble::as_tibble(non_brain_template),
+    id = paste0("x", x, "y", y, "z", z),
+    hemisphere = dplyr::if_else(x > 127, true = "left", false = "right")
+  )
+
+}
+
 make_CBscore_label <- function(voxel_df, score_set_up){
 
   voxel_df$CBscore_label <- ""
@@ -1351,23 +1402,68 @@ prepare_margin_selection <- function(voxel_df, dist_max){
 }
 
 
-# no edge
-propagate_selection_3D <- function(voxel_df,
-                                   selection_mask,
-                                   selection_plane,
-                                   selection_slice,
-                                   selection_slices = NULL,
-                                   selection_scope = NULL,
-                                   unscope_white_matter = TRUE,
-                                   erase = FALSE){
 
-  assign("voxel_df", voxel_df, envir = .GlobalEnv)
-  assign("selection_mask", selection_mask, envir = .GlobalEnv)
-  assign("selection_plane", selection_plane, envir = .GlobalEnv)
-  assign("selection_slice", selection_slice, envir = .GlobalEnv)
-  assign("selection_slices", selection_slices, envir = .GlobalEnv)
-  assign("selection_scope", selection_scope, envir = .GlobalEnv)
+propagate_selection_unscoped <- function(voxel_df,
+                                         selection_mask,
+                                         selection_plane,
+                                         selection_slices = NULL,
+                                         erase = FALSE){
 
+
+  # 2D -> 3D
+  ccs_axis <- switch_axis_label(selection_plane)
+  rename_inp <- req_axes_2d(selection_plane, ccs_val = FALSE)
+
+  # prepare slice vector
+  if(is.null(selection_slices)){
+
+    selection_slices <- unique(voxel_df[[ccs_axis]])
+
+  }
+
+  selection_mask <-
+    dplyr::filter(selection_mask, selected) %>%
+    dplyr::mutate(selection_flag = !{{erase}}) %>%
+    dplyr::rename(!!!rename_inp)
+
+  voxel_df <-
+    dplyr::left_join(
+      x = voxel_df,
+      y = selection_mask[,c(names(rename_inp), "selection_flag")],
+      by = names(rename_inp)
+    ) %>%
+    dplyr::mutate(
+      selected = dplyr::if_else(
+        condition = !is.na(selection_flag) & !!rlang::sym(ccs_axis) %in% {{selection_slices}},
+        true = selection_flag,
+        false = selected
+      ),
+      selection_flag = NULL
+    )
+
+  return(voxel_df)
+
+}
+
+propagate_selection_scoped <- function(voxel_df,
+                                       selection_mask,
+                                       selection_plane,
+                                       selection_slice,
+                                       selection_scope,
+                                       selection_slices = NULL,
+                                       unscope_white_matter = TRUE,
+                                       erase = FALSE){
+
+  if(FALSE){
+
+    assign("voxel_df", voxel_df, envir = .GlobalEnv)
+    assign("selection_mask", selection_mask, envir = .GlobalEnv)
+    assign("selection_plane", selection_plane, envir = .GlobalEnv)
+    assign("selection_slice", selection_slice, envir = .GlobalEnv)
+    assign("selection_slices", selection_slices, envir = .GlobalEnv)
+    assign("selection_scope", selection_scope, envir = .GlobalEnv)
+
+  }
 
   # at the beginning
   empty_slice_template <- tidyr::expand_grid(col = 1:256, row = 1:256)
@@ -1377,17 +1473,15 @@ propagate_selection_3D <- function(voxel_df,
   selection_mask <- dplyr::filter(selection_mask, selected)
   selected_hemispheres <- unique(selection_mask$hemisphere)
 
-  if(!is.character(selection_scope)){
-
-    selection_scope <- "EmptyScope"
-    selection_mask[[selection_scope]] <- "none"
-    voxel_df[[selection_scope]] <- "none"
-
-  } else if(isTRUE(unscope_white_matter)){
+  if(isTRUE(unscope_white_matter)){
 
     # selection mask already has white_matter values
     scope_var_orig <- voxel_df[[selection_scope]]
     voxel_df[[selection_scope]][voxel_df$is_wm] <- "white_matter"
+
+  } else {
+
+    voxel_df <- dplyr::add_row(voxel_df, load_non_brain_template())
 
   }
 
@@ -1397,8 +1491,6 @@ propagate_selection_3D <- function(voxel_df,
     purrr::map(
       .x = scope_labels,
       .f = function(scope_label){
-
-        print(scope_label)
 
         scope_label_df <-
           voxel_df[voxel_df[[selection_scope]] == scope_label & voxel_df$hemisphere %in% selected_hemispheres,] %>%
@@ -1429,21 +1521,18 @@ propagate_selection_3D <- function(voxel_df,
 
         }
 
-        stopifnot(selection_slice %in% selection_slices_iter)
-
         selection_masks <- vector(mode = "list", length = max(selection_slices_iter))
         selection_masks[[selection_slice]] <- scope_label_mask
 
         # iterate over lower list
         # slice input -> down to lowest
         if(selection_slice != min(selection_slices_iter)){
-print("lower")
+
           slices_lower <- (selection_slice-1):min(selection_slices_iter)
 
           for(i in seq_along(slices_lower)){
 
             slice_idx <- slices_lower[i]
-            print(slice_idx)
 
             ## prepare current candidates df
             cand_df <- scope_label_df[scope_label_df[[ccs_axis]] == slice_idx, ]
@@ -1478,13 +1567,12 @@ print("lower")
         # iterate over upper list
         # slice input -> up to highest
         if(selection_slice != max(selection_slices_iter)){
-print("higher")
+
           slices_higher <- (selection_slice+1):max(selection_slices_iter)
 
           for(i in seq_along(slices_higher)){
 
             slice_idx <- slices_higher[i]
-            print(slice_idx)
 
             ## prepare current candidates df
             cand_df <- scope_label_df[scope_label_df[[ccs_axis]] == slice_idx, ]
@@ -1527,11 +1615,7 @@ print("higher")
     )
 
   # remove temporary var if required
-  if(selection_scope == "EmptyScope"){
-
-    voxel_df$EmptyScope <- NULL
-
-  } else if(unscope_white_matter){
+ if(unscope_white_matter){
 
     voxel_df[[selection_scope]] <- scope_var_orig
 
@@ -1539,6 +1623,9 @@ print("higher")
 
   # extract and apply selection
   ids_all <- purrr::flatten_chr(ids_by_scope_label)
+
+  # remove non brain voxels
+  voxel_df <- dplyr::filter(voxel_df, !is.na(selected))
 
   if(erase){
 
@@ -1551,6 +1638,43 @@ print("higher")
   }
 
   return(voxel_df)
+
+}
+
+
+propagate_selection_3D <- function(voxel_df,
+                                   selection_mask,
+                                   selection_plane,
+                                   selection_slice,
+                                   selection_scope = NULL,
+                                   selection_slices = NULL,
+                                   unscope_white_matter = TRUE,
+                                   erase = FALSE){
+
+  if(is.null(selection_scope)){
+
+    propagate_selection_unscoped(
+      voxel_df = voxel_df,
+      selection_mask = selection_mask,
+      selection_plane = selection_plane,
+      selection_slices = selection_slices,
+      erase = erase
+    )
+
+  } else {
+
+    propagate_selection_scoped(
+      voxel_df = voxel_df,
+      selection_mask = selection_mask,
+      selection_plane = selection_plane,
+      selection_slice = selection_slice,
+      selection_scope = selection_scope,
+      selection_slices = selection_slices,
+      unscope_white_matter = unscope_white_matter,
+      erase = erase
+    )
+
+  }
 
 }
 
@@ -2041,8 +2165,6 @@ read_consensus_template <- function(as_df = TRUE){
 read_non_brain_template<- function(path = "data/meta/non_brain_template.RDS"){
 
   readRDS(path) %>%
-    as.data.frame() %>%
-    magrittr::set_names("id") %>%
     dplyr::mutate(
       x = stringr::str_extract(id, pattern = "x[0-9]*") %>% stringr::str_remove(pattern = "x") %>% as.integer(),
       y = stringr::str_extract(id, pattern = "y[0-9]*") %>% stringr::str_remove(pattern = "y") %>% as.integer(),
@@ -2097,6 +2219,18 @@ score_label_colors <- function(score_set_up){
 
 }
 
+trim_brain_3d <- function(plot_input, var, val_missing, fct = 0.5){
+
+  plot_input_main <- dplyr::filter(plot_input, !!rlang::sym(var) != {{val_missing}} | !is_wm)
+
+  plot_input_side <- dplyr::filter(plot_input, !id %in% plot_input_main$id)
+  keep <- round(nrow(plot_input_side)*0.5)
+  plot_input_side <- dplyr::slice_sample(plot_input_side, n = {{keep}})
+
+  rbind(plot_input_main, plot_input_side)
+
+}
+
 # Function to convert color input to 'rgb(r, g, b)' format
 to_rgb_format <- function(color) {
   # Convert color to RGB using grDevices::col2rgb
@@ -2116,23 +2250,25 @@ to_rgb_format <- function(color) {
 
 update_CBscore <- function(cb_df, update_df){
 
-  print("updating")
-  print(unique(cb_df$CBscore))
-
   out <-
-  dplyr::left_join(x = cb_df, y = update_df[,c("id", "CBscore_new")], by = "id") %>%
-    dplyr::mutate(
-      CBscore =
-        dplyr::case_when(
-          is.na(CBscore_new) ~ CBscore,
-          CBscore_new > CBscore ~ CBscore_new,
-          TRUE ~ CBscore)
-      ) %>%
-    dplyr::select(-CBscore_new)
+    dplyr::left_join(x = cb_df, y = update_df[,c("id", "CBscore_new")], by = "id") %>%
+      dplyr::mutate(
+        CBscore =
+          dplyr::case_when(
+            is.na(CBscore_new) ~ CBscore,
+            CBscore_new > CBscore ~ CBscore_new,
+            TRUE ~ CBscore)
+        ) %>%
+      dplyr::select(-CBscore_new)
 
-  print(unique(cb_df$CBscore))
-  print("done")
+  for(i in seq_along(score_set_up$choices)){
 
+    num_val <- unname(score_set_up$choices)[i]
+    label <- names(score_set_up$choices)[i]
+
+    out$CBscore_label[out$CBscore == num_val] <- label
+
+  }
 
   return(out)
 

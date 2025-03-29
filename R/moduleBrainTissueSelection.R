@@ -45,11 +45,12 @@ moduleBrainTissueSelectionUI <- function(id, macro_area = NULL){
       style = paste(
         "background-color: white;",
         "box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);",
+        "border-radius: 5px;",
+        "width: 550px;",
         "display: flex;",
         "flex-direction: column;",
         "padding: 10px;",
         "border: 1px solid #ccc;",
-        "max-width: 100%;",
         "flex-wrap: wrap;",
         "height: 300px;",
         "justify-content: space-between;",  # Ensures even distribution
@@ -232,7 +233,7 @@ moduleBrainTissueSelectionServer <- function(id,
           label = "Scoring Filter",
           size = "normal",
           onLabel = "Unscored Only",
-          offLabel = "All Tissues",
+          offLabel = "Disregard",
           value = FALSE,
           width = "100%"
         ) %>%
