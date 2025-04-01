@@ -68,7 +68,7 @@ CB_help <-
     "paintbrush_depth" =
       list(
         content = c(
-          "Sets how many slices the brush selection is propagated through in Beam mode.",
+          "Sets how many slices the brush selection is propagated through in Ray mode.",
           "",
           "The number defines how deep the brush stroke should go along the selected direction.",
           "",
@@ -80,7 +80,7 @@ CB_help <-
     "paintbrush_direction" =
       list(
         content = c(
-          "Controls the direction in which the 2D selection is propagated across slices in Beam mode.",
+          "Controls the direction in which the 2D selection is propagated across slices in Ray mode.",
           "",
           "- **Forward**: Propagates the selection in the direction you are looking (e.g., from inferior to superior in axial view).",
           "- **Backward**: Propagates opposite to your view direction.",
@@ -100,9 +100,8 @@ CB_help <-
           "",
           "**Sphere** mode selects voxels in a spherical neighborhood around each brush position, including adjacent slices.",
           "",
-          "**Beam** mode propagates the 2D brush selection across slices in a straight line (e.g., superior-inferior), preserving the exact 2D shape while extending its depth.",
-          "",
-          "Beam mode is useful when you want to apply the same brush stroke across several slices, e.g., for tube-shaped structures or lesion segments."
+          "**Ray** mode propagates the 2D brush selection across slices in a straight line (e.g., superior-inferior).
+          How the selection is propagated depends on the chosen brush scope."
         ),
         type = "inline"
       ),
@@ -124,15 +123,15 @@ CB_help <-
           "",
           "Unscored Only:",
           "Selection criteria apply only to brain tissue that has not yet been
-          assigned a score. For example, if you've selected a specific gyrus or
+          assigned a score. For example, if you've already selected a specific gyrus or
           subcortical structure, refined it with the paintbrush eraser, and
-          assigned a score, selecting 'Unscored Only' ensures that your criteria
-          apply only to unscored tissue.",
+          assigned a score, selecting 'Unscored Only' ensures that only brain tissue
+          is selected that has not received a score yet if you use the same selection
+          criteria again.",
           "",
-          "All Tissues:",
-          "Selection criteria apply to all relevant brain tissue, regardless of
-          whether it has already been scored. This includes both previously scored
-          and unscored tissue that meets your selection criteria."
+          "Disregard:",
+          "Selection criteria apply to the whole brain, regardless of
+          whether the certain regions have already been scored."
         ),
         type = "inline"
       ),
@@ -226,13 +225,13 @@ CB_help <-
         content = c(
           "Choose a tool to interactively define, refine, or erase tissue selections in the MRI viewer.",
           "",
-          "**Outline**: Draw a freehand outline directly on a 2D MRI slice to define a custom region. The shape can be confirmed and used to select all underlying voxels. Useful for irregular or non-anatomical structures.",
+          "**Region-Click**: Double-click a voxel to select its entire anatomical region across the brain, based on the selected selection scope (e.g., a gyrus or white matter region). This is a quick way to select meaningful structures in 3D.",
+          #"**Outline**: Draw a freehand outline directly on a 2D MRI slice to define a custom region. The shape can be confirmed and used to select all underlying voxels. Useful for irregular or non-anatomical structures.",
+          #"",
           "",
-          "**Paintbrush**: Use a circular brush to paint voxels on the current slice. Depending on the selected brush mode (Sphere or Beam), the selection is extended across slices. Ideal for marking localized or tube-like regions.",
+          "**Paintbrush**: Use a circular brush to paint voxels on the current slice. Depending on the selected brush mode (Sphere or Ray), the selection is extended across slices. Ideal for marking localized or tube-like regions.",
           "",
           "**Eraser (Paintbrush + Eraser)**: Works like the paintbrush but in erase mode. You can remove previously selected voxels using the same brush-based interaction. ⚠️ A selection must exist to use this tool.",
-          "",
-          "**Region-Click**: Double-click a voxel to select its entire anatomical region across the brain, based on the selected selection scope (e.g., a gyrus or white matter region). This is a quick way to select meaningful structures in 3D.",
           "",
           "**Margin**: Once a selection exists, this tool allows you to add a safety margin around it. The margin thickness can be adjusted, and margins can be confirmed or deleted. ⚠️ Requires an existing selection.",
           "",

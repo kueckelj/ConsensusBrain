@@ -1,58 +1,48 @@
 
-moduleScoreAssignmentUI <- function(id) {
+moduleScoreAssignmentUI <- function(id, height = "300px") {
 
   ns <- shiny::NS(id)
 
-  # Output UI with improved layout
   shiny::tagList(
     shiny::div(
-      style = c("
-              background-color: white;
-              box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
-              display: flex;
-              flex-direction: column;
-              padding: 10px;
-              border: 1px solid #ccc;
-              flex-wrap: wrap;
-              height: 300px;
-              width: 550px;
-              border-radius: 5px;"),
+      style = glue::glue("
+        background-color: white;
+        box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        border: 1px solid #ccc;
+        height: {height};
+        width: 550px;
+        border-radius: 5px;"),
 
-      # Header (Always at the Top)
+      # Header (Top)
       shiny::div(
         style = "flex-shrink: 0; text-align: left;",
         shiny::h4(shiny::strong(paste0(score_set_up$label, " - Score Assignment"))) %>%
           add_helper("score_description")
       ),
 
-      # Main Content (Centered)
-      shiny::fluidRow(
-        shiny::column(
-          width = 6,
-          align = "left",
-          shiny::uiOutput(ns("CBscore_main"))
-        ),
-        shiny::column(
-          width = 6,
-          align = "left",
-          shiny::uiOutput(ns("CBscore_margin"))
+      # Main Content (Middle, grows to fill space)
+      shiny::div(
+        style = "flex-grow: 1;",
+        shiny::fluidRow(
+          shiny::column(width = 1),
+          shiny::column(width = 5, align = "left", shiny::uiOutput(ns("CBscore_main"))),
+          shiny::column(width = 5, align = "left", shiny::uiOutput(ns("CBscore_margin"))),
+          shiny::column(width = 1)
         )
       ),
 
-      # Assign Score Button (Always at the Bottom)
+      # Action Button (Bottom, pushed down)
       shiny::div(
-        style = "flex-shrink: 0;",
-        shiny::fluidRow(
-          shiny::column(
-            width = 12,
-            align = "center",
-            shiny::uiOutput(ns("assign_score"))
-          )
-        )
+        style = "margin-top: auto; text-align: center;",
+        shiny::uiOutput(ns("assign_score"))
       )
     )
   )
 }
+
 
 
 moduleScoreAssignmentServer <- function(id,
@@ -130,7 +120,7 @@ moduleScoreAssignmentServer <- function(id,
 
         shiny::validate(
           shiny::need(
-            expr = any(voxel_df_input()$selected),
+            expr = any(voxel_df()$selected),
             message = "No tissue selected."
           )
         )
@@ -173,7 +163,7 @@ moduleScoreAssignmentServer <- function(id,
 
         shiny::validate(
           shiny::need(
-            expr = any(voxel_df_input()$is_margin & voxel_df_input()$selected),
+            expr = any(voxel_df()$is_margin & voxel_df()$selected),
             message = "No margin confirmed."
           )
         )
@@ -212,18 +202,30 @@ moduleScoreAssignmentServer <- function(id,
       })
 
       # -----
+
+      voxel_df <- shiny::reactiveVal(value = data.frame())
       voxel_df_with_score <- shiny::reactiveVal(value = data.frame())
 
       # ----- reactive (Expressions)
 
       voxel_df_selected <- shiny::reactive({
 
-        shiny::req("selected" %in% names(voxel_df_input()))
-        dplyr::filter(voxel_df_input(), selected)
+        shiny::req("selected" %in% names(voxel_df()))
+        dplyr::filter(voxel_df(), selected)
 
         })
 
       # ----- observeEvents
+
+      shiny::observeEvent(voxel_df_input(), {
+
+        if(!identical(x = voxel_df(), y = voxel_df_input())){
+
+          voxel_df({ voxel_df_input() })
+
+        }
+
+      })
 
       shiny::observeEvent(input$assign_score, {
 

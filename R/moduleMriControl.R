@@ -43,6 +43,10 @@ moduleMriControlServer <- function(id,
 
       # 1. Global ---------------------------------------------------------------
 
+      # paintbrush/paintbrush_erase share their value
+      selection_tool <- shiny::reactiveVal(value = "region_click")
+      selection_scope <- shiny::reactiveVal(value = list(region_click = "ann_dk_adj", paintbrush = "ann_macro"))
+
       # Dynamic UI --------------------------------------------------------------
 
       style_ab <- "height: 37px; font-size: 14px; padding: 6px; text-align: center;"
@@ -305,7 +309,7 @@ moduleMriControlServer <- function(id,
         shiny::req(stringr::str_detect(input$selection_tool, "paintbrush"))
         shiny::req(input$paintbrush_mode)
 
-        if(input$paintbrush_mode == "Beam" & paintbrush_direction() != "both"){
+        if(input$paintbrush_mode == "Ray" & paintbrush_direction() != "both"){
 
           shiny::column(
             width = 1,
@@ -333,24 +337,28 @@ moduleMriControlServer <- function(id,
 
         shiny::req(input$paintbrush_mode)
 
-        if(input$paintbrush_mode == "Beam"){
+        if(input$paintbrush_mode == "Ray"){
 
-          beam_choices <- c(
-            # Forward
-            '<div style="display: flex; justify-content: center; align-items: center; height: 100%;">
-     <i class="fas fa-arrow-up-long" style="font-size: 1.5em;" data-toggle="tooltip" title="Forward (in viewing direction)"></i>
+          Ray_choices <- c(
+
+            # Forward (arrow up with ceiling line)
+            '<div style="display: flex; flex-direction: column; align-items: center; height: 100%;">
+     <div style="width: 20px; height: 2px; background-color: black; margin-bottom: 2px;"></div>
+     <i class="fas fa-arrow-up-long" style="font-size: 1.2em;" data-toggle="tooltip" title="Forward (in viewing direction)"></i>
    </div>' = "forward",
 
-            # Backward
-            '<div style="display: flex; justify-content: center; align-items: center; height: 100%;">
-     <i class="fas fa-arrow-down-long" style="font-size: 1.5em;" data-toggle="tooltip" title="Backward (opposite to viewing direction)"></i>
+            # Backward (arrow down with floor line)
+            '<div style="display: flex; flex-direction: column; align-items: center; height: 100%;">
+     <i class="fas fa-arrow-down-long" style="font-size: 1.2em;" data-toggle="tooltip" title="Backward (opposite to viewing direction)"></i>
+     <div style="width: 20px; height: 2px; background-color: black; margin-top: 2px;"></div>
    </div>' = "backward",
 
-            # Both
+            # Both (up-down arrow without line)
             '<div style="display: flex; justify-content: center; align-items: center; height: 100%;">
      <i class="fas fa-arrows-up-down" style="font-size: 1.5em;" data-toggle="tooltip" title="Both directions"></i>
    </div>' = "both"
           )
+
 
           shiny::column(
             width = 1,
@@ -359,7 +367,7 @@ moduleMriControlServer <- function(id,
             shinyWidgets::radioGroupButtons(
               inputId = ns("paintbrush_direction"),
               label = NULL,
-              choices = beam_choices,
+              choices = Ray_choices,
               selected = shiny::isolate({ paintbrush_direction() }),
               direction = "horizontal",
               justified = TRUE,
@@ -388,7 +396,7 @@ moduleMriControlServer <- function(id,
           shinyWidgets::radioGroupButtons(
             inputId = ns("paintbrush_mode"),
             label = NULL,
-            choices = c("Sphere", "Beam"),
+            choices = c("Sphere", "Ray"),
             selected = shiny::isolate({ paintbrush_mode() }),
             direction = "horizontal",
             justified = TRUE,
@@ -435,7 +443,7 @@ moduleMriControlServer <- function(id,
         shiny::req(selection_scope())
         shiny::req(selection_tool())
 
-        if(stringr::str_detect(selection_tool(), "paintbrush") & input$paintbrush_mode == "Beam" |
+        if(stringr::str_detect(selection_tool(), "paintbrush") & input$paintbrush_mode == "Ray" |
            selection_tool() == "region_click"){
 
           if(stringr::str_detect(selection_tool(), "paintbrush")){
@@ -450,6 +458,8 @@ moduleMriControlServer <- function(id,
 
             helper_name <- "selection_scope_paintbrush"
 
+            label <- "Brush Scope:"
+
           } else {
 
             choices <-
@@ -460,12 +470,14 @@ moduleMriControlServer <- function(id,
 
             helper_name <- "selection_scope_region_click"
 
+            label <- "Region Scope:"
+
           }
 
           shiny::column(
             width = 2,
             align = "left",
-            shiny::h5(shiny::strong("Selection Scope:")) %>% add_helper(helper_name),
+            shiny::h5(shiny::strong(label)) %>% add_helper(helper_name),
             shinyWidgets::pickerInput(
               inputId = ns("selection_scope"),
               label = NULL,
@@ -514,18 +526,15 @@ moduleMriControlServer <- function(id,
 
       # Reactive Values ---------------------------------------------------------
 
-      paintbrush_depth <- shiny::reactiveVal(value = 10)
+      paintbrush_depth <- shiny::reactiveVal(value = 25)
       paintbrush_direction <- shiny::reactiveVal(value = "forward")
       paintbrush_mode <- shiny::reactiveVal(value = "Sphere")
-      paintbrush_radius <- shiny::reactiveVal(value = 5)
+      paintbrush_radius <- shiny::reactiveVal(value = 7.5)
 
       shiny::observeEvent(input$paintbrush_depth,{ paintbrush_depth({ input$paintbrush_depth }) })
       shiny::observeEvent(input$paintbrush_direction,{ paintbrush_direction({ input$paintbrush_direction }) })
       shiny::observeEvent(input$paintbrush_mode,{ paintbrush_mode({ input$paintbrush_mode }) })
       shiny::observeEvent(input$paintbrush_radius,{ paintbrush_radius({ input$paintbrush_radius }) })
-
-      # paintbrush/paintbrush_erase share their value
-      selection_scope <- shiny::reactiveVal(value = list(region_click = "ann_dk_adj", paintbrush = "ann_macro"))
 
       shiny::observeEvent(input$selection_scope, {
 
@@ -726,6 +735,20 @@ moduleMriControlServer <- function(id,
 
       outlines_valid <- shiny::reactive({ purrr::keep(outlines_control(), .p = ~ nrow(.x) > 3) })
 
+      paintbrush_masks <- shiny::reactive({
+
+        purrr::keep(
+          .x =
+            list(
+              sag = mri_sag_out()$paintbrushed_ids,
+              axi = mri_axi_out()$paintbrushed_ids,
+              cor = mri_cor_out()$paintbrushed_ids
+            ),
+          .p = ~ length(.x) != 0
+        )
+
+      })
+
       # Reactive Values ---------------------------------------------------------
 
       updated_voxels <- shiny::reactiveVal(character())
@@ -822,8 +845,6 @@ moduleMriControlServer <- function(id,
         stringr::str_detect(input$selection_tool, pattern = "_erase$")
 
       })
-
-      selection_tool <- shiny::reactiveVal(value = "region_click")
 
       shiny::observeEvent(input$selection_tool, {
 
@@ -953,7 +974,6 @@ moduleMriControlServer <- function(id,
         new_voxel_df <-
           dplyr::mutate(
             .data = voxel_df(),
-            color = dplyr::if_else(id %in% external_selection()[["id"]], true = alpha("forestgreen", alpha_val), false = color),
             selected = id %in% external_selection()[["id"]]
           )
 
@@ -1313,26 +1333,6 @@ moduleMriControlServer <- function(id,
 
       })
 
-      shiny::observeEvent(input$selection_debris_rm_modal, {
-
-        vdf_with_debris <- identify_debris(voxel_df())
-
-        debris_ids <-
-          dplyr::filter(vdf_with_debris, debris == "0") %>%
-          dplyr::pull(id)
-
-        voxel_df({
-
-          dplyr::mutate(
-            .data = vdf_with_debris,
-            selected = dplyr::if_else(id %in% {{debris_ids}}, true = FALSE, false = selected),
-            debris = NULL
-          )
-
-        })
-
-      })
-
       shiny::observeEvent(input$selection_reset, {
 
         shinyalert::shinyalert(
@@ -1540,7 +1540,7 @@ moduleMriControlServer <- function(id,
         debris_button <- if(length(debris_ids) != 0) {
 
           shiny::actionButton(
-            inputId = ns("selection_debris_rm_modal"),
+            inputId = ns("selection_debris_rm"),
             label = "Debris",
             icon = icon("broom")
           )
@@ -1672,6 +1672,7 @@ moduleMriControlServer <- function(id,
               outlines_reset = input$outline_reset_all,
               paintbrush_direction = paintbrush_direction(),
               paintbrush_depth = paintbrush_depth(),
+              paintbrush_masks = paintbrush_masks(),
               paintbrush_mode = paintbrush_mode(),
               paintbrush_radius = paintbrush_radius(),
               slice_state = slice_state,

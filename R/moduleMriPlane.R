@@ -493,6 +493,7 @@ moduleMriPlaneUI <- function(id,
 moduleMriPlaneServer <- function(id,
                                  plane,
                                  nifti_input,
+                                 selection_color_input = function(){ "forestgreen" },
                                  non_brain_template,
                                  mri_control,
                                  mode_init = "inspection"
@@ -507,13 +508,9 @@ moduleMriPlaneServer <- function(id,
   col_axis <- ra_mri["col"]
   row_axis <- ra_mri["row"]
 
+  mri_grid <- tidyr::expand_grid(col = 1:256, row = 1:256)
+
   # color = NA -> can be selected, but is not displayed
-  nbt <-
-    dplyr::mutate(
-      .data = non_brain_template,
-      color = ggplot2::alpha("forestgreen", 0.2),
-      selected = FALSE
-      )
 
   shiny::moduleServer(
     id = id,
@@ -527,16 +524,21 @@ moduleMriPlaneServer <- function(id,
         #assign(x = "data", value = reactiveValuesToList(data), envir = .GlobalEnv)
         print("-----------------------")
         print("Test")#
-        print("XXX")
-        print(mode())
+        print(mri_control_input$paintbrush_masks)
 
       }, ignoreInit = TRUE)
 
       shiny::observe({
 
         print("----------")
-        print(mode())
-        print(cursor_pos())
+        print(mri_control_input$paintbrush_masks)
+
+      })
+
+      pb_mask_on_diff_plane <- shiny::reactive({
+
+        length(mri_control_input$paintbrush_masks) == 1 &&
+        names(mri_control_input$paintbrush_masks) != plane
 
       })
 
@@ -600,69 +602,83 @@ moduleMriPlaneServer <- function(id,
 
           } else if(mri_control_input$selection_tool == "paintbrush"){
 
-            shiny::column(
-              offset = 1,
-              width = 10,
-              align = "center",
-              shiny::splitLayout(
-                cellWidths = "33%",
-                shiny::actionButton(
-                  inputId = ns("paintbrush_confirm"),
-                  label = "Confirm",
-                  width = "100%",
-                  icon = shiny::icon("check"),
-                  disabled = btns_disabled_paintbrush()
-                ),
-                shiny::actionButton(
-                  inputId = ns("paintbrush_backward"),
-                  label = "Backward",
-                  icon = shiny::icon(name = "step-backward"),
-                  width = "100%",
-                  disabled = btns_disabled_paintbrush()
-                ),
-                shiny::actionButton(
-                  inputId = ns("paintbrush_reset"),
-                  label = "Reset",
-                  icon = shiny::icon(name = "trash"),
-                  width = "100%",
-                  disabled = btns_disabled_paintbrush()
+            if(length(paintbrushed_ids()) != 0){
+
+              shiny::column(
+                offset = 1,
+                width = 10,
+                align = "center",
+                shiny::splitLayout(
+                  cellWidths = "33%",
+                  shiny::actionButton(
+                    inputId = ns("paintbrush_confirm"),
+                    label = "Confirm",
+                    width = "100%",
+                    icon = shiny::icon("check"),
+                    disabled = btns_disabled_paintbrush()
+                  ),
+                  shiny::actionButton(
+                    inputId = ns("paintbrush_backward"),
+                    label = "Backward",
+                    icon = shiny::icon(name = "step-backward"),
+                    width = "100%",
+                    disabled = btns_disabled_paintbrush()
+                  ),
+                  shiny::actionButton(
+                    inputId = ns("paintbrush_reset"),
+                    label = "Reset",
+                    icon = shiny::icon(name = "trash"),
+                    width = "100%",
+                    disabled = btns_disabled_paintbrush()
+                  )
                 )
-              ),
+              )
+
+            } else {
+
               shiny::uiOutput(ns("paintbrush_helptext"))
-            )
+
+            }
 
           } else if(mri_control_input$selection_tool == "paintbrush_erase"){
 
-            shiny::column(
-              offset = 1,
-              width = 10,
-              align = "center",
-              shiny::splitLayout(
-                cellWidths = "33%",
-                shiny::actionButton(
-                  inputId = ns("paintbrush_erase_confirm3D"),
-                  icon = shiny::icon("eraser"),
-                  label = "Erase",
-                  width = "100%",
-                  disabled = btns_disabled_paintbrush_erase()
-                ),
-                shiny::actionButton(
-                  inputId = ns("paintbrush_erase_backward"),
-                  label = "Backward",
-                  icon = shiny::icon(name = "step-backward"),
-                  width = "100%",
-                  disabled = btns_disabled_paintbrush_erase()
-                ),
-                shiny::actionButton(
-                  inputId = ns("paintbrush_erase_reset"),
-                  label = "Reset",
-                  icon = shiny::icon(name = "trash"),
-                  width = "100%",
-                  disabled = btns_disabled_paintbrush_erase()
+            if(length(paintbrushed_ids()) != 0){
+
+              shiny::column(
+                offset = 1,
+                width = 10,
+                align = "center",
+                shiny::splitLayout(
+                  cellWidths = "33%",
+                  shiny::actionButton(
+                    inputId = ns("paintbrush_erase_confirm3D"),
+                    icon = shiny::icon("eraser"),
+                    label = "Erase",
+                    width = "100%",
+                    disabled = btns_disabled_paintbrush_erase()
+                  ),
+                  shiny::actionButton(
+                    inputId = ns("paintbrush_erase_backward"),
+                    label = "Backward",
+                    icon = shiny::icon(name = "step-backward"),
+                    width = "100%",
+                    disabled = btns_disabled_paintbrush_erase()
+                  ),
+                  shiny::actionButton(
+                    inputId = ns("paintbrush_erase_reset"),
+                    label = "Reset",
+                    icon = shiny::icon(name = "trash"),
+                    width = "100%",
+                    disabled = btns_disabled_paintbrush_erase()
+                  )
                 )
-              ),
+              )
+
+            } else {
+
               shiny::uiOutput(ns("paintbrush_helptext"))
-            )
+
+            }
 
           } else if(selection_tool() == "safety_margin"){
 
@@ -697,17 +713,29 @@ moduleMriPlaneServer <- function(id,
 
       output$paintbrush_helptext <- shiny::renderUI({
 
-        if(!drawing_active()){
+        if(pb_mask_on_diff_plane()){
 
-          word <- ifelse(length(data$paintbrush_erase) != 0, "continue", "start")
+          name <- tolower(mri_planes_pretty[names(mri_control_input$paintbrush_masks)])
 
-          shiny::helpText(glue::glue("Double-click on the MRI to {word} brushing."))
+          shiny::helpText(glue::glue("Drawing on {name} plane."))
 
         } else {
 
-          shiny::helpText("Double-click to stop brushing.")
+          if(!drawing_active()){
+
+            word <- ifelse(length(data$paintbrush_erase) != 0, "continue", "start")
+
+            shiny::helpText(glue::glue("Double-click on the MRI to {word} brushing."))
+
+          } else {
+
+            shiny::helpText("Double-click to stop brushing.")
+
+          }
 
         }
+
+
 
       })
 
@@ -727,6 +755,7 @@ moduleMriPlaneServer <- function(id,
           outlines_reset = numeric(1),
           paintbrush_depth = numeric(1),
           paintbrush_direction = character(1),
+          paintbrush_masks = list(),
           paintbrush_mode = character(1),
           paintbrush_radius = numeric(1),
           slice_state = list(),
@@ -841,7 +870,6 @@ moduleMriPlaneServer <- function(id,
       hover_text <- shiny::reactive({
 
         shiny::req(cursor_pos())
-        print("hover_text")
 
         if(shiny::isTruthy(slice_df_hover()) & !drawing_active()){
 
@@ -853,12 +881,6 @@ moduleMriPlaneServer <- function(id,
             text <- c("No brain tissue")
 
           } else {
-
-            if(nrow(slice_df_hover())>1){
-
-              print(slice_df_hover())
-
-            }
 
             text <- make_pretty_label(slice_df_hover()[[selection_scope()]])
 
@@ -1039,7 +1061,7 @@ moduleMriPlaneServer <- function(id,
 
         shiny::req(!drawing_active())
         shiny::req(slice_df())
-print("C")
+
         # circumevent without req()!
         if(shiny::isTruthy(cursor_pos())){
 
@@ -1744,8 +1766,7 @@ print("C")
 
       }, bg = "transparent")
 
-
-      beam_depth <- shiny::reactive({
+      ray_depth <- shiny::reactive({
 
         pb_dir <- mri_control_input$paintbrush_direction
         pb_depth <- mri_control_input$paintbrush_depth
@@ -1764,9 +1785,9 @@ print("C")
 
       })
 
-      beam_dir <- shiny::reactive({
+      ray_dir <- shiny::reactive({
 
-        if(mri_control_input$paintbrush_mode == "Beam"){
+        if(mri_control_input$paintbrush_mode == "Ray"){
 
           mri_control_input$paintbrush_direction
 
@@ -1782,11 +1803,10 @@ print("C")
 
       localizer_col_h <- shiny::reactive({ ifelse(cursor_on_mri(), alpha("red", 0.5), "red") })
 
-
       localizer_lty <- shiny::reactive({ ifelse(cursor_on_mri(), "solid", "solid") })
       localizer_lwd <- shiny::reactive({ ifelse(cursor_on_mri(), 1, 1.5) })
 
-      show_localizer_beam_v <- shiny::reactive({
+      show_localizer_ray_v <- shiny::reactive({
 
         if(is.null(mri_control_input$paintbrush_mode)){
 
@@ -1795,7 +1815,7 @@ print("C")
         } else {
 
           mri_control_input$selection_tool %in% c("paintbrush", "paintbrush_erase") &
-          mri_control_input$paintbrush_mode == "Beam" &
+          mri_control_input$paintbrush_mode == "Ray" &
           mri_control_input$paintbrush_direction != "both" &
           unname(ra_mri["col"]) %in% mri_control_input$cursor_on_plane
 
@@ -1803,7 +1823,7 @@ print("C")
 
       })
 
-      show_localizer_beam_h <- shiny::reactive({
+      show_localizer_ray_h <- shiny::reactive({
 
         if(is.null(mri_control_input$paintbrush_mode)){
 
@@ -1812,7 +1832,7 @@ print("C")
         } else {
 
           mri_control_input$selection_tool %in% c("paintbrush", "paintbrush_erase") &
-          mri_control_input$paintbrush_mode == "Beam" &
+          mri_control_input$paintbrush_mode == "Ray" &
           mri_control_input$paintbrush_direction != "both" &
           unname(ra_mri["row"]) %in% mri_control_input$cursor_on_plane
 
@@ -1826,67 +1846,18 @@ print("C")
 
       localizer_x1_v <- shiny::reactive({ slice_pos[[ra_mri["col"]]] })
 
-      localizer_y0_v <- shiny::reactive({
+      localizer_y0_v <- shiny::reactive({ ifelse(show_localizer_ray_h(), NA, row_min()) })
 
-        if(show_localizer_beam_h()){
-
-          NA
-
-        } else {
-
-          row_min()
-
-        }
-
-      })
-
-      localizer_y1_v <- shiny::reactive({
-
-        if(show_localizer_beam_h()){
-
-          NA
-
-        } else {
-
-          row_max()
-
-        }
-
-      })
+      localizer_y1_v <- shiny::reactive({ ifelse(show_localizer_ray_h(), NA, row_max()) })
 
       # positioning of the horizontal localizer
       localizer_y0_h <- shiny::reactive({ slice_pos[[ra_mri["row"]]] })
 
       localizer_y1_h <- shiny::reactive({ slice_pos[[ra_mri["row"]]] })
 
-      localizer_x0_h <- shiny::reactive({
+      localizer_x0_h <- shiny::reactive({ ifelse(show_localizer_ray_v(), NA, col_min()) })
 
-        if(show_localizer_beam_v()){
-
-          NA
-
-        } else {
-
-          col_min()
-
-        }
-
-      })
-
-      localizer_x1_h <- shiny::reactive({
-
-        if(show_localizer_beam_v()){
-
-          NA
-
-        } else {
-
-          col_max()
-
-        }
-
-      })
-
+      localizer_x1_h <- shiny::reactive({ ifelse(show_localizer_ray_v(), NA, col_max()) })
 
       output$mriLocalizerPlot <- shiny::renderPlot({
 
@@ -1910,26 +1881,155 @@ print("C")
             col = localizer_col_h(), lwd = localizer_lwd(), lty = localizer_lty()
           )
 
-          if(show_localizer_beam_v()){
+          if(show_localizer_ray_v()){
+
+            ray_x <- slice_pos[[ra_mri[["col"]]]] - ray_depth()
+
+            if(!within_range(ray_x, r = range(voxel_df()[[ra_ccs["col"]]]))){
+
+              if(ray_dir() == "forward"){
+
+                ray_x <- max(voxel_df()[[ra_ccs["col"]]])
+
+                depth <- ray_x - slice_pos[[ra_mri[["col"]]]]
+
+                text_y <-
+                  c(
+                    row_min() + diff(range(row_seq())) * 0.06,
+                    row_max() - diff(range(row_seq())) * 0.04
+                  )
+
+                srt <- 270
+
+              } else if(ray_dir() == "backward"){
+
+                ray_x <- min(voxel_df()[[ra_ccs["col"]]])
+
+                depth <- slice_pos[[ra_mri[["col"]]]] - ray_x
+
+                text_y <-
+                  c(
+                    row_max() - diff(range(row_seq())) * 0.06,
+                    row_min() + diff(range(row_seq())) * 0.04
+                  )
+
+                srt <- 90
+
+              }
+
+              label <- c(paste(depth, "mm"), "Max.")
+
+            } else {
+
+              label <- paste0(abs(ray_depth()), "mm")
+
+              if(ray_dir() == "forward"){
+
+                text_y <- row_min() + diff(range(row_seq())) * 0.05
+
+                srt <- 270
+
+              } else if(ray_dir() == "backward"){
+
+                text_y <- row_max() - diff(range(row_seq())) * 0.05
+
+                srt <- 90
+
+              }
+
+            }
+
+            if(ray_dir() == "forward"){
+
+              text_x <- slice_pos[[ra_mri[["col"]]]] + diff(range(col_seq())) * 0.025
+
+            } else if(ray_dir() == "backward"){
+
+              text_x <- slice_pos[[ra_mri[["col"]]]] - diff(range(col_seq())) * 0.025
+
+            }
 
             # vertical
             segments(
-              x0 = slice_pos[[ra_mri[["col"]]]] - beam_depth(),
-              x1 = slice_pos[[ra_mri[["col"]]]] - beam_depth(),
+              x0 = ray_x, x1 = ray_x,
               y0 = row_min(), y1 = row_max(),
               col = "red", lwd = 1.5, lty = "dotted"
             )
 
+            text(
+              x = text_x,
+              y = text_y,
+              labels = label,
+              col = "red",
+              cex = 1.25 - diff(row_seq())*0.0001,
+              font = 1,
+              srt = srt,
+              adj = c(0.5, 0.5)
+            )
+
           }
 
-          if(show_localizer_beam_h()){
+          if(show_localizer_ray_h()){
+
+            ray_y <- slice_pos[[ra_mri[["row"]]]] + ray_depth()
+
+            if(!within_range(ray_y, r = range(voxel_df()[[ra_ccs["row"]]]))){
+
+              if(ray_dir() == "forward"){
+
+                ray_y <- min(voxel_df()[[ra_ccs["row"]]])
+
+                depth <- slice_pos[[ra_mri[["row"]]]] - ray_y
+
+              } else if(ray_dir() == "backward"){
+
+                ray_y <- max(voxel_df()[[ra_ccs["row"]]])
+
+                depth <- ray_y - slice_pos[[ra_mri[["row"]]]]
+
+              }
+
+              text_x <-
+                c(
+                  col_min() + diff(range(col_seq())) * 0.06,
+                  col_max() - diff(range(col_seq())) * 0.04
+                )
+
+              label <- c(paste(depth, "mm"), "Max")
+
+            } else {
+
+              text_x <- col_min() + diff(range(col_seq())) * 0.05
+
+              label <- paste0(abs(ray_depth()), "mm")
+
+            }
+
+            if(ray_dir() == "forward"){
+
+              text_y <- slice_pos[[ra_mri[["row"]]]] - diff(range(row_seq())) * 0.015
+
+            } else if(ray_dir() == "backward"){
+
+              text_y <- slice_pos[[ra_mri[["row"]]]] + diff(range(row_seq())) * 0.015
+
+            }
 
             # horizontal
             segments(
               x0 = col_min(), x1 = col_max(),
-              y0 = slice_pos[[ra_mri[["row"]]]] + beam_depth(),
-              y1 = slice_pos[[ra_mri[["row"]]]] + beam_depth(),
+              y0 = ray_y, y1 = ray_y,
               col = "red", lwd = 1.5, lty = "dotted"
+            )
+
+            text(
+              x = text_x,
+              y = text_y,
+              labels = label,
+              col = "red",
+              cex = 1.25 - diff(col_seq())*0.0001,
+              font = 1,
+              adj = c(0.5, 0.5)
             )
 
           }
@@ -1950,24 +2050,155 @@ print("C")
             col = localizer_col_h(), lwd = localizer_lwd(), lty = localizer_lty()
           )
 
-          if(show_localizer_beam_v()){
+          if(show_localizer_ray_v()){
+
+            ray_x <- slice_pos[[ra_mri[["col"]]]] + ray_depth()
+
+            if(!within_range(ray_x, r = range(voxel_df()[[ra_ccs["col"]]]))){
+
+              if(ray_dir() == "backward"){
+
+                ray_x <- max(voxel_df()[[ra_ccs["col"]]])
+
+                depth <- ray_x - slice_pos[[ra_mri[["col"]]]]
+
+                text_y <-
+                  c(
+                    row_min() + diff(range(row_seq())) * 0.06,
+                    row_max() - diff(range(row_seq())) * 0.04
+                  )
+
+                srt <- 270
+
+              } else if(ray_dir() == "forward"){
+
+                ray_x <- min(voxel_df()[[ra_ccs["col"]]])
+
+                depth <- slice_pos[[ra_mri[["col"]]]] - ray_x
+
+                text_y <-
+                  c(
+                    row_max() - diff(range(row_seq())) * 0.06,
+                    row_min() + diff(range(row_seq())) * 0.04
+                  )
+
+                srt <- 90
+
+              }
+
+              label <- c(paste(depth, "mm"), "Max.")
+
+            } else {
+
+              if(ray_dir() == "backward"){
+
+                text_y <- row_min() + diff(range(row_seq())) * 0.05
+
+                srt <- 270
+
+              } else if(ray_dir() == "forward"){
+
+                text_y <- row_max() - diff(range(row_seq())) * 0.05
+
+                srt <- 90
+
+              }
+
+              label <- paste0(abs(ray_depth()), "mm")
+
+            }
+
+            if(ray_dir() == "backward"){
+
+              text_x <- slice_pos[[ra_mri[["col"]]]] + diff(range(col_seq())) * 0.025
+
+            } else if(ray_dir() == "forward"){
+
+              text_x <- slice_pos[[ra_mri[["col"]]]] - diff(range(col_seq())) * 0.025
+
+            }
 
             # vertical
             segments(
-              x0 = slice_pos$sag + beam_depth(), x1 = slice_pos$sag + beam_depth(),
+              x0 = ray_x, x1 = ray_x,
               y0 = row_min(), y1 = row_max(),
               col = "red", lwd = 1.5, lty = "dotted"
             )
 
+            text(
+              x = text_x,
+              y = text_y,
+              labels = label,
+              col = "red",
+              cex = 1.25 - diff(row_seq())*0.0001,
+              font = 1,
+              srt = srt,
+              adj = c(0.5, 0.5)
+            )
+
           }
 
-          if(show_localizer_beam_h()){
+          if(show_localizer_ray_h()){
+
+            ray_y <- slice_pos[[ra_mri[["row"]]]] - ray_depth()
+
+            if(!within_range(ray_y, r = range(voxel_df()[[ra_ccs["row"]]]))){
+
+              if(ray_dir() == "backward"){
+
+                ray_y <- min(voxel_df()[[ra_ccs["row"]]])
+
+                depth <- slice_pos[[ra_mri[["row"]]]] - ray_y
+
+              } else if(ray_dir() == "forward"){
+
+                ray_y <- max(voxel_df()[[ra_ccs["row"]]])
+
+                depth <- ray_y - slice_pos[[ra_mri[["row"]]]]
+
+              }
+
+              text_x <-
+                c(
+                  col_min() + diff(range(col_seq())) * 0.06,
+                  col_max() - diff(range(col_seq())) * 0.04
+                )
+
+              label <- c(paste(depth, "mm"), "Max")
+
+            } else {
+
+              text_x <- col_min() + diff(range(col_seq())) * 0.05
+
+              label <- paste0(abs(ray_depth()), "mm")
+
+            }
+
+            if(ray_dir() == "backward"){
+
+              text_y <- slice_pos[[ra_mri[["row"]]]] - diff(range(row_seq())) * 0.015
+
+            } else if(ray_dir() == "forward"){
+
+              text_y <- slice_pos[[ra_mri[["row"]]]] + diff(range(row_seq())) * 0.015
+
+            }
 
             # horizontal
             segments(
               x0 = col_min(), x1 = col_max(),
-              y0 = slice_pos$cor - beam_depth(), y1 = slice_pos$cor - beam_depth(),
+              y0 = ray_y, y1 = ray_y,
               col = "red", lwd = 1.5, lty = "dotted"
+            )
+
+            text(
+              x = text_x,
+              y = text_y,
+              labels = label,
+              col = "red",
+              cex = 1.25 - diff(col_seq())*0.0001,
+              font = 1,
+              adj = c(0.5, 0.5)
             )
 
           }
@@ -1988,24 +2219,155 @@ print("C")
             col = localizer_col_h(), lwd = localizer_lwd(), lty = localizer_lty()
           )
 
-          if(show_localizer_beam_v()){
+          if(show_localizer_ray_v()){
+
+            ray_x <- slice_pos[[ra_mri[["col"]]]] + ray_depth()
+
+            if(!within_range(ray_x, r = range(voxel_df()[[ra_ccs["col"]]]))){
+
+              if(ray_dir() == "backward"){
+
+                ray_x <- max(voxel_df()[[ra_ccs["col"]]])
+
+                depth <- ray_x - slice_pos[[ra_mri[["col"]]]]
+
+                text_y <-
+                  c(
+                    row_min() + diff(range(row_seq())) * 0.06,
+                    row_max() - diff(range(row_seq())) * 0.04
+                  )
+
+                srt <- 270
+
+              } else if(ray_dir() == "forward"){
+
+                ray_x <- min(voxel_df()[[ra_ccs["col"]]])
+
+                depth <- slice_pos[[ra_mri[["col"]]]] - ray_x
+
+                text_y <-
+                  c(
+                    row_max() - diff(range(row_seq())) * 0.0,
+                    row_min() + diff(range(row_seq())) * 0.04
+                  )
+
+                srt <- 90
+
+              }
+
+              label <- c(paste(depth, "mm"), "Max.")
+
+            } else {
+
+              if(ray_dir() == "backward"){
+
+                text_y <- row_min() + diff(range(row_seq())) * 0.05
+
+                srt <- 270
+
+              } else if(ray_dir() == "forward"){
+
+                text_y <- row_max() - diff(range(row_seq())) * 0.05
+
+                srt <- 90
+
+              }
+
+              label <- paste0(abs(ray_depth()), "mm")
+
+            }
+
+            if(ray_dir() == "backward"){
+
+              text_x <- slice_pos[[ra_mri[["col"]]]] + diff(range(col_seq())) * 0.025
+
+            } else if(ray_dir() == "forward"){
+
+              text_x <- slice_pos[[ra_mri[["col"]]]] - diff(range(col_seq())) * 0.025
+
+            }
 
             # vertical
             segments(
-              x0 = slice_pos$sag + beam_depth(), x1 = slice_pos$sag + beam_depth(),
+              x0 = ray_x, x1 = ray_x,
               y0 = row_min(), y1 = row_max(),
               col = "red", lwd = 1.5, lty = "dotted"
             )
 
+            text(
+              x = text_x,
+              y = text_y,
+              labels = label,
+              col = "red",
+              cex = 1.25 - diff(row_seq())*0.0001,
+              font = 1,
+              srt = srt,
+              adj = c(0.5, 0.5)
+            )
+
           }
 
-          if(show_localizer_beam_h()){
+          if(show_localizer_ray_h()){
+
+            ray_y <- slice_pos[[ra_mri[["row"]]]] + ray_depth()
+
+            if(!within_range(ray_y, r = range(voxel_df()[[ra_ccs["row"]]]))){
+
+              if(ray_dir() == "forward"){
+
+                ray_y <- min(voxel_df()[[ra_ccs["row"]]])
+
+                depth <- slice_pos[[ra_mri[["row"]]]] - ray_y
+
+              } else if(ray_dir() == "backward"){
+
+                ray_y <- max(voxel_df()[[ra_ccs["row"]]])
+
+                depth <- ray_y - slice_pos[[ra_mri[["row"]]]]
+
+              }
+
+              text_x <-
+                c(
+                  col_min() + diff(range(col_seq())) * 0.06,
+                  col_max() - diff(range(col_seq())) * 0.04
+                )
+
+              label <- c(paste(depth, "mm"), "Max")
+
+            } else {
+
+              text_x <- col_min() + diff(range(col_seq())) * 0.05
+
+              label <- paste0(abs(ray_depth()), "mm")
+
+            }
+
+            if(ray_dir() == "forward"){
+
+              text_y <- slice_pos[[ra_mri[["row"]]]] - diff(range(row_seq())) * 0.015
+
+            } else if(ray_dir() == "backward"){
+
+              text_y <- slice_pos[[ra_mri[["row"]]]] + diff(range(row_seq())) * 0.015
+
+            }
 
             # horizontal
             segments(
               x0 = col_min(), x1 = col_max(),
-              y0 = slice_pos$axi + beam_depth(), y1 = slice_pos$axi + beam_depth(),
+              y0 = ray_y, y1 = ray_y,
               col = "red", lwd = 1.5, lty = "dotted"
+            )
+
+            text(
+              x = text_x,
+              y = text_y,
+              labels = label,
+              col = "red",
+              cex = 1.25 - diff(col_seq())*0.0001,
+              font = 1,
+              adj = c(0.5, 0.5)
             )
 
           }
@@ -2075,8 +2437,6 @@ print("C")
         }
 
         # -- mode and interaction aid
-        label <- paste0("Mode: ", stringr::str_to_title(mode()))
-
         if(shiny::isTruthy(interaction_tool())){
 
           # plot paintbrush size if required
@@ -2096,7 +2456,7 @@ print("C")
           }
 
           # update label
-          label_interaction <-
+          label <-
             paste0(
               "\nTool: ",
               stringr::str_remove_all(interaction_tool(), pattern = "erase$") %>%
@@ -2106,16 +2466,44 @@ print("C")
 
           if(interaction_erase()){
 
-            label_interaction <- paste0(label_interaction, " - Erase")
+            label <- paste0(label, " - Erase")
 
           }
 
-          label <- paste0(label, label_interaction)
+          if(selection_tool() == "region_click"){
 
-        }
+            label <- paste0(label, "\nScope: ", ann_var_names[selection_scope()])
 
-        x_pos <- max(mri_range()[["col"]]) - (side_length*0.0125)
-        y_pos <- min(mri_range()[["row"]]) + (side_length*0.05)
+          } else if(selection_tool() == "paintbrush"){
+
+            label <- paste0(label, "\n3D Brush: ", mri_control_input$paintbrush_mode)
+
+            if(mri_control_input$paintbrush_mode == "Ray") {
+
+              label <- paste0(label, "\nDirection: ", stringr::str_to_title(mri_control_input$paintbrush_direction))
+
+              if(is.null(selection_scope())){
+
+                scope <- "None"
+
+              } else {
+
+                scope <- ann_var_names[selection_scope()]
+
+              }
+
+              label <- paste0(label, "\nScope: ", ann_var_names[selection_scope()])
+
+            }
+
+
+
+          }
+
+        } else { label = NA }
+
+        x_pos <- min(mri_range()[["col"]]) + (side_length*0.0125)
+        y_pos <- min(mri_range()[["row"]]) #+ (side_length*0.0125)
 
         # dist text
         graphics::text(
@@ -2125,7 +2513,7 @@ print("C")
           col = "white",
           cex = 1,
           font = 2,
-          adj = c(1, 0.5)
+          adj = c(0, 1)
         )
 
       }, bg = "transparent")
@@ -2139,8 +2527,19 @@ print("C")
 
         voxels_show <- inspection_template()
 
-        col <- ggplot2::alpha(score_set_up$colors[voxels_show$CBscore+1], 0.4)
-        col[voxels_show$CBscore == 0] <- ggplot2::alpha(col[voxels_show$CBscore == 0], 0.2)
+        if(!any(voxels_show$highlighted)){
+
+          col <- ggplot2::alpha(score_set_up$colors[voxels_show$CBscore+1], 0.4)
+          col[voxels_show$CBscore == 0] <- ggplot2::alpha(col[voxels_show$CBscore == 0], 0.2)
+
+        } else {
+
+          col <- score_set_up$colors[voxels_show$CBscore+1]
+
+          col[voxels_show$highlighted] <- ggplot2::alpha(col[voxels_show$highlighted], 0.6)
+          col[!voxels_show$highlighted] <- ggplot2::alpha(col[!voxels_show$highlighted], 0.1)
+
+        }
 
         graphics::rect(
           xleft = voxels_show$col - 0.5,
@@ -2214,7 +2613,7 @@ print("C")
 
         shiny::req(mri_slice())
 
-        plot_mri_frame(col = col_seq(), row = row_seq())
+        plot_mri_frame(col = col_seq(), row = row_seq(), bg = "green")
 
         graphics::rasterImage(
           image = mri_slice()[row_seq(), col_seq()],
@@ -2266,6 +2665,16 @@ print("C")
 
       })
 
+      nbt <- shiny::reactive({
+
+        dplyr::mutate(
+          .data = non_brain_template,
+          color = NA,
+          selected = FALSE
+        )
+
+      })
+
       # only voxels of the currently selected slice (=pixels) !!!!remove?
       selected_pixels <- shiny::reactive({
 
@@ -2279,13 +2688,21 @@ print("C")
 
       selected_voxels_control <- shiny::reactive({ mri_control_input$selected_voxels })
 
-      selection_color <- shiny::reactive({ ifelse(!selection_erase(), "forestgreen", "red") })
+      selection_color <- shiny::reactive({
+
+        ifelse(
+          test = !selection_erase(),
+          yes = selection_color_input(),
+          no = "red"
+          )
+
+        })
 
       selection_erase <- shiny::reactive({ mri_control_input$selection_erase })
 
       selection_slices <- shiny::reactive({
 
-        if(mri_control_input$paintbrush_mode == "Beam"){
+        if(mri_control_input$paintbrush_mode == "Ray"){
 
           if(mri_control_input$paintbrush_direction == "forward") {
 
@@ -2331,30 +2748,14 @@ print("C")
 
         shiny::req(nrow(voxel_df()) != 0)
 
-        out <-
-          dplyr::rename(
-            .data = voxel_df()[voxel_df()[[axis_ccs]] == slice_idx(), ],
-            !!!ra_ccs
-          )
-
         if(stringr::str_detect(selection_tool(), "paintbrush")){
 
-          # unscope white matter for paintbrush tools
-          if(!is.null(selection_scope())){
-
-            if(selection_scope() != "ann_macro"){
-
-              out[[selection_scope()]][out$is_wm] <- "white_matter"
-
-            }
-
-          }
-
-          nbt_slice <-
-            nbt[nbt[[axis_ccs]] == slice_idx(), ] %>%
-            dplyr::rename(!!!ra_ccs)
-
-          out <- dplyr::add_row(out, nbt_slice)
+          out <-
+            dplyr::left_join(
+              x = identify_obs_in_polygon(mri_grid, brain_outlines[[plane]][[slice_idx()]], strictly = TRUE),
+              y = dplyr::rename(voxel_df()[voxel_df()[[axis_ccs]]==slice_idx(),], !!!ra_ccs),
+              by = c("col", "row")
+            )
 
           # during drawing: highlight NEW drawing by increasing transparency of old selection
           if(drawing_active()){
@@ -2363,11 +2764,23 @@ print("C")
               dplyr::mutate(
                 .data = out,
                 color = dplyr::if_else(selected, true = alpha(color, 0.3), false = alpha(color, 0.6))
-                )
+              )
 
           }
 
+        } else {
+
+          out <-
+            dplyr::rename(
+              .data = voxel_df()[voxel_df()[[axis_ccs]] == slice_idx(), ],
+              !!!ra_ccs
+            )
+
         }
+
+
+
+
 
         return(out)
 
@@ -2391,6 +2804,7 @@ print("C")
           if(stringr::str_detect(selection_tool(), pattern = "paintbrush")){
 
             data[[selection_tool()]] <- character()
+            paintbrushed_ids(character(0))
 
           } else if(selection_tool() == "outline"){
 
@@ -2677,6 +3091,24 @@ print("C")
         # initiate drawing logic for selection + paintbrush
         if(!drawing_active()){
 
+          name <- tolower(mri_planes_pretty[names(mri_control_input$paintbrush_masks)])
+
+          if(pb_mask_on_diff_plane()){
+
+            shinyWidgets::sendSweetAlert(
+              session = session,
+              title = "Drawing on different plane!",
+              text = glue::glue(
+                "There is a paintbrush drawing on the {name} MRI.
+                Please confirm the selection by clicking on Confirm or reset it before drawing on a different plane."
+                ),
+              type = "info"
+            )
+
+            shiny::req(FALSE)
+
+          }
+
           data$cursor_pos <- list()
 
           slice_pos[[col_axis]] <- round(cursor_pos()[1])
@@ -2698,20 +3130,20 @@ print("C")
           slice_pos[[col_axis]] <- round(cursor_pos()[1])
           slice_pos[[row_axis]] <- round(cursor_pos()[2])
 
+          paintbrushed_ids(data$paintbrush)
+
         }
 
       }, ignoreInit = TRUE)
 
 
       # apply buttons
-
       shiny::observeEvent(input$paintbrush_confirm, {
 
         if(mri_control_input$paintbrush_mode == "Sphere"){
 
           voxel_df({
 
-            # rename to apply_paintbrush_Sphere?
             apply_paintbrush_sphere(
               voxel_df = voxel_df(),
               cp_list = data$cursor_pos,
@@ -2726,28 +3158,48 @@ print("C")
 
           data$cursor_pos <- list()
 
-        } else if(mri_control_input$paintbrush_mode == "Beam"){
+        } else if(mri_control_input$paintbrush_mode == "Ray"){
 
+          out <-
+            tryCatch({
 
-          voxel_df({
+              propagate_selection_3D(
+                voxel_df = voxel_df(),
+                selection_mask = dplyr::mutate(selection_template(), selected = id %in% data$paintbrush),
+                selection_plane = plane,
+                selection_scope = selection_scope(),
+                selection_slice = slice_idx(),
+                selection_slices = selection_slices(),
+                unscope_white_matter = FALSE,
+                erase = selection_erase()
+              )
 
-            propagate_selection_3D(
-              voxel_df = voxel_df(),
-              selection_mask = dplyr::mutate(selection_template(), selected = id %in% data$paintbrush),
-              selection_plane = plane,
-              selection_scope = selection_scope(),
-              selection_slice = slice_idx(),
-              selection_slices = selection_slices(),
-              unscope_white_matter = FALSE,
-              erase = selection_erase()
+            }, error = function(error){
+
+              FALSE
+
+            })
+
+          if(is.data.frame(out)){
+
+            voxel_df({ out })
+
+          } else {
+
+            shinyWidgets::sendSweetAlert(
+              session = session,
+              title = "Unkown Error",
+              text = "We are sorry. An unknown error occured during the 3D propagation. Please try again.",
+              type = "info"
             )
 
-          })
+          }
 
         }
 
         # disable buttons
         data$paintbrush <- character()
+        paintbrushed_ids({ data$paintbrush })
         btns_disabled_paintbrush(TRUE)
 
       })
@@ -2763,6 +3215,7 @@ print("C")
       shiny::observeEvent(input$paintbrush_reset, {
 
         data$paintbrush <- character()
+        paintbrushed_ids(data$paintbrush)
         btns_disabled_paintbrush(TRUE)
 
       })
@@ -2775,6 +3228,24 @@ print("C")
         # initiate drawing logic for selection + paintbrush
         if(!drawing_active()){
 
+          if(pb_mask_on_diff_plane()){
+
+            name <- tolower(mri_planes_pretty[names(mri_control_input$paintbrush_masks)])
+
+            shinyWidgets::sendSweetAlert(
+              session = session,
+              title = "Drawing on different plane!",
+              text = glue::glue(
+                "There is a paintbrush drawing on the {name} MRI.
+                Please confirm the deselection by clicking on Erase or reset it before drawing on a different plane."
+              ),
+              type = "info"
+            )
+
+            shiny::req(FALSE)
+
+          }
+
           drawing_active(TRUE)
 
         } else if(drawing_active()){
@@ -2785,29 +3256,12 @@ print("C")
 
           }
 
+          paintbrushed_ids(data$paintbrush_erase)
           drawing_active(FALSE)
 
         }
 
       }, ignoreInit = TRUE)
-
-      # apply buttons
-      shiny::observeEvent(input$paintbrush_erase_confirm2D, {
-
-        voxel_df({
-
-          dplyr::mutate(
-            .data = voxel_df(),
-            selected = dplyr::if_else(id %in% data$paintbrush_erase, true = FALSE, false = selected)
-          )
-
-        })
-
-        data$paintbrush_erase <- character()
-        btns_disabled_paintbrush_erase(TRUE)
-
-      })
-
 
       shiny::observeEvent(input$paintbrush_erase_confirm3D, {
 
@@ -2829,27 +3283,48 @@ print("C")
 
           data$cursor_pos <- list()
 
-        } else if(mri_control_input$paintbrush_mode == "Beam"){
+        } else if(mri_control_input$paintbrush_mode == "Ray"){
 
-          voxel_df({
+          out <-
+            tryCatch({
 
-            propagate_selection_3D(
-              voxel_df = voxel_df(),
-              selection_mask = dplyr::mutate(selection_template(), selected = id %in% data$paintbrush_erase),
-              selection_plane = plane,
-              selection_scope = selection_scope(),
-              selection_slice = slice_idx(),
-              selection_slices = selection_slices(),
-              unscope_white_matter = FALSE,
-              erase = TRUE
+              propagate_selection_3D(
+                voxel_df = voxel_df(),
+                selection_mask = dplyr::mutate(selection_template(), selected = id %in% data$paintbrush_erase),
+                selection_plane = plane,
+                selection_scope = selection_scope(),
+                selection_slice = slice_idx(),
+                selection_slices = selection_slices(),
+                unscope_white_matter = FALSE,
+                erase = TRUE
+              )
+
+            }, error = function(error){
+
+              FALSE
+
+            })
+
+          if(is.data.frame(out)){
+
+            voxel_df({ out })
+
+          } else {
+
+            shinyWidgets::sendSweetAlert(
+              session = session,
+              title = "Unkown Error",
+              text = "We are sorry. An unknown error occured during the 3D propagation. Please try again.",
+              type = "info"
             )
 
-          })
+          }
 
         }
 
         # reset and disable buttons
-        data$paintbrush_erase <- character()
+        data$paintbrush_erase <- character(0)
+        paintbrushed_ids(data$paintbrush_erase)
         btns_disabled_paintbrush_erase(TRUE)
 
       }, ignoreInit = TRUE)
@@ -2863,7 +3338,8 @@ print("C")
 
       shiny::observeEvent(input$paintbrush_erase_reset, {
 
-        data$paintbrush_erase <- character()
+        data$paintbrush_erase <- character(0)
+        paintbrushed_ids(data$paintbrush_erase)
         btns_disabled_paintbrush_erase(TRUE)
 
       }, ignoreInit = TRUE)
@@ -2873,11 +3349,14 @@ print("C")
 
       # LAST: Module Output -----------------------------------------------------
 
+      paintbrushed_ids <- shiny::reactiveVal(value = character(0))
+
       module_output <- shiny::reactive({
 
         list(
           cursor_on_mri = cursor_on_mri(),
           drawing_outline_confirmed = drawing_outline_confirmed(),
+          paintbrushed_ids = paintbrushed_ids(),
           slice_pos = slice_pos,
           voxel_df = voxel_df()
         )

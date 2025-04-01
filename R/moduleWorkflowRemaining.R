@@ -3,45 +3,69 @@ moduleWorkflowRemainingUI <- function(id){
 
   ns <- shiny::NS(id)
 
-  shiny::tagList(
-    shiny::fluidRow(
-      shiny::column(
-        width = 4,
-        align = "center",
-        shiny::div(
-          style = paste(
-            "background-color: white;",
-            "box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);",
-            "display: flex;",
-            "flex-direction: column;",
-            "padding: 10px;",
-            "border: 1px solid #ccc;",
-            "max-width: 100%;",
-            "flex-wrap: wrap;",
-            "height: 300px;",
-            "align-items: center;",  # <-- Added to center horizontally
-            "justify-content: center;",  # <-- Updated to center vertically
-            sep = " "
-          ),
-          shiny::uiOutput(ns("rem_tissue_ui"))
+  shiny::div(
+    style = "width: 100%; height: 100%; padding-right: 10px;",
+    shiny::tagList(
+      shiny::fluidRow(
+        shiny::column(
+          width = 4,
+          align = "center",
+          shiny::div(
+            style = paste(
+              "background-color: white;",
+              "box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);",
+              "display: flex;",
+              "flex-direction: column;",
+              "padding: 10px;",
+              "border: 1px solid #ccc;",
+              "border-radius: 5px;",
+              "width: 550px;",
+              "flex-wrap: wrap;",
+              "height: 325px;",
+              "align-items: center;",  # <-- Added to center horizontally
+              "justify-content: center;",  # <-- Updated to center vertically
+              sep = " "
+            ),
+            shiny::uiOutput(ns("rem_tissue_ui"))
+          )
+        ),
+        shiny::column(
+          width = 4,
+          align = "center",
+          moduleScoreAssignmentUI(id = ns("score_assignment"), height = "325px")
+        ),
+        shiny::column(
+          width = 4,
+          align = "center",
+          shiny::div(
+            style = paste(
+              "background-color: black;",
+              "box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);",
+              "display: flex;",
+              "flex-direction: column;",
+              "padding: 10px;",
+              "border: 1px solid #ccc;",
+              "border-radius: 5px;",
+              "width: 550px;",
+              "flex-wrap: wrap;",
+              "height: 325px;",
+              "align-items: center;",  # <-- Added to center horizontally
+              "justify-content: center;",  # <-- Updated to center vertically
+              sep = " "
+            ),
+            plotly::plotlyOutput(outputId = ns("selectionViewer3D"), height = "300px", width = "100%")
+          )
         )
       ),
-      shiny::column(
-        width = 4,
-        moduleScoreAssignmentUI(id = ns("score_assignment"))
-      ),
-      shiny::column(
-        width = 4,
-        plotly::plotlyOutput(outputId = ns("selectionViewer3D"), height = "350px")
-      )
-    ),
-    shiny::fluidRow(
-      shiny::column(
-        width = 12,
-        moduleMriUI(id = ns("mri"))
+      shiny::fluidRow(
+        shiny::column(
+          width = 12,
+          moduleMriUI(id = ns("mri"))
+        )
       )
     )
   )
+
 
 }
 
@@ -101,6 +125,7 @@ moduleWorkflowRemainingServer <- function(id,
                 shinyWidgets::radioGroupButtons(
                   inputId = ns("rem_regions"),
                   choices = names(rem_regions_colored()),
+                  selected = character(),
                   direction = "horizontal",
                   size = "lg",
                   justified = FALSE,
@@ -158,9 +183,38 @@ moduleWorkflowRemainingServer <- function(id,
 
       })
 
+      voxel_df_broi_colored <- shiny::reactive({
+
+        shiny::validate(
+          shiny::need(
+            expr = shiny::isTruthy(rem_regions_colored()),
+            message = "Identify remaining brain regions."
+          )
+        )
+
+        if(shiny::isTruthy(input$rem_regions)){
+
+          out <-
+            dplyr::mutate(
+              .data = voxel_df_input(),
+              color = ggplot2::alpha(unname(rem_regions_colored()[input$rem_regions]), 0.45)
+            )
+
+        } else {
+
+          out <- voxel_df_input()
+
+        }
+
+        return(out)
+
+      })
+
       # ----- Observers
 
       shiny::observeEvent(input$rem_regions, {
+
+        shiny::req(length(input$rem_regions) == 1)
 
         sel_region <- input$rem_regions
 
@@ -197,13 +251,25 @@ moduleWorkflowRemainingServer <- function(id,
           dplyr::group_by(broi) %>%
           dplyr::mutate(broi = paste0("Brain Region ", dplyr::cur_group_id()))
 
-        broi_out <- sort(unique(voxel_broi$broi))
+        regions <- stringr::str_extract(voxel_broi$broi, "[0-9]*$")
+        regions_num <- as.numeric(regions)
+
+        # ensure equal spacing of buttons
+        if(max(regions_num) >= 10){
+
+          regions[regions_num < 10] <- paste0("0", regions[regions_num < 10])
+
+          voxel_broi$broi <- paste0("Brain Region ", regions)
+
+        }
+
+        broi_out <- unique(voxel_broi$broi)
 
         clr_vector <-
           ggsci::pal_d3("category20b")(length(broi_out)) %>%
           purrr::set_names(nm = broi_out)
 
-        voxel_broi$color <- clr_vector[voxel_broi$broi]
+        voxel_broi$color <- clr_vector[as.character(voxel_broi$broi)]
 
         remaining_df({
 
@@ -251,7 +317,9 @@ moduleWorkflowRemainingServer <- function(id,
           )
         )
 
-        plot_input <- remaining_df()
+        plot_input <-
+          remaining_df() %>%
+          trim_brain_3d(var = "broi", val_missing = "none", fct = 0.25)
 
         brois <- unique(plot_input$broi)
         brois <- brois[brois != "none"]
@@ -260,7 +328,7 @@ moduleWorkflowRemainingServer <- function(id,
           voxel_df = plot_input,
           color_by = "broi",
           group_highlight = brois,
-          opacity_hide = 0.05,
+          opacity_hide = 0.025,
           clrp_adjust = c(rem_regions_colored(), "none" = "lightgrey"),
           pt_size = 1,
           paper_bgcolor = "black",
@@ -274,9 +342,9 @@ moduleWorkflowRemainingServer <- function(id,
       module_mri <-
         moduleMriServer(
           id = "mri",
-          mode_init = "inspection",
+          mode_init = "selection",
           non_brain_template = non_brain_template,
-          voxel_df = shiny::reactive({ voxel_df_input() }),
+          voxel_df = shiny::reactive({ voxel_df_broi_colored() }),
           nifti_input = shiny::reactive({ nifti_input() }),
           external_selection = shiny::reactive({ selected_broi() }),
           external_selection_opts = list(use_colors = TRUE)

@@ -1308,10 +1308,15 @@ plot_mri_frame <- function(col,
                            color = NULL,
                            xlim = NULL,
                            ylim = NULL,
+                           bg = NA,
                            ...){
 
   # Remove extra margins and ensure no padding
-  par(mar = c(0, 0, 0, 0), oma = c(0, 0, 0, 0), xaxs = "i", yaxs = "i")
+  par(mar = c(0, 0, 0, 0), oma = c(0, 0, 0, 0), xaxs = "i", yaxs = "i", bg = bg)
+
+  # room for text
+  #col[1]<-col[1]-col[2]*0.05
+  #row[1]<-row[1]-row[2]*0.05
 
   # default to col/row; allow specifics if drawing
   if(is.null(xlim)){ xlim <- range(col) }
@@ -1454,7 +1459,7 @@ propagate_selection_scoped <- function(voxel_df,
                                        unscope_white_matter = TRUE,
                                        erase = FALSE){
 
-  if(FALSE){
+  if(TRUE){
 
     assign("voxel_df", voxel_df, envir = .GlobalEnv)
     assign("selection_mask", selection_mask, envir = .GlobalEnv)
