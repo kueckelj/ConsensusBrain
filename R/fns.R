@@ -429,7 +429,7 @@ comp_selection_bb <- function(voxel_df, distance = NULL){
 
 }
 
-
+#' @export
 ConsensusBrain <- function(nifti_object = NULL){
 
   # draw from package data
