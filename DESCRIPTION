@@ -2,7 +2,7 @@ Package: ConsensusBrain
 Title: What the Package Does (One Line, Title Case)
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
+    person("Jan", "Kueckelhaus", , "jan.kueckelhaus@uk-erlangen.de", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
 Description: What the package does (one paragraph).
 License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
@@ -15,3 +15,26 @@ BugReports: https://github.com/kueckelj/ConsensusBrain/issues
 Depends: 
     R (>= 2.10)
 LazyData: true
+Imports: 
+    dbscan,
+    dplyr,
+    ggplot2,
+    ggsci,
+    glue,
+    magrittr,
+    plotly,
+    purrr,
+    RANN,
+    rlang,
+    tibble,
+    tidyr,
+    shiny,
+    shinyalert,
+    shinycssloaders,
+    shinydashboard,
+    shinydisconnect,
+    shinyhelper,
+    shinyjs,
+    shinyWidgets,
+    sp,
+    stringr,

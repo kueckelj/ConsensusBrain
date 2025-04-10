@@ -4,13 +4,13 @@ moduleMriControlUI <- function(id){
 
   ns <- shiny::NS(id)
 
-  shiny::tagList(shiny::uiOutput(ns("mri_control_ui")))
+  shiny::tagList(
+    shiny::uiOutput(ns("mri_control_ui")),
+    #shiny::actionButton(ns("test"), "Test"),
+    NULL
+    )
 
   }
-
-#' @param mri_sag_out,mri_axi_out,mri_cor_out The output values of the plane
-#' specific MRI modules: A named list as a reactive expression.
-#' See [`moduleMriPlane`] for specifics.
 
 moduleMriControlServer <- function(id,
                                    mri_sag_out,
@@ -18,7 +18,6 @@ moduleMriControlServer <- function(id,
                                    mri_cor_out,
                                    voxel_df_input,
                                    mode_init = "selection",
-                                   inspection_var = function(){ "CBscore_label" },
                                    external_selection = function(){ NULL },
                                    external_selection_opts = list()
                                    ){
@@ -32,20 +31,15 @@ moduleMriControlServer <- function(id,
       shiny::observeEvent(input$test, {
 
         print("------")
-        assign("voxel_df", voxel_df(), envir = .GlobalEnv)
 
       }, ignoreInit = TRUE)
-
-      shiny::observe({
-
-
-      })
 
       # 1. Global ---------------------------------------------------------------
 
       # paintbrush/paintbrush_erase share their value
       selection_tool <- shiny::reactiveVal(value = "region_click")
       selection_scope <- shiny::reactiveVal(value = list(region_click = "ann_dk_adj", paintbrush = "ann_macro"))
+      selection_state <- shiny::reactiveVal(value = character())
 
       # Dynamic UI --------------------------------------------------------------
 
@@ -56,18 +50,100 @@ moduleMriControlServer <- function(id,
           "background-color: white;
            border-radius: 5px;
            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
-           margin-top: 20px;
+           margin-top: 10px;
            padding-left: 10px;
            padding-right: 10px;
            display: flex;
            flex-direction: column;
            width: 95%;
-           height: 100px;"
+           height: 90px;"
         )
+
+      output$highlight_groups <- shiny::renderUI({
+
+        shiny::req(input$highlight_var)
+
+        if(input$highlight_var == "ann_macro"){
+
+          choices <- sort(unique(voxel_df()[["ann_macro"]]))
+
+          names(choices) <- make_pretty_label(choices)
+
+        } else if(input$highlight_var == "ann_dk_adj"){
+
+          choices <- cortical_regions_dk
+
+          names(choices) <- make_pretty_label(names(choices))
+
+          choices <-
+            purrr::map(
+              .x = choices,
+              .f = ~ purrr::set_names(x = .x, nm = make_pretty_label(.x))
+            )
+
+          choices$Subcortical <-
+            dplyr::filter(voxel_df(), ann_macro == "subcortical") %>%
+            dplyr::pull(var = "ann_dk_adj") %>%
+            unique() %>%
+            sort()
+
+          names(choices$Subcortical) <- make_pretty_label(choices$Subcortical)
+
+        } else if(input$highlight_var == "ann_dt_adj"){
+
+          choices <- cortical_regions_dt
+
+          names(choices) <- make_pretty_label(names(choices))
+
+          choices <-
+            purrr::map(
+              .x = choices,
+              .f = ~ purrr::set_names(x = .x, nm = make_pretty_label(.x))
+            )
+
+          choices$Subcortical <-
+            dplyr::filter(voxel_df(), ann_macro == "subcortical") %>%
+            dplyr::pull(var = "ann_dt_adj") %>%
+            unique() %>%
+            sort()
+
+          names(choices$Subcortical) <- make_pretty_label(choices$Subcortical)
+
+        } else if(input$highlight_var == "wm_tract"){
+
+          choices <- sort(unique(voxel_df()[["wm_tract"]]))
+          choices <- choices[choices != "none"]
+
+          names(choices) <- make_pretty_label(choices)
+
+        } else if(input$highlight_var == "CBscore"){
+
+          choices <- score_set_up$choices
+
+        }
+
+        shiny::tagList(
+          shiny::h5(shiny::strong("Region:")),
+          shinyWidgets::pickerInput(
+            inputId = ns("highlight_groups"),
+            label = NULL,
+            choices = choices,
+            multiple = TRUE,
+            width = "100%",
+            options = shinyWidgets::pickerOptions(
+              actionsBox = TRUE,
+              liveSearch = TRUE,
+              container = "body",
+              size = 15
+            )
+          )
+        )
+
+      })
 
       output$margin_opts <- shiny::renderUI({
 
-        if(length(shiny::isolate({ current_selection() })) != 0){
+        if(length(shiny::isolate({ selection_state() })) != 0){
 
           shiny::tagList(
             shiny::column(
@@ -125,7 +201,7 @@ moduleMriControlServer <- function(id,
           label = "Trash", #"Trash",
           icon = shiny::icon("trash"),
           width = "100%",
-          disabled = !contains_selected_margin(),
+          disabled = length(voxels_margin()) != 0,
           style = style_ab
         )
 
@@ -133,7 +209,100 @@ moduleMriControlServer <- function(id,
 
       output$mri_buttons <- shiny::renderUI({
 
-       if(mode() == "selection"){
+      if(mode() == "inspection"){
+
+        html_out <-
+          shiny::tagList(
+            shiny::column(
+              width = 2,
+              align = "left",
+              shiny::h5(shiny::strong("Highlight Control:")),
+              shiny::splitLayout(
+                cellWidths = "50%",
+                shiny::actionButton(
+                  inputId = ns("highlight_update"),
+                  label = "Highlight",
+                  icon = shiny::icon("refresh"),
+                  width = "100%",
+                  style = style_ab
+                ),
+                shiny::actionButton(
+                  inputId = ns("highlight_reset"),
+                  label = "Reset",
+                  icon = shiny::icon("trash"),
+                  width = "100%",
+                  disabled = TRUE,
+                  style = style_ab
+                )
+              )
+            ),
+            shiny::column(
+              width = 2,
+              align = "left",
+              shiny::h5(shiny::strong("Highlight Scope:")) %>% add_helper("highlight_scope"),
+              shinyWidgets::pickerInput(
+                inputId = ns("highlight_var"),
+                choices = c(
+                  "Macroanatomical" = "ann_macro",
+                  "Desikan-Kiliany" = "ann_dk_adj",
+                  "Destrieux" = "ann_dt_adj",
+                  "White Matter Tracts" = "wm_tract",
+                  "Score" = "CBscore"
+                ),
+                width = "100%",
+                multiple = FALSE,
+                options = shinyWidgets::pickerOptions(
+                  dropupAuto = TRUE,
+                  container = "body",
+                  size = 15
+                )
+              )
+            ),
+            shiny::column(
+              width = 2,
+              align = "left",
+              shiny::uiOutput(outputId = ns("highlight_groups"))
+            ),
+            shiny::column(
+              width = 2,
+              align = "left",
+              shiny::h5(shiny::strong("Hemisphere:")),
+              shinyWidgets::checkboxGroupButtons(
+                inputId = ns("highlight_hemisphere"),
+                label = NULL,
+                choices = c("Left" = "left", "Right" = "right"),
+                justified = TRUE,
+                selected = c("left", "right"),
+                checkIcon = list(yes = shiny::icon("ok", lib = "glyphicon"))
+              )
+            ),
+            shiny::column(width = 2),
+            shiny::column(
+              width = 2,
+              align = "left",
+              shiny::h5(shiny::strong("Hover:")) %>% add_helper("hover_vars"),
+              shinyWidgets::pickerInput(
+                inputId = ns("hover_vars"),
+                choices = c(
+                  "Macroanatomical" = 1,
+                  "Desikan-Kiliany" = 2,
+                  "Destrieux" = 3,
+                  "White Matter Tracts" = 4,
+                  "Score" = 5
+                ),
+                selected = c(1, 2, 5),
+                width = "100%",
+                multiple = TRUE,
+                options = shinyWidgets::pickerOptions(
+                  dropupAuto = TRUE,
+                  container = "body",
+                  size = 15
+                )
+              )
+            )
+          )
+
+      } else if(mode() == "selection"){
 
           # choices
           choices <-
@@ -225,7 +394,18 @@ moduleMriControlServer <- function(id,
 
       output$mri_control_ui <- shiny::renderUI({
 
-        if(mode() == "selection"){
+        if(mode() == "inspection"){
+
+          shiny::fluidRow(
+            #shiny::actionButton(ns("test"), "Test"),
+            shiny::div(style = "height: 20px;"),
+            shiny::div(
+              style = style_box,
+              shiny::uiOutput(outputId = ns("mri_buttons"))
+            )
+          )
+
+        } else if(mode() == "selection"){
 
           shiny::fluidRow(
             #shiny::actionButton(ns("test"), "Test"),
@@ -320,7 +500,7 @@ moduleMriControlServer <- function(id,
               label = NULL,
               value = shiny::isolate({ paintbrush_depth() }),
               step = 1,
-              min = 1,
+              min = 0,
               max = 256
             )
           )
@@ -351,12 +531,7 @@ moduleMriControlServer <- function(id,
             '<div style="display: flex; flex-direction: column; align-items: center; height: 100%;">
      <i class="fas fa-arrow-down-long" style="font-size: 1.2em;" data-toggle="tooltip" title="Backward (opposite to viewing direction)"></i>
      <div style="width: 20px; height: 2px; background-color: black; margin-top: 2px;"></div>
-   </div>' = "backward",
-
-            # Both (up-down arrow without line)
-            '<div style="display: flex; justify-content: center; align-items: center; height: 100%;">
-     <i class="fas fa-arrows-up-down" style="font-size: 1.5em;" data-toggle="tooltip" title="Both directions"></i>
-   </div>' = "both"
+   </div>' = "backward"
           )
 
 
@@ -439,40 +614,20 @@ moduleMriControlServer <- function(id,
 
       output$selection_scope <- shiny::renderUI({
 
-        shiny::req(input$paintbrush_mode)
         shiny::req(selection_scope())
         shiny::req(selection_tool())
 
-        if(stringr::str_detect(selection_tool(), "paintbrush") & input$paintbrush_mode == "Ray" |
-           selection_tool() == "region_click"){
+        if(selection_tool() == "region_click"){
 
-          if(stringr::str_detect(selection_tool(), "paintbrush")){
+          choices <-
+            c("Desikan-Kiliany" = "ann_dk_adj",
+              "Destrieux" = "ann_dt_adj")
 
-            choices <-
-              c("None" = "none",
-                "Macroanatomical" = "ann_macro",
-                "Desikan-Kiliany" = "ann_dk_adj",
-                "Destrieux" = "ann_dt_adj")
+          selected <- selection_scope()[["region_click"]]
 
-            selected <- selection_scope()[["paintbrush"]]
+          helper_name <- "selection_scope_region_click"
 
-            helper_name <- "selection_scope_paintbrush"
-
-            label <- "Brush Scope:"
-
-          } else {
-
-            choices <-
-              c("Desikan-Kiliany" = "ann_dk_adj",
-                "Destrieux" = "ann_dt_adj")
-
-            selected <- selection_scope()[["region_click"]]
-
-            helper_name <- "selection_scope_region_click"
-
-            label <- "Region Scope:"
-
-          }
+          label <- "Region Scope:"
 
           shiny::column(
             width = 2,
@@ -487,7 +642,34 @@ moduleMriControlServer <- function(id,
             )
           )
 
-        } else {
+        } else if(stringr::str_detect(selection_tool(), "paintbrush") & paintbrush_mode() == "Ray"){
+
+          choices <-
+            c("None" = "none",
+              "Macroanatomical" = "ann_macro",
+              "Desikan-Kiliany" = "ann_dk_adj",
+              "Destrieux" = "ann_dt_adj")
+
+          selected <- selection_scope()[["paintbrush"]]
+
+          helper_name <- "selection_scope_paintbrush"
+
+          label <- "Brush Scope:"
+
+          shiny::column(
+            width = 2,
+            align = "left",
+            shiny::h5(shiny::strong(label)) %>% add_helper(helper_name),
+            shinyWidgets::pickerInput(
+              inputId = ns("selection_scope"),
+              label = NULL,
+              choices = choices,
+              selected = selected,
+              options = shinyWidgets::pickerOptions(dropupAuto = TRUE)
+            )
+          )
+
+          } else {
 
           shiny::tagList()
 
@@ -556,66 +738,28 @@ moduleMriControlServer <- function(id,
 
       stacks <- shiny::reactiveValues(selection = list())
 
-      voxel_df <- shiny::reactiveVal(value = data.frame())
+      voxel_df <- shiny::reactive({
+
+        if(mode() == "inspection"){
+
+          voxel_df_input()
+
+        } else if(mode() == "selection"){
+
+          dplyr::mutate(voxel_df_input(), selected = id %in% selection_state())
+
+        }
+
+      })
 
       # Reactive Expressions ----------------------------------------------------
 
 
       # Observe Events ----------------------------------------------------------
 
-      shiny::observeEvent(voxel_df_input(), {
-
-        if(!identical(x = shiny::isolate({voxel_df()}), y = voxel_df_input())){
-
-          voxel_df({ voxel_df_input() })
-
-        }
-
-      }, ignoreInit = FALSE)
-
       # 2. Purpose: Manage MRI Modes --------------------------------------------
 
       mode <- shiny::reactiveVal(mode_init)
-
-      shiny::observeEvent(input$mode,{
-
-        if(!identical(x = shiny::isolate({mode()}), y = input$mode)){
-
-          mode(input$mode)
-
-        }
-
-      })
-
-      shiny::observeEvent(mri_sag_out()$mode, {
-
-        if(!identical(x = shiny::isolate({mode()}), y = mri_sag_out()$mode)){
-
-          mode(mri_sag_out()$mode)
-
-        }
-
-      })
-
-      shiny::observeEvent(mri_axi_out()$mode, {
-
-        if(!identical(x = shiny::isolate({mode()}), y = mri_axi_out()$mode)){
-
-          mode(mri_axi_out()$mode)
-
-        }
-
-      })
-
-      shiny::observeEvent(mri_cor_out()$mode, {
-
-        if(!identical(x = shiny::isolate({mode()}), y = mri_cor_out()$mode)){
-
-          mode(mri_cor_out()$mode)
-
-        }
-
-      })
 
       # 3. Purpose: Manage Slice State and Orientation -------------------------
 
@@ -711,19 +855,89 @@ moduleMriControlServer <- function(id,
 
       })
 
-      # observe updates in voxel selection and shift focus
-      shiny::observeEvent(updated_voxels(), {
+      # 4. Manage Inspection Mode -----------------------------------------------
 
-        voxel_subset <- dplyr::filter(voxel_df(), id %in% updated_voxels())
+      voxels_highlighted <- shiny::reactiveVal(value = character())
 
-        slice_state$sag <- mean(voxel_subset$x)
-        slice_state$axi <- mean(voxel_subset$y)
-        slice_state$cor <- mean(voxel_subset$z)
+      shiny::observeEvent(input$highlight_update, {
 
-      }, ignoreInit = TRUE, ignoreNULL = TRUE)
+        highlight <- voxel_df()[[input$highlight_var]] %in% input$highlight_groups
+        hemispheres <- voxel_df()$hemisphere %in% input$highlight_hemisphere
 
+        if(sum(highlight & hemispheres) == 0){
 
-      # 4. Purpose: Manage Selection Mode ---------------------------------------
+          shinyWidgets::sendSweetAlert(
+            session = session,
+            title = "No Tissue Remaining",
+            text = "No tissue matches your combination of highlight criteria.",
+            type = "warning",
+            showCloseButton = TRUE
+          )
+
+          shiny::req(FALSE)
+
+        }
+
+        voxels_highlighted({ voxel_df()[["id"]][highlight & hemispheres] })
+
+        shiny::updateActionButton(
+          session = session,
+          inputId = "highlight_reset",
+          disabled = FALSE
+        )
+
+        xmax <-
+          dplyr::filter(.data = voxel_df(), id %in% voxels_highlighted()) %>%
+          dplyr::group_by(x) %>%
+          dplyr::summarize(count = dplyr::n(), .groups = "drop") %>%
+          dplyr::filter(count == max(count)) %>%
+          dplyr::pull(x)
+
+        ymax <-
+          dplyr::filter(.data = voxel_df(), id %in% voxels_highlighted()) %>%
+          dplyr::group_by(y) %>%
+          dplyr::summarize(count = dplyr::n(), .groups = "drop") %>%
+          dplyr::filter(count == max(count)) %>%
+          dplyr::pull(y)
+
+        zmax <-
+          dplyr::filter(.data = voxel_df(), id %in% voxels_highlighted()) %>%
+          dplyr::group_by(z) %>%
+          dplyr::summarize(count = dplyr::n(), .groups = "drop") %>%
+          dplyr::filter(count == max(count)) %>%
+          dplyr::pull(z)
+
+        slice_state$sag <- xmax[1]
+        slice_state$axi <- ymax[1]
+        slice_state$cor <- zmax[1]
+
+      })
+
+      shiny::observeEvent(input$highlight_reset, {
+
+        shinyWidgets::updatePickerInput(
+          session = session,
+          inputId = "highlight_groups",
+          selected = character(0)
+        )
+
+        shinyWidgets::updateCheckboxGroupButtons(
+          session = session,
+          inputId = "highlight_hemisphere",
+          selected = c("left", "right")
+        )
+
+        voxels_highlighted({ character(0) })
+
+        shiny::updateActionButton(
+          session = session,
+          inputId = "highlight_reset",
+          disabled = TRUE
+        )
+
+      })
+
+      # 5. Purpose: Manage Selection Mode ---------------------------------------
 
       outlines <- shiny::reactiveValues(
         sag = data.frame(),
@@ -751,20 +965,7 @@ moduleMriControlServer <- function(id,
 
       # Reactive Values ---------------------------------------------------------
 
-      updated_voxels <- shiny::reactiveVal(character())
-
       # Reactive (Expressions) --------------------------------------------------
-
-      contains_selected_margin <- shiny::reactive({
-
-        any(voxel_df()$is_margin & voxel_df()$selected)
-
-      })
-
-      # centralized vector of selected voxels
-      # - character(0) when initialized
-      # - character(n) after observing selection changes in either MRI instance
-      current_selection <- shiny::reactive({ sort(voxel_df()$id[voxel_df()$selected]) })
 
       previous_selection <- shiny::reactive({
 
@@ -849,7 +1050,7 @@ moduleMriControlServer <- function(id,
       shiny::observeEvent(input$selection_tool, {
 
         # prerequisites for selection tools
-        if(input$selection_tool == "margin" & length(shiny::isolate({ current_selection() })) == 0){
+        if(input$selection_tool == "margin" & length(shiny::isolate({ selection_state() })) == 0){
 
           shiny::showNotification(
             ui = "The margin tool can not be used without a selection.",
@@ -866,7 +1067,7 @@ moduleMriControlServer <- function(id,
 
         }
 
-        if(input$selection_tool == "paintbrush_erase" & length(shiny::isolate({ current_selection() })) == 0){
+        if(input$selection_tool == "paintbrush_erase" & length(shiny::isolate({ selection_state() })) == 0){
 
           shiny::showNotification(
             ui = "The paintbrush eraser tool can not be used without a selection.",
@@ -886,7 +1087,7 @@ moduleMriControlServer <- function(id,
         # ensure certain things before switching
         if(selection_tool() == "margin"){
 
-          if(any(shiny::isolate({ voxel_df()$is_margin_cand }))){
+          if(length(voxels_margin_cand()) != 0){
 
             shiny::showModal(
               shiny::modalDialog(
@@ -930,7 +1131,7 @@ moduleMriControlServer <- function(id,
         # ensure certain things after switching
         if(selection_tool() == "margin"){
 
-          if(length(shiny::isolate({ current_selection() })) == 0){
+          if(length(shiny::isolate({ selection_state() })) == 0){
 
             shiny::showNotification(
               ui = "No brain tissue has been selected yet.",
@@ -948,50 +1149,18 @@ moduleMriControlServer <- function(id,
               duration = 3
             )
 
-            voxel_df({
-
-              dplyr::mutate(
-                .data = shiny::isolate({ voxel_df() }),
-                is_margin = dplyr::if_else(is_margin & !selected, true = FALSE, false = is_margin)
-              ) %>%
-                prepare_margin_selection(dist_max = 15)
-
-            })
-
           }
 
         }
 
       })
 
-
-
-
       # Observe Events ----------------------------------------------------------
 
       shiny::observeEvent(external_selection(), {
 
-        new_voxel_df <-
-          dplyr::mutate(
-            .data = voxel_df(),
-            selected = id %in% external_selection()[["id"]]
-          )
+        selection_state({ external_selection()[["id"]] })
 
-        # 1. update voxel_df
-        voxel_df({ new_voxel_df })
-
-        # 2. switch modes
-        if(nrow(external_selection()) == 0){
-
-          mode("inspection")
-
-        } else {
-
-          mode("selection")
-
-        }
-
-        # 3. update slice state
         xmax <-
           dplyr::filter(.data = voxel_df(), selected) %>%
           dplyr::group_by(x) %>%
@@ -1022,87 +1191,45 @@ moduleMriControlServer <- function(id,
       # ----- selection changes by plane
 
       # observe selection changes in the sagittal MRI
-      shiny::observeEvent(mri_sag_out()$voxel_df, {
+      shiny::observeEvent(mri_sag_out()$plane_selection_state, {
 
-        ids_selected_new <- sort(mri_sag_out()$voxel_df$id[mri_sag_out()$voxel_df$selected])
-        ids_selected_old <- shiny::isolate({ sort(voxel_df()$id[voxel_df()$selected]) })
+        ids_selected_new <- sort(mri_sag_out()$plane_selection_state)
+        ids_selected_old <- shiny::isolate({ sort(selection_state()) })
 
         # changes in selection in MRI instance
         if(!identical(x = ids_selected_new, y = ids_selected_old)){
 
-         # adds to selection?
-         new_only <- setdiff(x = ids_selected_new, y = ids_selected_old)
-
-         voxel_df({
-
-           dplyr::mutate(
-             .data = voxel_df(),
-             # new_only derives from within the MRI plane and is a main selection
-             color = dplyr::if_else(id %in% {{new_only}}, true = alpha("forestgreen", alpha_val), false = color),
-             is_margin = dplyr::if_else(id %in% {{new_only}}, true = FALSE, false = is_margin),
-             is_margin_cand = dplyr::if_else(id %in% {{new_only}}, true = FALSE, false = is_margin_cand),
-             selected = id %in% {{ids_selected_new}}
-           )
-
-         })
+          selection_state({ ids_selected_new })
 
         }
 
       }, ignoreInit = TRUE)
 
       # observe selection changes in the axial MRI
-      shiny::observeEvent(mri_axi_out()$voxel_df, {
+      shiny::observeEvent(mri_axi_out()$plane_selection_state, {
 
-        ids_selected_new <- sort(mri_axi_out()$voxel_df$id[mri_axi_out()$voxel_df$selected])
-        ids_selected_old <- shiny::isolate({ sort(voxel_df()$id[voxel_df()$selected]) })
+        ids_selected_new <- sort(mri_axi_out()$plane_selection_state)
+        ids_selected_old <- shiny::isolate({ sort(selection_state()) })
 
         # changes in selection in MRI instance
         if(!identical(x = ids_selected_new, y = ids_selected_old)){
 
-          # adds to selection?
-          new_only <- setdiff(x = ids_selected_new, y = ids_selected_old)
-
-          voxel_df({
-
-            dplyr::mutate(
-              .data = voxel_df(),
-              # new_only derives from within the MRI plane and is a main selection
-              color = dplyr::if_else(id %in% {{new_only}}, true = alpha("forestgreen", alpha_val), false = color),
-              is_margin = dplyr::if_else(id %in% {{new_only}}, true = FALSE, false = is_margin),
-              is_margin_cand = dplyr::if_else(id %in% {{new_only}}, true = FALSE, false = is_margin_cand),
-              selected = id %in% {{ids_selected_new}}
-            )
-
-          })
+          selection_state({ ids_selected_new })
 
         }
 
       }, ignoreInit = TRUE)
 
       # observe selection changes in the coronal MRI
-      shiny::observeEvent(mri_cor_out()$voxel_df, {
+      shiny::observeEvent(mri_cor_out()$plane_selection_state, {
 
-        ids_selected_new <- sort(mri_cor_out()$voxel_df$id[mri_cor_out()$voxel_df$selected])
-        ids_selected_old <- shiny::isolate({ sort(voxel_df()$id[voxel_df()$selected]) })
+        ids_selected_new <- sort(mri_cor_out()$plane_selection_state)
+        ids_selected_old <- shiny::isolate({ sort(selection_state()) })
 
         # changes in selection in MRI instance
         if(!identical(x = ids_selected_new, y = ids_selected_old)){
 
-          # adds to selection?
-          new_only <- setdiff(x = ids_selected_new, y = ids_selected_old)
-
-          voxel_df({
-
-            dplyr::mutate(
-              .data = voxel_df(),
-              # new_only derives from within the MRI plane and is a main selection
-              color = dplyr::if_else(id %in% {{new_only}}, true = alpha("forestgreen", alpha_val), false = color),
-              is_margin = dplyr::if_else(id %in% {{new_only}}, true = FALSE, false = is_margin),
-              is_margin_cand = dplyr::if_else(id %in% {{new_only}}, true = FALSE, false = is_margin_cand),
-              selected = id %in% {{ids_selected_new}}
-            )
-
-          })
+          selection_state({ ids_selected_new })
 
         }
 
@@ -1146,39 +1273,13 @@ moduleMriControlServer <- function(id,
       # apply outlines
       shiny::observeEvent(input$outline_select, {
 
-        selected_ids <-
-          identify_obs_in_outlines(
-            voxel_df = voxel_df(),
-            outlines = outlines_valid()
-            )
-
-        voxel_df({
-
-          dplyr::mutate(
-            .data = voxel_df(),
-            selected = selected | id %in% {{selected_ids}}
-          )
-
-        })
+        # currently not active
 
       }, ignoreInit = TRUE)
 
       shiny::observeEvent(input$outline_deselect, {
 
-        selected_ids <-
-          identify_obs_in_outlines(
-            voxel_df = voxel_df(),
-            outlines = outlines_valid()
-          )
-
-        voxel_df({
-
-          dplyr::mutate(
-            .data = voxel_df(),
-            selected = dplyr::if_else(id %in% {{selected_ids}}, true = FALSE, false = selected)
-          )
-
-        })
+        # currently not active
 
       }, ignoreInit = TRUE)
 
@@ -1192,9 +1293,9 @@ moduleMriControlServer <- function(id,
 
       # ----- stack management
 
-      shiny::observeEvent(current_selection(), {
+      shiny::observeEvent(selection_state(), {
 
-        if(length(current_selection()) != 0){
+        if(length(selection_state()) != 0){
 
           shiny::updateActionButton(
             session = session,
@@ -1202,13 +1303,13 @@ moduleMriControlServer <- function(id,
             disabled = FALSE
           )
 
-          if(!identical(x = current_selection(), y = dplyr::last(stacks$selection))){
+          if(!identical(x = selection_state(), y = dplyr::last(stacks$selection))){
 
             stacks <-
               add_to_stack(
                 stacks = stacks,
                 which = "selection",
-                what = current_selection()
+                what = selection_state()
               )
 
           }
@@ -1257,36 +1358,16 @@ moduleMriControlServer <- function(id,
 
       shiny::observeEvent(input$selection_undo, {
 
+        selection_state({ previous_selection() })
+
         # update margin selection if required
         if(input$selection_tool == "margin"){
-
-          voxel_df({
-
-            dplyr::mutate(
-              .data = voxel_df(),
-              #is_margin = dplyr::if_else(is_margin & !selected, true = FALSE, false = is_margin),
-              selected = id %in% previous_selection()
-            ) %>%
-              prepare_margin_selection(dist_max = 15)
-
-          })
 
           shiny::updateSliderInput(
             session = session,
             inputId = "margin_dist",
             value = 0
           )
-
-        } else {
-
-          voxel_df({
-
-            dplyr::mutate(
-              .data = voxel_df(),
-              selected = id %in% previous_selection()
-            )
-
-          })
 
         }
 
@@ -1297,23 +1378,14 @@ moduleMriControlServer <- function(id,
 
       shiny::observeEvent(input$selection_debris_rm, {
 
-        vdf_with_debris <- identify_debris(voxel_df())
-
         debris_ids <-
-          dplyr::filter(vdf_with_debris, debris == "0") %>%
-          dplyr::pull(id)
+          identify_debris(voxel_df()) %>%
+          dplyr::filter(debris == "0") %>%
+          dplyr::pull(var = "id")
 
         if(length(debris_ids) != 0){
 
-          voxel_df({
-
-            dplyr::mutate(
-              .data = vdf_with_debris,
-              selected = dplyr::if_else(id %in% {{debris_ids}}, true = FALSE, false = selected),
-              debris = NULL
-            )
-
-          })
+          selection_state({ selection_state()[!selection_state() %in% debris_ids] })
 
           shinyWidgets::sendSweetAlert(
             session = session,
@@ -1344,19 +1416,31 @@ moduleMriControlServer <- function(id,
           confirmButtonText = "Trash",
           cancelButtonText = "Cancel",
           closeOnEsc = FALSE,
-          closeOnClickOutside = FALSE,
+          closeOnClickOutside = TRUE,
           callbackR = function(confirmed) {
             if (isTRUE(confirmed)) {
               stacks$selection <- list()
-              voxel_df({ dplyr::mutate(voxel_df(), selected = FALSE) })
+              selection_state({ character(0) })
+              voxels_margin({ character(0) })
+              voxels_margin_cand({ character(0) })
             }
           }
         )
       })
 
+      # only changes in case of a score assignment
+      shiny::observeEvent(voxel_df_input(), {
+
+        stacks$selection <- list()
+        selection_state({ character(0) })
+        voxels_margin({ character(0) })
+        voxels_margin_cand({ character(0) })
+
+      }, ignoreInit = TRUE)
+
       shiny::observeEvent(stacks$selection,{
 
-        if(length(stacks$selection) > 1){
+        if(length(stacks$selection) != 0){
 
           shiny::updateActionButton(
             session = session,
@@ -1377,24 +1461,44 @@ moduleMriControlServer <- function(id,
       })
 
       # ----- margin management
-      shiny::observeEvent(input$margin_dist, {
+      voxels_dist <- shiny::reactive({
 
-        shiny::req("dist" %in% names(voxel_df()))
+        prepare_margin_selection(
+          voxel_df = voxel_df(),
+          dist_max = 15,
+          voxels_margin = shiny::isolate({ voxels_margin() })
+        )
 
-        margin_ids <- voxel_df()[voxel_df()$dist <= input$margin_dist,][["id"]]
+      })
 
-        voxel_df({
+      voxels_margin <- shiny::reactiveVal(value = character())
+      voxels_margin_cand <- shiny::reactiveVal(value = character())
 
-          dplyr::mutate(
-            .data = voxel_df(),
-            is_margin_cand = id %in% {{margin_ids}},
-            color = dplyr::if_else(is_margin_cand & !selected, true = alpha("steelblue", {{alpha_val}}), false = color)
+      shiny::observeEvent(voxels_margin(), {
+
+        if(length(voxels_margin()) != 0){
+
+          shiny::updateActionButton(
+            session = session,
+            inputId = "margin_reset",
+            disabled = FALSE
           )
 
-        })
+        } else {
 
-        # update button state if unconfirmed margin exists
-        if(any(voxel_df()$is_margin_cand)){
+          shiny::updateActionButton(
+            session = session,
+            inputId = "margin_reset",
+            disabled = FALSE
+          )
+
+        }
+
+      })
+
+      shiny::observeEvent(voxels_margin_cand(), {
+
+        if(length(voxels_margin_cand()) != 0){
 
           shiny::updateActionButton(
             session = session,
@@ -1412,21 +1516,14 @@ moduleMriControlServer <- function(id,
 
         }
 
-      }, ignoreInit = TRUE)
+      })
 
       shiny::observeEvent(input$margin_confirm, {
 
-        voxel_df({
+        selection_state({ c(selection_state(), voxels_margin_cand()) })
+        voxels_margin({ unique(c(voxels_margin(), voxels_margin_cand())) })
+        voxels_margin_cand({ character(0) })
 
-          dplyr::mutate(
-            .data = voxel_df(),
-            selected = selected | is_margin_cand,
-            is_margin = selected & is_margin_cand,
-            color = dplyr::if_else(is_margin, true = alpha("cadetblue", alpha_val*1.25), false = color),
-            is_margin_cand = FALSE
-            )
-
-        })
 
         shiny::updateSliderInput(
           session = session,
@@ -1434,31 +1531,13 @@ moduleMriControlServer <- function(id,
           value = 0
         )
 
-        if(contains_selected_margin()){
-
-          shiny::updateActionButton(
-            session = session,
-            inputId = "margin_reset",
-            disabled = FALSE
-          )
-
-        }
-
-      })
+      }, ignoreInit = TRUE)
 
       shiny::observeEvent(input$margin_confirm_modal, {
 
-        voxel_df({
-
-          dplyr::mutate(
-            .data = voxel_df(),
-            selected = selected | is_margin_cand,
-            is_margin = selected & is_margin_cand,
-            color = dplyr::if_else(is_margin, true = alpha("cadetblue", alpha_val*1.25), false = color),
-            is_margin_cand = FALSE
-          )
-
-        })
+        selection_state({ c(selection_state(), voxels_margin_cand()) })
+        voxels_margin({ unique(c(voxels_margin(), voxels_margin_cand())) })
+        voxels_margin_cand({ character(0) })
 
         shiny::updateSliderInput(
           session = session,
@@ -1466,29 +1545,23 @@ moduleMriControlServer <- function(id,
           value = 0
         )
 
-        if(contains_selected_margin()){
-
-          shiny::updateActionButton(
-            session = session,
-            inputId = "margin_reset",
-            disabled = FALSE
-          )
-
-        }
-
         # update selection tool
         shiny::removeModal()
         selection_tool(input$selection_tool)
 
-      })
+      }, ignoreInit = TRUE)
+
+      shiny::observeEvent(input$margin_dist, {
+
+        shiny::req(nrow(voxels_dist()) != 0)
+
+        voxels_margin_cand({ voxels_dist()[voxels_dist()$dist <= input$margin_dist,][["id"]] })
+
+      }, ignoreInit = TRUE)
 
       shiny::observeEvent(input$margin_dont_confirm_modal, {
 
-        voxel_df({
-
-          dplyr::mutate(.data = voxel_df(), is_margin_cand = FALSE)
-
-        })
+        voxels_margin_cand({ character(0) })
 
         shiny::updateSliderInput(
           session = session,
@@ -1500,18 +1573,13 @@ moduleMriControlServer <- function(id,
         shiny::removeModal()
         selection_tool(input$selection_tool)
 
-      })
+      }, ignoreInit = TRUE)
 
       shiny::observeEvent(input$margin_reset, {
 
-        voxel_df({
-
-          dplyr::mutate(
-            .data = voxel_df(),
-            selected = dplyr::if_else(is_margin, true = FALSE, false = selected)
-            )
-
-        })
+        selection_state({ selection_state()[!selection_state() %in% voxels_margin()] })
+        voxels_margin({ character(0) })
+        voxels_margin_cand({ character(0) })
 
         shiny::updateSliderInput(
           session = session,
@@ -1519,10 +1587,10 @@ moduleMriControlServer <- function(id,
           value = 0
         )
 
-      })
+      }, ignoreInit = TRUE)
 
       # 3D viewer
-      observeEvent(input$viewer3D, {
+      shiny::observeEvent(input$viewer3D, {
 
         shiny::showNotification(
           ui = "Rendering 3D visualization.",
@@ -1530,24 +1598,31 @@ moduleMriControlServer <- function(id,
           duration = 3
         )
 
-        vdf_with_debris <- identify_debris(voxel_df())
+        if(mode() == "inspection") {
 
-        debris_ids <-
-          dplyr::filter(vdf_with_debris, debris == "0") %>%
-          dplyr::pull(id)
+          debris_button <- NULL
 
-        # Conditionally add footer button if debris exists
-        debris_button <- if(length(debris_ids) != 0) {
+        } else if(mode() == "selection"){
 
-          shiny::actionButton(
-            inputId = ns("selection_debris_rm"),
-            label = "Debris",
-            icon = icon("broom")
-          )
+          debris_ids <-
+            identify_debris(voxel_df()) %>%
+            dplyr::filter(debris == "0") %>%
+            dplyr::pull(var = "id")
 
-        } else {
+          # Conditionally add footer button if debris exists
+          debris_button <- if(length(debris_ids) != 0) {
 
-          NULL
+            shiny::actionButton(
+              inputId = ns("selection_debris_rm"),
+              label = "Debris",
+              icon = icon("broom")
+            )
+
+          } else {
+
+            NULL
+
+          }
 
         }
 
@@ -1555,7 +1630,7 @@ moduleMriControlServer <- function(id,
           style = "display: flex; align-items: center; gap: 10px;",
           debris_button,
           shiny::actionButton(
-            inputId = ns("close_modal"),
+            inputId = ns("close_modal3D"),
             label = "Close",
           )
         )
@@ -1566,14 +1641,16 @@ moduleMriControlServer <- function(id,
               ui_element = plotly::plotlyOutput(outputId = ns("plot3D")),
               id = ns("plot3D_spinner")
             ),
-            easyClose = TRUE,
+            easyClose = FALSE,
             size = "l",
             footer = footer
           )
         )
       })
 
-      shiny::observeEvent(input$close_modal, {
+      shiny::observeEvent(input$close_modal3D, {
+
+        shinyjs::runjs(sprintf("Plotly.purge('%s');", ns("plot3D")))
 
         shiny::removeModal()
 
@@ -1581,62 +1658,39 @@ moduleMriControlServer <- function(id,
 
       output$plot3D <- plotly::renderPlotly({
 
-        if(mode() == "inspection"){
+         if(mode() == "selection"){
 
+          hemispheres <-
+            dplyr::filter(voxel_df(), selected) %>%
+            dplyr::pull(var = "hemisphere") %>%
+            unique()
 
-
-
-        } else if(mode() == "selection"){
-
-          voxels3D <- dplyr::filter(voxel_df(), selected | is_margin)
-
-          hemispheres <- unique(voxels3D$hemisphere)
-
-          plot_input <-
-            dplyr::filter(voxel_df(), hemisphere %in% hemispheres) %>%
+          dplyr::filter(voxel_df(), hemisphere %in% hemispheres) %>%
             dplyr::mutate(
               selection = dplyr::case_when(
-                selected & !is_margin ~ "Main Selection",
-                selected & is_margin ~ "Margin Confirmed",
-                is_margin_cand ~ "Margin Unconfirmed",
+                selected & !id %in% voxels_margin() ~ "Main Selection",
+                selected & id %in% voxels_margin() ~ "Margin Confirmed",
+                id %in% voxels_margin_cand() ~ "Margin Unconfirmed",
                 TRUE ~ "Not Selected"
               )
-            )
-
-          plot_input <-
+            ) %>%
             trim_brain_3d(
-              plot_input = plot_input,
               var = "selection",
               val_missing = "Not Selected",
-              fct = 0.5
+              fct = 0.15
+            ) %>%
+            plot_brain_3d(
+              voxel_df = .,
+              color_by = "selection",
+              group_highlight = c("Main Selection", "Margin Confirmed", "Margin Unconfirmed"),
+              opacity_hide = 0.05,
+              pt_size = 1.25,
+              clrp_adjust = colorsCB3D,
+              paper_bgcolor = "black",
+              show_legend = FALSE
             )
-
-          clrp_adjust_df <-
-            dplyr::distinct(plot_input, selection, color) %>%
-            dplyr::mutate(color = ggplot2::alpha(color, 1))
-
-          clrp_adjust <-
-            purrr::set_names(
-              x = clrp_adjust_df[["color"]],
-              nm = clrp_adjust_df[["selection"]]
-            )
-
-          clrp_adjust[names(clrp_adjust) == "Not Selected"] <- "lightgrey"
-
-          groups_highlight <- names(clrp_adjust)[names(clrp_adjust) != "Not Selected"]
 
         }
-
-        plot_brain_3d(
-          voxel_df = plot_input,
-          color_by = "selection",
-          group_highlight = groups_highlight,
-          opacity_hide = 0.05,
-          pt_size = 1.25,
-          clrp_adjust = clrp_adjust,
-          paper_bgcolor = "black",
-          show_legend = FALSE
-        )
 
       })
 
@@ -1649,8 +1703,9 @@ moduleMriControlServer <- function(id,
           output <-
             list(
               cursor_on_plane = cursor_on_plane(),
+              hover_vars = as.numeric(input$hover_vars),
               slice_state = slice_state,
-              voxel_df = voxel_df()
+              voxels_highlighted = voxels_highlighted()
             )
 
         } else if(mode() == "selection"){
@@ -1676,11 +1731,12 @@ moduleMriControlServer <- function(id,
               paintbrush_mode = paintbrush_mode(),
               paintbrush_radius = paintbrush_radius(),
               slice_state = slice_state,
-              selected_voxels = current_selection(),
               selection_erase = selection_erase(),
               selection_scope = sel_scope,
               selection_tool = selection_tool(),
-              voxel_df = voxel_df()
+              voxels_margin = voxels_margin(), # only margin
+              voxels_margin_cand = voxels_margin_cand(), # unconfirmed margin
+              voxels_selected = selection_state() # main + margin
             )
 
         }

@@ -1,4 +1,8 @@
 
+#' @importFrom magrittr %>%
+NULL
+
+
 global_settings_default <-
   list(
     localizer =
@@ -62,13 +66,6 @@ mri_slider_labels <- list(
   axi = c("Superior", "Inferior"), # Axial: Moves top - bottom
   cor = c("Anterior", "Posterior") # Coronal: Moves front - back
 )
-
-
-allowedCols <- c("#D4AF37", "#EEDD82", "#ADFF2F", "#a1c935", "#556B2F",
-                  "#40E0D0","forestgreen" , "#4682B4", "#6495ED", "#0F52BA",
-                  "#483D8B", "#9467bd", "#663399", "#8A2BE2", "#BA55D3", "#6b2d5c")
-
-
 
 cortical_regions_dk <-
   list(
@@ -191,5 +188,64 @@ cortical_regions_dt <- list(
 
 cortical_regions <- list(ann_dk_adj = cortical_regions_dk, ann_dt_adj = cortical_regions_dt)
 
-
 alpha_val <- 0.5
+
+colorsCB <-
+  list(
+    erased = "tomato",
+    margin = "#7E57C2",
+    margin_cand = "#BA68C8",
+    not_selected = "#4DB6AC",
+    selected = "#00ACC1"
+  )
+
+colorsCB3D <-
+  c(
+    "Main Selection" = "#00ACC1",
+    "Margin Confirmed" = "#7E57C2",
+    "Margin Unconfirmed" = "#BA68C8",
+    "Not Selected" = "lightgrey"
+  )
+
+macroanatomical_regions <-
+  list(
+    # Grey Matter
+    frontal_lobe =
+      c("caudalmiddlefrontal", "lateralorbitofrontal", "medialorbitofrontal", "paracentral",
+        "parsopercularis", "parsorbitalis", "parstriangularis", "precentral",
+        "rostralmiddlefrontal", "superiorfrontal"),
+    parietal_lobe = c("inferiorparietal", "postcentral", "precuneus", "supramarginal", "superiorparietal"),
+    occipital_lobe = c("cuneus", "lateraloccipital", "lingual", "pericalcarine"),
+    temporal_lobe =
+      c("entorhinal", "fusiform", "inferiortemporal", "middletemporal", "parahippocampal",
+        "superiortemporal", "transversetemporal"),
+    insular_lobe = "insula",
+    cingulate_lobe = c("caudalanteriorcingulate", "isthmuscingulate", "posteriorcingulate", "rostralanteriorcingulate"),
+
+    # White Matter = White Matter of the Telencephalon
+    white_matter = c("Cerebral-White-Matter", "WM-hypointensities", "Cerebellum-White-Matter"),
+
+    # Corpus Callosum
+    corpus_callosum = c("CC_Anterior", "CC_Central", "CC_Mid_Anterior", "CC_Mid_Posterior", "CC_Posterior"),
+
+    # Subcortical
+    subcortical = c("Accumbens-area", "Amygdala", "Caudate", "Hippocampus", "Pallidum", "Putamen", "Thalamus", "VentralDC"),
+
+    # Non-Telencephalon
+    ventricular_system = c("3rd-Ventricle", "4th-Ventricle", "Inf-Lat-Vent", "Lateral-Ventricle", "choroid-plexus"),
+    brainstem = c("Brain-Stem"),
+    cerebellum = c("Cerebellum-Cortex"),
+
+    # Non-Brain
+    non_brain = c("CSF", "Optic-Chiasm", "vessel")
+  )
+
+workflow_tabs <-
+  c('frontal_lobe', 'parietal_lobe', 'occipital_lobe', 'temporal_lobe',
+    'insular_lobe', 'cingulate_lobe', 'corpus_callosum', 'subcortical',
+    'infratentorial', "wm_tract")
+
+names(workflow_tabs) <-
+  c('Frontal Lobe', 'Parietal Lobe', 'Occipital Lobe', 'Temporal Lobe',
+    'Insular Lobe', 'Cingulate Lobe','Corpus Callosum', 'Subcortical',
+    'Infratentorial', 'White Matter Tracts')

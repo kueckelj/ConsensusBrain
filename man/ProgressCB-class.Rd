@@ -13,8 +13,8 @@ S4 class to store and track score assignment progress.
 \describe{
 \item{\code{link}}{The weblink under which to store the progress.}
 
-\item{\code{score_assigned}}{A matrix indicating the scores assigned by the user.
-Rownames correspond to voxel ids.}
+\item{\code{score_assigned}}{A data.frame indicating the scores assigned by the user.
+Required columns: CBscore, x, y, z. (x,y,z are used for left_join())!}
 
 \item{\code{user_affiliation}}{A character string specifying the user's institutional affiliation.}
 

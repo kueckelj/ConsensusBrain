@@ -20,6 +20,22 @@ CB_help <-
         type = "inline"
       ),
 
+    "highlight_scope" =
+      list(
+        content = c(
+          "Select the scope among which to pick brain regions to highlight."
+        ),
+        type = "inline"
+      ),
+
+    "hover_vars" =
+      list(
+        content = c(
+          "Select what to display as meta information when hovering over the MRI."
+        ),
+        type = "inline"
+      ),
+
     "margin_dist" =
       list(
         content = c(
@@ -72,7 +88,9 @@ CB_help <-
           "",
           "The number defines how deep the brush stroke should go along the selected direction.",
           "",
-          "For example, a depth of 5mm will apply the current 2D brush selection to 5 slices."
+          "For example, a depth of 5mm will apply the current 2D brush selection to 5 slices.",
+          "",
+          "You can set depth to 0mm to prevent any 3D propagation and only affect the selection in the slice you are currently drawing on."
         ),
         type = "inline"
       ),
@@ -80,15 +98,12 @@ CB_help <-
     "paintbrush_direction" =
       list(
         content = c(
-          "Controls the direction in which the 2D selection is propagated across slices in Ray mode.",
+          "Controls the direction in which the 2D selection is propagated across slices in Ray mode after clicking on Confirm.",
           "",
           "- **Forward**: Propagates the selection in the direction you are looking (e.g., from inferior to superior in axial view).",
           "- **Backward**: Propagates opposite to your view direction.",
-          "- **Both**: Propagates equally in both directions from the current slice.",
           "",
-          "The direction is relative to your viewing plane and allows targeted or symmetric selection across depth.",
-          "",
-          "When **Forward** or **Backward** are selected, hovering over a plane makes the respective other two planes visualize the direction as well as the depth with a dotted line."
+          "If depth is set to 0mm the selection only applies to the slice you are currently working in."
         ),
         type = "inline"
       ),
@@ -101,17 +116,7 @@ CB_help <-
           "**Sphere** mode selects voxels in a spherical neighborhood around each brush position, including adjacent slices.",
           "",
           "**Ray** mode propagates the 2D brush selection across slices in a straight line (e.g., superior-inferior).
-          How the selection is propagated depends on the chosen brush scope."
-        ),
-        type = "inline"
-      ),
-
-    "progress_indicator_tab" =
-      list(
-        content = c(
-          "This plot displays the selection progress within the brain region for
-          this Workflow Tab. Click 'View 3D' to visualize progress in 3D, where
-          all other brain regions will be shown in grey."
+          How the selection is propagated depends on the chosen scope."
         ),
         type = "inline"
       ),
@@ -139,19 +144,42 @@ CB_help <-
     "score_description" =
       list(
         content = c(
-          "The resectability score reflects the surgical risk associated with removing tissue in a specific region. It guides the planning and use of intraoperative techniques such as neuromonitoring or awake mapping.",
+          "The resectability score reflects the surgical risk associated with removing tissue from a specific brain region. It supports preoperative planning and guides the use of intraoperative techniques such as neuromonitoring or awake mapping.",
           "",
           "**1 — Safely resectable**: The region can be removed without significant risk to function. Standard resection is expected to be safe.",
           "",
-          "**2 — Resectable with low to medium risk**: The region is resectable, but functional risk is present. Resection should involve intraoperative neuromonitoring or mapping techniques. Awake surgery may be considered depending on the functional anatomy.",
+          "**2 — Resectable with low to medium risk**: The region is resectable, but carries some functional risk. Intraoperative neuromonitoring or mapping should be used. Awake surgery may be considered depending on functional anatomy.",
           "",
-          "**3 — Resectable with medium to high risk**: Resection may still be possible, but the risk to critical functions is higher. Advanced neuromonitoring and awake mapping are typically required.",
+          "**3 — Resectable with medium to high risk**: Resection may be possible, but the risk to critical functions is higher. Advanced neuromonitoring and awake mapping are typically required.",
           "",
-          "**4 — Not resectable**: The region cannot be safely resected due to its functional importance or anatomical constraints. Surgery should avoid this area."
+          "**4 — Not resectable**: The region cannot be safely removed due to its functional importance or anatomical constraints. Resection should be avoided in this area.",
+          "",
+          "Click **Assign Score** to apply the selected score to your current selection. If any part of the selection already has a score,
+          you can click **Clear** to remove it and reset those voxels to 'Missing'.",
+          "",
+          "When refining your selection using the interaction tools, it's common for your selection to include voxels that already have an assigned score.
+          By default, **score assignment will not overwrite higher scores**.
+          For example, if your selection overlaps voxels scored as 'Low-Medium' and you assign 'Safely', the existing 'Low-Medium' voxels will remain unchanged,
+          while unscored voxels will receive the new 'Safely' score.",
+          "",
+          "To allow lower scores to overwrite higher ones, check the **Force** option before assigning."
         ),
         type = "inline"
       ),
 
+    "score_main" =
+      list(
+        content = "Assign a score to the selected brain tissue.",
+        type = "inline"
+      ),
+
+    "score_margin" =
+      list(
+        content =
+          "Assign a score to the brain tissue defined as the margin of your main
+        selection. This score can be the same as the main selection score.",
+        type = "inline"
+      ),
 
     "selection_criteria" =
       list(
@@ -237,20 +265,6 @@ CB_help <-
           "",
           "Use 'Undo' to step back through previous selections and 'Trash' to clear all selections. The chosen tool will define the interaction logic until changed."
         ),
-        type = "inline"
-      ),
-
-    "score_main" =
-      list(
-        content = "Assign a score to the selected brain tissue.",
-        type = "inline"
-      ),
-
-    "score_margin" =
-      list(
-        content =
-          "Assign a score to the brain tissue defined as the margin of your main
-        selection. This score can be the same as the main selection score.",
         type = "inline"
       )
   )

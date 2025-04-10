@@ -1,5 +1,5 @@
 
-moduleScoreAssignmentUI <- function(id, height = "300px") {
+moduleScoreAssignmentUI <- function(id, height = 300, width = 525) {
 
   ns <- shiny::NS(id)
 
@@ -12,8 +12,8 @@ moduleScoreAssignmentUI <- function(id, height = "300px") {
         flex-direction: column;
         padding: 10px;
         border: 1px solid #ccc;
-        height: {height};
-        width: 550px;
+        height: {height}px;
+        width: {width}px;
         border-radius: 5px;"),
 
       # Header (Top)
@@ -34,11 +34,25 @@ moduleScoreAssignmentUI <- function(id, height = "300px") {
         )
       ),
 
-      # Action Button (Bottom, pushed down)
       shiny::div(
         style = "margin-top: auto; text-align: center;",
-        shiny::uiOutput(ns("assign_score"))
+        shiny::column(
+          width = 3,
+          shiny::uiOutput(ns("force_score"))
+        ),
+        shiny::column(
+          width = 6,
+          align = "center",
+          shiny::uiOutput(ns("assign_score_opts"))
+        ),
+        shiny::column(
+          width = 3,
+          align = "center",
+          shiny::uiOutput(ns("clear_score"))
+        )
       )
+
+
     )
   )
 }
@@ -46,9 +60,17 @@ moduleScoreAssignmentUI <- function(id, height = "300px") {
 
 
 moduleScoreAssignmentServer <- function(id,
-                                        macro_area = NULL,
+                                        voxels_selected_input,
+                                        voxels_margin_input,
                                         voxel_df_input,
-                                        voxel_df_progress = NULL){
+                                        ...){
+
+  ab_style <-
+    stringr::str_replace(
+      string = css_styles$CB_action_button,
+      pattern = "width: 50%",
+      replacement = "width: 100%"
+    )
 
   shiny::moduleServer(
     id = id,
@@ -71,19 +93,12 @@ moduleScoreAssignmentServer <- function(id,
         ) %>%
         stringr::str_c(collapse = "")
 
-      # ----- debug
-
-      shiny::observe({
-
-
-      })
-
       # ----- renderUI
-      output$assign_score <- shiny::renderUI({
+      output$assign_score_opts <- shiny::renderUI({
 
-        shiny::req(nrow(voxel_df_selected()) != 0)
+        shiny::req(any(voxel_df()$selected))
 
-        if(any(voxel_df_selected()$is_margin)){
+        if(length(voxels_margin()) != 0){
 
           ready_for_score_assignment <-
             shiny::isTruthy(input$CBscore_main) &
@@ -107,20 +122,111 @@ moduleScoreAssignmentServer <- function(id,
           )
         )
 
-        shiny::actionButton(
-          inputId = ns("assign_score"),
-          label = "Assign Score",
-          width = "40%",
-          style = css_styles$CB_action_button
+        shiny::tagList(
+          shiny::actionButton(
+            inputId = ns("assign_score"),
+            label = "Assign",
+            style = ab_style
+          )
         )
 
       })
+
+      output$force_score <- shiny::renderUI({
+
+        shiny::req(any(voxel_df()$CBscore[voxel_df()$selected] != 0))
+
+        shinyWidgets::awesomeCheckboxGroup(
+          inputId = ns("force_score"),
+          label = NULL,
+          choices = "Force",
+          selected = character(),
+          inline = TRUE,
+          status = "primary"
+        )
+
+      })
+
+      force_score <- shiny::reactive({
+
+        !is.null(input$force_score) && "Force" %in% input$force_score
+
+      })
+
+      output$clear_score <- shiny::renderUI({
+
+        shiny::req(any(voxel_df()$CBscore[voxel_df()$selected] != 0))
+
+        shiny::actionButton(
+          inputId = ns("clear_score"),
+          label = "Clear",
+          icon = shiny::icon("trash"),
+          width = "100%",
+          style = ab_style
+        )
+
+      })
+
+      voxels_margin <- shiny::reactiveVal(value = character(0))
+      voxels_selected <- shiny::reactiveVal(value = character(0))
+
+      shiny::observeEvent(voxels_margin_input(), {
+
+        if(!identical(x = sort(voxels_margin()), y = sort(voxels_margin_input()))){
+
+          voxels_margin({ voxels_margin_input() })
+
+        }
+
+      })
+
+      shiny::observeEvent(voxels_selected_input(), {
+
+        if(!identical(x = sort(voxels_selected()), y = sort(voxels_selected_input()))){
+
+          voxels_selected({ voxels_selected_input() })
+
+        }
+
+      })
+
+      shiny::observeEvent(voxels_selected(), {
+
+        if(length(voxels_selected()) != 0 & !show_CBscore_main()){
+
+          show_CBscore_main({ TRUE })
+
+        } else if(length(voxels_selected()) == 0 & show_CBscore_main()){
+
+          show_CBscore_main({ FALSE })
+
+        }
+
+      })
+
+      shiny::observeEvent(voxels_margin(), {
+
+        if(length(voxels_margin()) != 0 & !show_CBscore_margin()){
+
+          show_CBscore_margin({ TRUE })
+
+        } else if(length(voxels_margin()) == 0 & show_CBscore_margin()){
+
+          show_CBscore_margin({ FALSE })
+
+        }
+
+      })
+
+      show_CBscore_main <- shiny::reactiveVal(value = FALSE)
+
+      show_CBscore_margin <- shiny::reactiveVal(value = FALSE)
 
       output$CBscore_main <- shiny::renderUI({
 
         shiny::validate(
           shiny::need(
-            expr = any(voxel_df()$selected),
+            expr = show_CBscore_main(),
             message = "No tissue selected."
           )
         )
@@ -138,14 +244,14 @@ moduleScoreAssignmentServer <- function(id,
             size = "normal",
             width = "100%"  # Fills the column width
           ) %>% add_helper("score_main"),
-          tags$script(HTML(glue::glue("
+          shiny::tags$script(shiny::HTML(glue::glue("
           $(document).ready(function() {{
             var inputID = '{ns('CBscore_main')}';
             {java_script}
           }});
           "))),
           # JavaScript: Highlight Selected Button (Uses Correct Namespace)
-          tags$script(HTML(glue::glue("
+          shiny::tags$script(shiny::HTML(glue::glue("
           $(document).ready(function() {{
             var inputID = '{ns('CBscore_main')}';
             $(\"input:radio[name='\" + inputID + \"']\").change(function() {{
@@ -163,7 +269,7 @@ moduleScoreAssignmentServer <- function(id,
 
         shiny::validate(
           shiny::need(
-            expr = any(voxel_df()$is_margin & voxel_df()$selected),
+            expr = show_CBscore_margin(),
             message = "No margin confirmed."
           )
         )
@@ -181,13 +287,13 @@ moduleScoreAssignmentServer <- function(id,
             size = "normal",
             width = "100%"  # Fills the column width
           ) %>% add_helper("score_margin"),
-          tags$script(HTML(glue::glue("
+          shiny::tags$script(shiny::HTML(glue::glue("
           $(document).ready(function() {{
             var inputID = '{ns('CBscore_margin')}';
             {java_script}
           }});
           "))),
-          tags$script(HTML(glue::glue("
+          shiny::tags$script(shiny::HTML(glue::glue("
           $(document).ready(function() {{
             var inputID = '{ns('CBscore_margin')}';
             $(\"input:radio[name='\" + inputID + \"']\").change(function() {{
@@ -198,69 +304,126 @@ moduleScoreAssignmentServer <- function(id,
           ")))
         )
 
-
       })
 
       # -----
 
-      voxel_df <- shiny::reactiveVal(value = data.frame())
-      voxel_df_with_score <- shiny::reactiveVal(value = data.frame())
+      voxel_df <- shiny::reactive({
 
-      # ----- reactive (Expressions)
-
-      voxel_df_selected <- shiny::reactive({
-
-        shiny::req("selected" %in% names(voxel_df()))
-        dplyr::filter(voxel_df(), selected)
-
-        })
-
-      # ----- observeEvents
-
-      shiny::observeEvent(voxel_df_input(), {
-
-        if(!identical(x = voxel_df(), y = voxel_df_input())){
-
-          voxel_df({ voxel_df_input() })
-
-        }
+        dplyr::mutate(voxel_df_input(), selected = id %in% voxels_selected())
 
       })
 
+      # ----- observeEvents
+
+      voxel_df_with_score <- shiny::reactiveVal({ data.frame() })
+
       shiny::observeEvent(input$assign_score, {
 
-        shiny::req(voxel_df_selected())
+        if(length(voxels_margin()) != 0){
 
-        if(any(voxel_df_selected()$is_margin)){
-
-          voxel_df_with_score({
-
-            dplyr::filter(voxel_df_selected(), selected) %>%
+          vdf_ws <-
+            dplyr::filter(voxel_df(), selected) %>%
             dplyr::mutate(
               CBscore_new =
                 dplyr::if_else(
-                  condition = is_margin,
+                  condition = id %in% voxels_margin(),
                   true = as.numeric(input$CBscore_margin),
                   false = as.numeric(input$CBscore_main)
-                  )
+                ),
+              force = force_score()
             )
-
-          })
 
         } else {
 
-          voxel_df_with_score({
-
-            dplyr::filter(voxel_df_selected(), selected) %>%
-            dplyr::mutate(CBscore_new = as.numeric(input$CBscore_main))
-
-          })
+          vdf_ws <-
+            dplyr::filter(voxel_df(), selected) %>%
+            dplyr::mutate(
+              CBscore_new = as.numeric(input$CBscore_main),
+              force = force_score()
+            )
 
         }
 
+        text <- NULL
+        if(all(vdf_ws$CBscore_new < vdf_ws$CBscore) & !force_score()){
+
+          title <- "Cannot Overwrite Higher Risk Scores"
+          text <- paste(
+            "The whole region you selected already has a higher risk score than the one you're trying to assign.",
+            "To allow ConsensusBrain to overwrite higher scores with lower ones, please enable the 'Force' option on the left."
+          )
+
+          shinyWidgets::sendSweetAlert(
+            session = session,
+            title = title,
+            text = text,
+            type = "warning"
+          )
+
+          shiny::req(FALSE)
+
+        } else if(all(vdf_ws$CBscore_new == vdf_ws$CBscore)){
+
+          title <- "Nothing Happened"
+          text <- "The whole region you selected already has the exact score you're trying to assign."
+
+          shinyWidgets::sendSweetAlert(
+            session = session,
+            title = title,
+            text = text,
+            type = "warning"
+          )
+
+          shiny::req(FALSE)
+
+        } else if(any(vdf_ws$CBscore_new < vdf_ws$CBscore) & !force_score()) {
+
+          text <- paste(
+            "Info: Part of the region you selected already had a higher risk score than the one you assigned.",
+            "This was not updated since 'Force' was not enabled."
+          )
+
+        }
+
+        voxel_df_with_score({ vdf_ws })
+
         shinyWidgets::sendSweetAlert(
           session = session,
-          title = "Score assigned!",
+          title = glue::glue("Score {val}!", val = ifelse(force_score(), "forced", "assigned")),
+          text = text,
+          type = "success"
+        )
+
+        # update to ensure no forcing for next selection
+        shinyWidgets::updateAwesomeCheckboxGroup(
+          session = session,
+          inputId = "force_score",
+          selected = character()
+        )
+
+      }, ignoreInit = TRUE)
+
+      shiny::observeEvent(input$clear_score, {
+
+        voxel_df_with_score({
+
+          dplyr::filter(voxel_df(), selected) %>%
+          dplyr::mutate(CBscore_new = 0, force = TRUE)
+
+        })
+
+        # works regardless of force but ensure that it is unchecked
+        # for new selection
+        shinyWidgets::updateAwesomeCheckboxGroup(
+          session = session,
+          inputId = "force_score",
+          selected = character()
+        )
+
+        shinyWidgets::sendSweetAlert(
+          session = session,
+          title = "Score removed!",
           type = "success"
         )
 

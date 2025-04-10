@@ -1,2 +1,10 @@
 ^ConsensusBrain\.Rproj$
 ^\.Rproj\.user$
+^data_dev$
+^docs$
+^figures$
+^plots$
+^py_scripts$
+^py_venv$
+^R_markdown$
+^R_scripts$

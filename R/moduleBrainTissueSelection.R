@@ -4,19 +4,9 @@
 
 # Lobes -------------------------------------------------------------------
 
-moduleBrainTissueSelectionUI <- function(id, macro_area = NULL){
+moduleBrainTissueSelectionUI <- function(id, height = 300, width = 525){
 
   ns <- shiny::NS(id)
-
-  if(is.character(macro_area)){
-
-    macro_area_label <- make_pretty_label(macro_area)
-
-  } else {
-
-    macro_area_label <- NULL
-
-  }
 
   shiny::tagList(
     tags$head(
@@ -42,24 +32,24 @@ moduleBrainTissueSelectionUI <- function(id, macro_area = NULL){
       )
     ),
     shiny::div(
-      style = paste(
+      style = paste0(
         "background-color: white;",
         "box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);",
         "border-radius: 5px;",
-        "width: 550px;",
+        "width: ", width, "px;",
         "display: flex;",
         "flex-direction: column;",
         "padding: 10px;",
         "border: 1px solid #ccc;",
         "flex-wrap: wrap;",
-        "height: 300px;",
+        "height: ", height, "px;",
         "justify-content: space-between;",  # Ensures even distribution
         sep = " "
       ),
 
       # Title at the top
       shiny::h4(
-        shiny::strong(glue::glue("Selection Criteria: {macro_area_label}")),
+        shiny::uiOutput(ns("header_brain_tissue_selection")),
         style = "margin-bottom: 10px; text-align: left;"
         ) %>% add_helper("selection_criteria"),
 
@@ -121,25 +111,22 @@ moduleBrainTissueSelectionServer <- function(id,
                                              macro_area,
                                              voxel_df_input){
 
-  is_lobe <-
-    length(macro_area) == 1 &&
-    stringr::str_detect(macro_area, pattern = "lobe$")
-
-  if(macro_area == "wm_tract"){
-
-    label <- "White Matter Tract"
-    label_lower <- "white matter tract"
-
-  } else {
-
-    label <- "Brain Area"
-    label_lower <- "brain area"
-
-  }
-
   shiny::moduleServer(
     id = id,
     module = function(input, output, session){
+
+      is_lobe <- shiny::reactive({
+
+        length(macro_area()) == 1 &&
+          stringr::str_detect(macro_area(), pattern = "lobe$")
+
+      })
+
+      label <- shiny::reactive({
+
+        ifelse(macro_area() == "wm_tract", "White Matter Tract", "Brain Area")
+
+      })
 
       # ----- debuggin
       shiny::observeEvent(input$test,{
@@ -161,9 +148,23 @@ moduleBrainTissueSelectionServer <- function(id,
         )
 
       # ----- renderUI
+
+      output$header_brain_tissue_selection <- shiny::renderUI({
+
+        macro_area_label <-
+          ifelse(
+            test = macro_area() == "wm_tract",
+            yes = "White Matter Tract",
+            no = make_pretty_label(macro_area())
+            )
+
+        shiny::strong(glue::glue("Selection Criteria: {macro_area_label}"))
+
+      })
+
       output$parc_atlas <- shiny::renderUI({
 
-        shiny::req(is_lobe)
+        shiny::req(is_lobe())
 
         shiny::column(
           width = 6,
@@ -188,7 +189,7 @@ moduleBrainTissueSelectionServer <- function(id,
           align = "left",
           shinyWidgets::pickerInput(
             inputId = ns("brain_area"),
-            label = paste0(label, ":"),
+            label = paste0(label(), ":"),
             choices = choices(),
             choicesOpt = list(style = unlist(progress_values())),
             selected = character(),
@@ -224,7 +225,7 @@ moduleBrainTissueSelectionServer <- function(id,
 
         shiny::req({
 
-          any(voxel_df_input()[voxel_df_input()$ann_macro %in% macro_area,][["CBscore"]] != 0)
+          any(voxel_df_input()[voxel_df_input()$ann_macro %in% macro_area(),][["CBscore"]] != 0)
 
         })
 
@@ -250,12 +251,12 @@ moduleBrainTissueSelectionServer <- function(id,
       # ann_dk_adj and ann_dt_adj agree on everything except for lobe parcellation
       ann_var <- shiny::reactive({
 
-        if(is_lobe){
+        if(is_lobe()){
 
           shiny::req(input$parc_atlas)
           input$parc_atlas
 
-        } else if(macro_area == "wm_tract") {
+        } else if(macro_area() == "wm_tract") {
 
           "wm_tract"
 
@@ -279,14 +280,14 @@ moduleBrainTissueSelectionServer <- function(id,
 
         } else {
 
-          if(stringr::str_detect(macro_area, pattern = "lobe$")){
+          if(stringr::str_detect(macro_area(), pattern = "lobe$")){
 
-            choices_out <- cortical_regions[[ann_var()]][[macro_area]]
+            choices_out <- cortical_regions[[ann_var()]][[macro_area()]]
 
           } else {
 
             choices_out <-
-              dplyr::filter(.data = voxel_df_input(), ann_macro %in% {{macro_area}})[[ann_var()]] %>%
+              dplyr::filter(.data = voxel_df_input(), ann_macro %in% macro_area())[[ann_var()]] %>%
               unique() %>%
               sort()
 
@@ -331,8 +332,8 @@ moduleBrainTissueSelectionServer <- function(id,
 
           shinyWidgets::sendSweetAlert(
             session = session,
-            title = glue::glue("Missing {label}!"),
-            text = glue::glue("You need to select at least one {label_lower}."),
+            title = glue::glue("Missing {label()}!"),
+            text = glue::glue("You need to select at least one {tolower(label())}."),
             type = "error"
           )
 

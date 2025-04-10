@@ -12,58 +12,41 @@ moduleMriPlaneUI <- function(id,
                              title = "MRI",
                              slider_min = 1,
                              slider_max = 256,
-                             pd = 5, # padding
-                             siamp = 30, # size items around mri plot
                              showValue = TRUE,
-                             wmp = 500, # width mri plot
-                             cf = F) {
+                             width = 525) {
 
   ns <- shiny::NS(id)
 
+  # for debugging
+  cf = F
   bgc <- function(cf){
 
-    if(cf){
+    if(!cf){ "white" } else {
 
-      sample(colors, size = 1) %>%
-        paste0(., "; border: 1px solid black;")
-
-    } else {
-
-      "white"
+      sample(colors, size = 1)
 
     }
 
   }
 
-  # size around mri plot -> add padding
-  samp <- pd*2 + siamp
-
-  # width mri container
-  wmc <- wmp + samp
-
-  assign("wmc", wmc, envir = .GlobalEnv)
+  width <- width-10
+  pd <- round(width*0.01)
+  siamp <- round(width*0.065)
+  samp <- round(width*0.05)
+  wmp <- round(width*0.95)
 
   # HTML + CSS
   {shiny::tagList(
     shiny::tags$head(
       shiny::tags$script(
         shiny::HTML(
-        "$(document).ready(function(){
-         $('[data-toggle=\"tooltip\"]').tooltip();});"
+          "$(document).ready(function(){
+           $('[data-toggle=\"tooltip\"]').tooltip();});"
         )
       ),
       shiny::tags$style(
         shiny::HTML(
           glue::glue("
-                     .CB-control-group {
-                      display: flex;
-                      flex-direction: column;
-                      align-items: center;
-                      justify-content: flex-start;
-                      gap: 10px; /* Adds spacing between checkbox group and buttons */
-                    }
-
-                    /* Checkbox Group (Forces Vertical Alignment) */
                     .CB-checkbox-group {
                       display: flex;
                       flex-direction: column;
@@ -72,7 +55,6 @@ moduleMriPlaneUI <- function(id,
                       width: auto;
                     }
 
-                    /* Ensure each button inside the checkbox group is aligned properly */
                     .CB-checkbox-group .btn-group {
                       flex-direction: column !important;  /* Force buttons to stack vertically */
                       display: flex !important;
@@ -91,27 +73,16 @@ moduleMriPlaneUI <- function(id,
                       transition: all 0.2s ease-in-out
                     }
 
-                    /* Change background color when selected */
                     .CB-checkbox-group .btn.active {
                       background-color: steelblue !important;
                       color: white !important;
                       border-color: steelblue !important;
                     }
 
-                    /* Ensure icons inside remain white when selected */
                     .CB-checkbox-group .btn.active i {
                       color: white !important;
                     }
 
-                    /* Action Buttons Group */
-                    .CB-btn-group {
-                      display: flex;
-                      flex-direction: column;
-                      align-items: center;
-                      gap: 2.5px; /* Adds spacing between buttons */
-                    }
-
-                    /* Adjust button styles to ensure they remain square and aligned */
                     .CB-btn {
                       width: {{siamp}}px !important;  /* Square button width */
                       height: {{siamp}}px !important; /* Square button height */
@@ -124,6 +95,13 @@ moduleMriPlaneUI <- function(id,
                       font-size: 18px;
                       cursor: pointer;
                       transition: all 0.2s ease-in-out;
+                    }
+
+                    .CB-btn-group {
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 2.5px; /* Adds spacing between buttons */
                     }
 
                     .CB-btn-slider {
@@ -141,7 +119,6 @@ moduleMriPlaneUI <- function(id,
                       transition: all 0.2s ease-in-out;
                     }
 
-                    /* Hover Effect */
                     .CB-btn:hover {
                       background-color: rgba(200, 200, 200, 0.5);
                     }
@@ -161,11 +138,8 @@ moduleMriPlaneUI <- function(id,
                       transition: all 0.2s ease-in-out;
                       }
 
-
-                    /* Hide default min/max labels */
                     .irs-min, .irs-max { display: none !important; }
 
-                    /* Custom labels above the slider */
                     .slider-container {
                       display: flex;
                       flex-direction: column-reverse; /* Moves labels above the slider */
@@ -195,7 +169,8 @@ moduleMriPlaneUI <- function(id,
                     display: flex;
                     flex-direction: column;
                     padding: 5px;
-                    width: {wmc+10}px;
+                    margin-top: -7.5px;
+                    width: {width+10}px;
                     height:100%;"),
       #shiny::actionButton(ns("test"), label= "Test"),
       shiny::div( # Above MRI Plot
@@ -203,10 +178,10 @@ moduleMriPlaneUI <- function(id,
                       display: flex;
                       align-items: flex-end;
                       justify-content: center;
-                      height: {samp*1.5}px;
-                      width: {wmc}px;
+                      height: {samp*2.5}px;
+                      width: {width}px;
                       margin-bottom: -10px;
-                      background-color: {bgc(cf)}"),
+                      background-color: white"),
         shiny::div(
           style = glue::glue("
                              display: flex;
@@ -236,7 +211,7 @@ moduleMriPlaneUI <- function(id,
           style = glue::glue("
                         display: flex;
                         justify-content: flex-end;
-                        width: {samp}px;
+                        width: {samp*1.5}px;
                         margin: 10px;
                         margin-bottom: 20px;
                         background-color: {bgc(cf)}"),
@@ -249,7 +224,6 @@ moduleMriPlaneUI <- function(id,
         ),
         shiny::div(
           style = glue::glue("
-                        /*flex-grow: 1;  Allow slider to take remaining space */
                         display: flex;
                         justify-content: center;
                         padding-top:5px;
@@ -274,7 +248,7 @@ moduleMriPlaneUI <- function(id,
           style = glue::glue("
                         display: flex;
                         justify-content: flex-start;
-                        width: {samp*2}px;
+                        width: {samp*3}px;
                         margin: 10px;
                         margin-bottom: 20px;
                         background-color: {bgc(cf)};
@@ -285,33 +259,11 @@ moduleMriPlaneUI <- function(id,
             class = "CB-btn-slider",
             icon = shiny::icon("step-forward")
           ),
-          shinyWidgets::dropdownButton(
-            status = "dropdownbutton",
-            inputId = ns("mri_opts_dropdown"),
-            icon = shiny::icon("gear"),
-            circle = FALSE,
-            size = "sm",
-            tooltip = "MRI Options",
-            # dropdown content
-            shiny::div( # Checkbox Buttons
-              class = "CB-checkbox-group",
-              shinyWidgets::checkboxGroupButtons(
-                inputId = ns("mri_opts"),
-                label = NULL,
-                selected = c("localizer_lines", "link", "hover_show"),
-                choices = c(
-                  '<i class="fas fa-link" style="font-size: 1.5em;" data-toggle="tooltip" title="Link MRI"></i>' = "link",
-                  #'<i class="fas fa-ruler-horizontal" style="font-size: 1.5em;" data-toggle="tooltip" title="Scale Bar"></i>' = "scale_bar" # not necessary?
-                  '<i class="fas fa-plus" style="font-size: 2em;" data-toggle="tooltip" title="MRI-Localizer"></i>' = "localizer_lines",
-                  '<i class="fas fa-mouse-pointer" style="font-size: 1.5em;" data-toggle="tooltip" title="Tissue-Label"></i>' = "hover_show"
-                ),
-                direction = "vertical",
-                justified = FALSE,
-                individual = FALSE,
-                size = "sm",
-                width = "100%"
-              )
-            )
+          shiny::actionButton(
+            inputId = ns("mri_refresh"),
+            label = NULL,
+            class = "CB-btn-slider",
+            icon = shiny::icon("refresh")
           )
         )
       ),
@@ -321,12 +273,12 @@ moduleMriPlaneUI <- function(id,
                             display: flex;
                             flex-direction: row;
                             height: {wmp}px;
-                            width: {wmc}px;"),
+                            width: {width}px;"),
         shiny::div( # MRI Plot
           style = glue::glue("
-                                  display: flex;
-                                  width: {wmp}px;
-                                  height: {wmp}px"),
+                              display: flex;
+                              width: {wmp}px;
+                              height: {wmp}px"),
           class = "multiple-plots",
           shiny::tags$style(
             glue::glue(".multiple-plots { position: relative; width: {{wmp}}px; height: {{wmp}}px; }
@@ -420,9 +372,9 @@ moduleMriPlaneUI <- function(id,
         style = glue::glue("
                             display: flex;
                             flex-direction: row;
-                            width: {wmc};
+                            width: {width};
                             height: {samp};
-                            background-color: black"),
+                            background-color: white"),
         shiny::div( # Horizontal Slider
           style = glue::glue("
                               display: flex;
@@ -430,8 +382,9 @@ moduleMriPlaneUI <- function(id,
                               justify-content: center;
                               height: {samp}px;
                               width: {wmp}px;
-                              padding-top:{pd*1.5}px;
-                              background-color: {bgc(cf)}"),
+                              padding-top: {pd*4}px;
+                              margin-bottom: {pd*2}px;
+                              background-color: white"),
           shinyWidgets::noUiSliderInput(
             inputId = ns("mri_slider_col"),
             label = NULL,
@@ -456,51 +409,24 @@ moduleMriPlaneUI <- function(id,
         )
       ),
       shiny::fluidRow(
+        #shiny::actionButton(ns("test"), "Test"),
         shiny::uiOutput(outputId = ns("options_bottom"))
       )
     )
   )}
 }
 
-#' @param id The module id.
-#' @param plane The plane in which the MRI data set is represented.
-#' @param mri_list Named list of length three (names: sag, axi, cor). Each
-#' slot corresponds to a list of raster matrices which in turn corresponds
-#' to a MRI slice of the respective plane. Each value in each slice corresponds
-#' to a color in HEX code for the respective pixel.
-#' @param interaction_templates A list of length n, where n corresponds
-#' to the number of slices of the respective plane represented by this module instance.
-#' Each slot is a data.frame (variables: col, row, id, selected). ID corresponds
-#' to the voxel ID in the global voxel data.frame.
-#' @param voxel_df The global 3D representation of the MRI data set. Each
-#' row corresponds to a voxel.
-#' @param slice_sag,slice_axi,slice_cor Numeric value that indicate the currently
-#' plotted slice of the respective plane. Provided as reactive expressions -
-#' should be provided from the output of the connected MRI control module.
-#' @param mri_control The output of the connected MRI control module. Provided
-#' as a reactive expression.
-#'
-#'
-#' @section Module Modes:
-#'
-#' **Selection**
-#' Mode in which the objective is to interactively select voxels in one
-#' slice or across multiple slices. The objective of the selection process can
-#' vary and is managed by the MRI control module. The result of the selection
-#' process (all selected voxels across all slices) is returned as a character
-#' vector of voxel IDs upon every click on `input$selection_confirm`.
-
 moduleMriPlaneServer <- function(id,
                                  plane,
                                  nifti_input,
-                                 selection_color_input = function(){ "forestgreen" },
-                                 non_brain_template,
+                                 voxel_df_input,
                                  mri_control,
+                                 color_selected = function(){ colorsCB$selected },
                                  mode_init = "inspection"
                                  ){
 
   # define once
-  axis_ccs <- switch_axis_label(plane)
+  plane_ccs <- switch_axis_label(plane)
 
   ra_ccs <- req_axes_2d(plane)
   ra_mri <- req_axes_2d(plane, mri = TRUE)
@@ -509,8 +435,6 @@ moduleMriPlaneServer <- function(id,
   row_axis <- ra_mri["row"]
 
   mri_grid <- tidyr::expand_grid(col = 1:256, row = 1:256)
-
-  # color = NA -> can be selected, but is not displayed
 
   shiny::moduleServer(
     id = id,
@@ -521,29 +445,29 @@ moduleMriPlaneServer <- function(id,
       # ----- Debugging/Testing
       shiny::observeEvent(input$test,{
 
-        #assign(x = "data", value = reactiveValuesToList(data), envir = .GlobalEnv)
         print("-----------------------")
         print("Test")#
-        print(mri_control_input$paintbrush_masks)
+        print(plane_selection_state)
 
       }, ignoreInit = TRUE)
 
-      shiny::observe({
-
-        print("----------")
-        print(mri_control_input$paintbrush_masks)
-
-      })
-
-      pb_mask_on_diff_plane <- shiny::reactive({
-
-        length(mri_control_input$paintbrush_masks) == 1 &&
-        names(mri_control_input$paintbrush_masks) != plane
-
-      })
-
       # 1. Global ---------------------------------------------------------------
 
+      cursor_on_mri <- shiny::reactiveVal(value = FALSE)
+
+      # needs debuggin
+      shiny::observeEvent(NULL, {
+
+        shiny::req(stringr::str_detect(selection_tool(), pattern = "paintbrush"))
+
+        session$sendCustomMessage("plot-hover-toggle", list(
+          show = cursor_on_mri(),
+          # 500 = MRI width
+          radius_px = (paintbrush_radius()/2) * (500 / diff(col_min(), col_max())),
+          color = selection_color()
+        ))
+
+      }, ignoreNULL = TRUE)
 
       # Dynamic UI --------------------------------------------------------------
 
@@ -680,7 +604,7 @@ moduleMriPlaneServer <- function(id,
 
             }
 
-          } else if(selection_tool() == "safety_margin"){
+          } else if(selection_tool() == "margin"){
 
             shiny::column(
               offset = 1,
@@ -746,9 +670,10 @@ moduleMriPlaneServer <- function(id,
         shiny::reactiveValues(
           # all modes
           cursor_on_plane = character(1),
-          voxel_df = data.frame(),
 
           # inspection
+          hover_vars = numeric(1),
+          voxels_highlighted = character(1),
 
           # selection
           outlines = list(),
@@ -762,7 +687,10 @@ moduleMriPlaneServer <- function(id,
           selected_voxels = character(1),
           selection_erase = logical(1),
           selection_scope = character(1),
-          selection_tool = character(1)
+          selection_tool = character(1),
+          voxels_margin = character(1),
+          voxels_margin_cand = character(1),
+          voxels_selected = character(1)
         )
 
       stacks <- shiny::reactiveValues(zoom = list())
@@ -771,21 +699,15 @@ moduleMriPlaneServer <- function(id,
 
       hover_show <- shiny::reactive({
 
-        shiny::req(input$mri_opts)
-
         if(mode() == "inspection"){
 
-          out <- "hover_show" %in% input$mri_opts
+          TRUE
 
         } else {
 
-          out <-
-            "hover_show" %in% input$mri_opts &
-            !stringr::str_detect(interaction_tool(), pattern = "outline|paintbrush")
+          !stringr::str_detect(interaction_tool(), pattern = "outline|paintbrush")
 
         }
-
-        return(out)
 
       })
 
@@ -818,46 +740,49 @@ moduleMriPlaneServer <- function(id,
       btns_disabled_paintbrush <- shiny::reactiveVal(value = TRUE)
       btns_disabled_paintbrush_erase <- shiny::reactiveVal(value = TRUE)
 
-      reselect <- shiny::reactiveVal(value = "")
-
       slice_pos <- shiny::reactiveValues(sag = 128, axi = 128, cor = 128)
 
-      # is immediately updated by the controller input
-      voxel_df <- shiny::reactiveVal(data.frame())
+      voxel_df <- shiny::reactive({
 
-      shiny::observeEvent(mri_control_input$voxel_df, {
+        dplyr::mutate(
+          .data = voxel_df_input(),
+          selected = id %in% c(mri_control_input$voxels_selected)
+        )
 
-        if(!identical(x = shiny::isolate({ voxel_df() }), y = mri_control_input$voxel_df)){
+      })
 
-          voxel_df({ mri_control_input$voxel_df })
+      plane_selection_state <- shiny::reactiveVal(value = character())
+
+      shiny::observeEvent(mri_control_input$voxels_selected, {
+
+        if(!identical(x = sort(plane_selection_state()), y = sort(mri_control_input$voxels_selected))){
+
+          plane_selection_state({ mri_control_input$voxels_selected })
 
         }
 
       })
 
+
       # Reactive Expressions ----------------------------------------------------
+
+      border_color <- shiny::reactive({
+
+        if(nrow(drawing_outline_confirmed()) != 0){
+
+          "orange"
+
+        } else {
+
+          NA
+
+        }
+
+      })
 
       cursor_on_brain_tissue <- shiny::reactive({ nrow(slice_df_hover()) != 0 })
 
       cursor_on_mri <- shiny::reactiveVal(value = FALSE)
-
-      shiny::observeEvent(input$mriPlot_hover, {
-
-        if(shiny::isTruthy(input$mriPlot_hover)){
-
-          if(!cursor_on_mri()){
-
-            cursor_on_mri(TRUE)
-
-          }
-
-        } else {
-
-          cursor_on_mri(FALSE)
-
-        }
-
-      }, ignoreNULL = FALSE)
 
       cursor_pos <- shiny::reactive({ c(input$mriPlot_hover$x, input$mriPlot_hover$y) })
 
@@ -865,36 +790,37 @@ moduleMriPlaneServer <- function(id,
       col_max <- shiny::reactive({ max(mri_range()[["col"]]) })
       col_seq <- shiny::reactive({ col_min():col_max() })
 
-      erase <- shiny::reactiveVal(TRUE) #!!!!
-
       hover_text <- shiny::reactive({
 
         shiny::req(cursor_pos())
 
         if(shiny::isTruthy(slice_df_hover()) & !drawing_active()){
 
-          shiny::req(slice_idx())
-
           # Ensure data exists after filtering
           if(nrow(slice_df_hover()) == 0) {
 
             text <- c("No brain tissue")
 
-          } else {
+          } else if(mode() == "inspection") {
 
-            text <- make_pretty_label(slice_df_hover()[[selection_scope()]])
+            text <-
+              c(
+                paste0("Macro: ", make_pretty_label(slice_df_hover()[["ann_macro"]])),
+                paste0("Desikan-Kiliany: ", make_pretty_label(slice_df_hover()[["ann_dk_adj"]])),
+                paste0("Destrieux: ", make_pretty_label(slice_df_hover()[["ann_dt_adj"]])),
+                paste0("Tract: ", make_pretty_label(slice_df_hover()[["wm_tract"]])),
+                paste0("Score: ", names(score_set_up$choices)[slice_df_hover()[["CBscore"]]+1])
+              )
 
-            if(slice_df_hover()$is_wm){ text <- paste0("White Matter - ", text) }
+            text <- stringr::str_c(text[mri_control_input$hover_vars], collapse = "\n")
 
-            if(slice_df_hover()$is_margin){
+          } else if(mode() == "selection"){
 
-              text <- paste0(text, " (Margin)")
-
-            } else if(slice_df_hover()$selected){
-
-              text <- paste0(text, " (Main Selection)")
-
-            }
+            text <-
+              paste0(
+                "Scope: ", ann_var_names[selection_scope()],
+                "\nRegion:  ", make_pretty_label(slice_df_hover()[[selection_scope()]])
+              )
 
           }
 
@@ -946,7 +872,7 @@ moduleMriPlaneServer <- function(id,
 
         out <-
           dplyr::rename(
-            .data = voxel_df()[voxel_df()[[axis_ccs]] == slice_idx(), ],
+            .data = voxel_df()[voxel_df()[[plane_ccs]] == slice_idx(), ],
             !!!ra_ccs
           )
 
@@ -997,6 +923,32 @@ moduleMriPlaneServer <- function(id,
 
       })
 
+      localizer_col_v <- shiny::reactive({ ifelse(cursor_on_mri(), alpha("red", 0.5), "red") })
+
+      localizer_col_h <- shiny::reactive({ ifelse(cursor_on_mri(), alpha("red", 0.5), "red") })
+
+      localizer_lty <- shiny::reactive({ ifelse(cursor_on_mri(), "solid", "solid") })
+
+      localizer_lwd <- shiny::reactive({ ifelse(cursor_on_mri(), 1, 1.5) })
+
+      # positioning of the vertical localizer
+      localizer_x0_v <- shiny::reactive({ slice_pos[[ra_mri["col"]]] })
+
+      localizer_x1_v <- shiny::reactive({ slice_pos[[ra_mri["col"]]] })
+
+      localizer_y0_v <- shiny::reactive({ ifelse(show_localizer_ray_h(), NA, row_min()) })
+
+      localizer_y1_v <- shiny::reactive({ ifelse(show_localizer_ray_h(), NA, row_max()) })
+
+      # positioning of the horizontal localizer
+      localizer_y0_h <- shiny::reactive({ slice_pos[[ra_mri["row"]]] })
+
+      localizer_y1_h <- shiny::reactive({ slice_pos[[ra_mri["row"]]] })
+
+      localizer_x0_h <- shiny::reactive({ ifelse(show_localizer_ray_v(), NA, col_min()) })
+
+      localizer_x1_h <- shiny::reactive({ ifelse(show_localizer_ray_v(), NA, col_max()) })
+
       mri_slice <- shiny::reactive({
 
         shiny::req(nifti_input())
@@ -1011,13 +963,7 @@ moduleMriPlaneServer <- function(id,
 
       n_slices <- shiny::reactive({ dim(nifti_input())[which(c("sag", "cor", "axi") == plane)] })
 
-      paintbrush_radius <- shiny::reactive({
-
-        #round(mri_side_length() * paintbrush_radius_fct())
-        mri_control_input$paintbrush_radius
-
-        })
-      #paintbrush_radius_fct <- shiny::reactive({ mri_control_input$pbr_fct })
+      paintbrush_radius <- shiny::reactive({ mri_control_input$paintbrush_radius })
 
       paintbrush_selected <- shiny::reactive({
 
@@ -1028,27 +974,82 @@ moduleMriPlaneServer <- function(id,
 
       paintbrush_selected_ids <- shiny::reactive({ data$paintbrush })
 
+      pb_mask_on_diff_plane <- shiny::reactive({
+
+        length(mri_control_input$paintbrush_masks) == 1 &&
+          names(mri_control_input$paintbrush_masks) != plane
+
+      })
+
+      ray_depth <- shiny::reactive({
+
+        pb_dir <- mri_control_input$paintbrush_direction
+        pb_depth <- mri_control_input$paintbrush_depth
+
+        if(pb_dir == "forward"){
+
+          out <- -pb_depth
+
+        } else if(pb_dir == "backward"){
+
+          out <- pb_depth
+
+        }
+
+        return(out)
+
+      })
+
+      ray_dir <- shiny::reactive({
+
+        if(mri_control_input$paintbrush_mode == "Ray"){
+
+          mri_control_input$paintbrush_direction
+
+        } else {
+
+          NULL
+
+        }
+
+      })
+
       row_min <- shiny::reactive({ min(mri_range()[["row"]]) })
       row_max <- shiny::reactive({ max(mri_range()[["row"]]) })
       row_seq <- shiny::reactive({ row_min():row_max() })
 
-      selection3D <- shiny::reactive({
 
-        all({
+      show_localizer_ray_v <- shiny::reactive({
 
-          purrr::map_lgl(
-            .x = c("x", "y", "z"),
-            .f = function(axis){
+        if(is.null(mri_control_input$paintbrush_mode)){
 
-              slices <- dplyr::filter(voxel_df(), selected)[[axis]]
+          FALSE
 
-              dplyr::n_distinct(slices) > 1
+        } else {
 
-            }
-          )
+          mri_control_input$selection_tool %in% c("paintbrush", "paintbrush_erase") &
+          mri_control_input$paintbrush_mode == "Ray" &
+          mri_control_input$paintbrush_depth != 0 &
+          unname(ra_mri["col"]) %in% mri_control_input$cursor_on_plane
 
-        })
+        }
 
+      })
+
+      show_localizer_ray_h <- shiny::reactive({
+
+        if(is.null(mri_control_input$paintbrush_mode)){
+
+          FALSE
+
+        } else {
+
+          mri_control_input$selection_tool %in% c("paintbrush", "paintbrush_erase") &
+          mri_control_input$paintbrush_mode == "Ray" &
+          mri_control_input$paintbrush_depth != 0 &
+          unname(ra_mri["row"]) %in% mri_control_input$cursor_on_plane
+
+        }
 
       })
 
@@ -1056,13 +1057,14 @@ moduleMriPlaneServer <- function(id,
       slice_cor <- shiny::reactive({ mri_control_input$slice_state$cor })
       slice_sag <- shiny::reactive({ mri_control_input$slice_state$sag })
 
-      slice_df <- shiny::reactive({ voxel_df()[voxel_df()[[axis_ccs]] == slice_idx(),] })
+      slice_df <- shiny::reactive({ voxel_df()[voxel_df()[[plane_ccs]] == slice_idx(),] })
+
       slice_df_hover <- shiny::reactive({
 
         shiny::req(!drawing_active())
         shiny::req(slice_df())
 
-        # circumevent without req()!
+        # circumvent without req()!
         if(shiny::isTruthy(cursor_pos())){
 
           slice_dfh <- slice_df()
@@ -1082,8 +1084,8 @@ moduleMriPlaneServer <- function(id,
         }
 
       })
-      slice_idx <- shiny::reactive({ slice_pos[[plane]] })
 
+      slice_idx <- shiny::reactive({ slice_pos[[plane]] })
 
       # ----- Observers
 
@@ -1104,6 +1106,24 @@ moduleMriPlaneServer <- function(id,
         }
 
       })
+
+      shiny::observeEvent(input$mriPlot_hover, {
+
+        if(shiny::isTruthy(input$mriPlot_hover)){
+
+          if(!cursor_on_mri()){
+
+            cursor_on_mri({ TRUE })
+
+          }
+
+        } else {
+
+          cursor_on_mri({ FALSE })
+
+        }
+
+      }, ignoreNULL = FALSE)
 
       # --- drawing logic
       shiny::observeEvent(cursor_pos(),{
@@ -1163,17 +1183,6 @@ moduleMriPlaneServer <- function(id,
         }
 
       })
-
-      # --- update mode if it has changed within the controller
-      shiny::observeEvent(mri_control_input$mode, {
-
-        if(!identical(mode(), mri_control_input$mode)) {
-
-          mode(mri_control_input$mode)
-
-        }
-
-      }, ignoreNULL = TRUE)
 
       # reset outline from the controller side
       shiny::observeEvent(mri_control_input$outlines_reset, {
@@ -1293,10 +1302,8 @@ moduleMriPlaneServer <- function(id,
 
         nmr <-
           list(
-            col =
-              c(floor(input$mriPlot_brush$xmin), ceiling(input$mriPlot_brush$xmax)),
-            row =
-              c(floor(input$mriPlot_brush$ymin), ceiling(input$mriPlot_brush$ymax))
+            col = c(floor(input$mriPlot_brush$xmin), ceiling(input$mriPlot_brush$xmax)),
+            row = c(floor(input$mriPlot_brush$ymin), ceiling(input$mriPlot_brush$ymax))
           )
 
         # ensure both axes are equally long
@@ -1503,6 +1510,29 @@ moduleMriPlaneServer <- function(id,
 
       # Observe Events (Slice Pos Effect) ---------------------------------------
 
+      shiny::observeEvent(input$mri_refresh, {
+
+        stacks$zoom <- list()
+
+        # update localizer
+        shinyWidgets::updateNoUiSliderInput(
+          session = session,
+          inputId = "mri_slider_row",
+          range = c(1, 256),
+          value = 128
+        )
+
+        shinyWidgets::updateNoUiSliderInput(
+          session = session,
+          inputId = "mri_slider_col",
+          range = c(1, 256),
+          value = 128
+        )
+
+        slice_pos[[plane]] <- 128
+
+      })
+
       # - plane
       shiny::observeEvent(slice_pos[[plane]], {
 
@@ -1663,7 +1693,7 @@ moduleMriPlaneServer <- function(id,
               condition =
                 interaction_template()[interaction_template()$selected,]$id %in%
                 data$paintbrush_erase,
-              true = alpha("red", 0.45),
+              true = ggplot2::alpha("red", 0.45),
               false = interaction_template()[interaction_template()$selected,]$color
             ),
             border = NA
@@ -1671,7 +1701,7 @@ moduleMriPlaneServer <- function(id,
 
         }
 
-        if(shiny::isTruthy(cursor_pos())){
+        if(cursor_on_mri()){
 
           symbols(
             x = cursor_pos()[1],
@@ -1687,20 +1717,6 @@ moduleMriPlaneServer <- function(id,
         }
 
       }, bg = "transparent")
-
-      border_color <- shiny::reactive({
-
-        if(nrow(drawing_outline_confirmed()) != 0){
-
-          "orange"
-
-        } else {
-
-          NA
-
-        }
-
-      })
 
       output$mriOutlinePlot <- shiny::renderPlot({
 
@@ -1722,7 +1738,7 @@ moduleMriPlaneServer <- function(id,
           graphics::polypath(
             x = drawing_outline()$col,
             y = drawing_outline()$row,
-            col = alpha("orange", 0.15),
+            col = ggplot2::alpha("orange", 0.15),
             border = border_color(),
             lwd = 3,
             lty = "solid"
@@ -1748,10 +1764,6 @@ moduleMriPlaneServer <- function(id,
           x_pos <- min(mri_range()[["col"]]) + side_length*0.0125
           y_pos <- max(mri_range()[["row"]]) - side_length*0.0125
 
-          bg_colors <-
-            mri_slice()[min(mri_range()[["col"]]):x_pos, max(mri_range()[["row"]]):y_pos] %>%
-            as.character()
-
           graphics::text(
             x = x_pos,
             y = y_pos,
@@ -1766,102 +1778,7 @@ moduleMriPlaneServer <- function(id,
 
       }, bg = "transparent")
 
-      ray_depth <- shiny::reactive({
-
-        pb_dir <- mri_control_input$paintbrush_direction
-        pb_depth <- mri_control_input$paintbrush_depth
-
-        if(pb_dir == "forward"){
-
-          out <- -pb_depth
-
-        } else if(pb_dir == "backward"){
-
-          out <- pb_depth
-
-        }
-
-        return(out)
-
-      })
-
-      ray_dir <- shiny::reactive({
-
-        if(mri_control_input$paintbrush_mode == "Ray"){
-
-          mri_control_input$paintbrush_direction
-
-        } else {
-
-          NULL
-
-        }
-
-      })
-
-      localizer_col_v <- shiny::reactive({ ifelse(cursor_on_mri(), alpha("red", 0.5), "red") })
-
-      localizer_col_h <- shiny::reactive({ ifelse(cursor_on_mri(), alpha("red", 0.5), "red") })
-
-      localizer_lty <- shiny::reactive({ ifelse(cursor_on_mri(), "solid", "solid") })
-      localizer_lwd <- shiny::reactive({ ifelse(cursor_on_mri(), 1, 1.5) })
-
-      show_localizer_ray_v <- shiny::reactive({
-
-        if(is.null(mri_control_input$paintbrush_mode)){
-
-          FALSE
-
-        } else {
-
-          mri_control_input$selection_tool %in% c("paintbrush", "paintbrush_erase") &
-          mri_control_input$paintbrush_mode == "Ray" &
-          mri_control_input$paintbrush_direction != "both" &
-          unname(ra_mri["col"]) %in% mri_control_input$cursor_on_plane
-
-        }
-
-      })
-
-      show_localizer_ray_h <- shiny::reactive({
-
-        if(is.null(mri_control_input$paintbrush_mode)){
-
-          FALSE
-
-        } else {
-
-          mri_control_input$selection_tool %in% c("paintbrush", "paintbrush_erase") &
-          mri_control_input$paintbrush_mode == "Ray" &
-          mri_control_input$paintbrush_direction != "both" &
-          unname(ra_mri["row"]) %in% mri_control_input$cursor_on_plane
-
-        }
-
-      })
-
-
-      # positioning of the vertical localizer
-      localizer_x0_v <- shiny::reactive({ slice_pos[[ra_mri["col"]]] })
-
-      localizer_x1_v <- shiny::reactive({ slice_pos[[ra_mri["col"]]] })
-
-      localizer_y0_v <- shiny::reactive({ ifelse(show_localizer_ray_h(), NA, row_min()) })
-
-      localizer_y1_v <- shiny::reactive({ ifelse(show_localizer_ray_h(), NA, row_max()) })
-
-      # positioning of the horizontal localizer
-      localizer_y0_h <- shiny::reactive({ slice_pos[[ra_mri["row"]]] })
-
-      localizer_y1_h <- shiny::reactive({ slice_pos[[ra_mri["row"]]] })
-
-      localizer_x0_h <- shiny::reactive({ ifelse(show_localizer_ray_v(), NA, col_min()) })
-
-      localizer_x1_h <- shiny::reactive({ ifelse(show_localizer_ray_v(), NA, col_max()) })
-
       output$mriLocalizerPlot <- shiny::renderPlot({
-
-        shiny::req("localizer_lines" %in% input$mri_opts)
 
         plot_mri_frame(col = col_seq(), row = row_seq())
 
@@ -2378,7 +2295,6 @@ moduleMriPlaneServer <- function(id,
 
       output$mriVisualAidPlot <- shiny::renderPlot({
 
-        shiny::req(input$mri_opts)
         shiny::req(mri_range())
         side_length <- mri_side_length()
 
@@ -2386,7 +2302,7 @@ moduleMriPlaneServer <- function(id,
         plot_mri_frame(col = col_seq(), row = row_seq())
 
         # -- scale bar (currently not active)
-        if("scale_bar" %in% input$mri_opts){
+        if(FALSE){
 
           # rounds to 5er steps
           dist_display <- (round(side_length) * 0.1 / 5) * 5
@@ -2439,26 +2355,10 @@ moduleMriPlaneServer <- function(id,
         # -- mode and interaction aid
         if(shiny::isTruthy(interaction_tool())){
 
-          # plot paintbrush size if required
-          if(FALSE){
-
-            symbols(
-              x = max(mri_range()[["col"]]) - (side_length*0.0125) - paintbrush_radius(),
-              y = max(mri_range()[["row"]]) - (side_length*0.0125) - paintbrush_radius(),
-              circles = paintbrush_radius(),
-              inches = FALSE,
-              add = TRUE,
-              fg = interaction_color(),
-              lwd = 3,
-              lty = ifelse(drawing_active(), "solid", "dotted")
-            )
-
-          }
-
           # update label
           label <-
             paste0(
-              "\nTool: ",
+              "Tool: ",
               stringr::str_remove_all(interaction_tool(), pattern = "erase$") %>%
                stringr::str_to_title() %>%
                stringr::str_replace_all(string = ., pattern = "_", replacement = " ")
@@ -2470,17 +2370,13 @@ moduleMriPlaneServer <- function(id,
 
           }
 
-          if(selection_tool() == "region_click"){
+          if(selection_tool() == "paintbrush"){
 
-            label <- paste0(label, "\nScope: ", ann_var_names[selection_scope()])
-
-          } else if(selection_tool() == "paintbrush"){
-
-            label <- paste0(label, "\n3D Brush: ", mri_control_input$paintbrush_mode)
+            label <- paste0(label, "\nMode: ", mri_control_input$paintbrush_mode)
 
             if(mri_control_input$paintbrush_mode == "Ray") {
 
-              label <- paste0(label, "\nDirection: ", stringr::str_to_title(mri_control_input$paintbrush_direction))
+              label <- paste0(label, " (", stringr::str_to_title(mri_control_input$paintbrush_direction), ")")
 
               if(is.null(selection_scope())){
 
@@ -2496,14 +2392,12 @@ moduleMriPlaneServer <- function(id,
 
             }
 
-
-
           }
 
         } else { label = NA }
 
         x_pos <- min(mri_range()[["col"]]) + (side_length*0.0125)
-        y_pos <- min(mri_range()[["row"]]) #+ (side_length*0.0125)
+        y_pos <- min(mri_range()[["row"]]) + (side_length*0.0125)
 
         # dist text
         graphics::text(
@@ -2527,17 +2421,19 @@ moduleMriPlaneServer <- function(id,
 
         voxels_show <- inspection_template()
 
-        if(!any(voxels_show$highlighted)){
+        if(length(mri_control_input$voxels_highlighted) == 0){
 
           col <- ggplot2::alpha(score_set_up$colors[voxels_show$CBscore+1], 0.4)
           col[voxels_show$CBscore == 0] <- ggplot2::alpha(col[voxels_show$CBscore == 0], 0.2)
 
         } else {
 
+          highlight <- voxels_show$id %in% mri_control_input$voxels_highlighted
+
           col <- score_set_up$colors[voxels_show$CBscore+1]
 
-          col[voxels_show$highlighted] <- ggplot2::alpha(col[voxels_show$highlighted], 0.6)
-          col[!voxels_show$highlighted] <- ggplot2::alpha(col[!voxels_show$highlighted], 0.1)
+          col[highlight] <- ggplot2::alpha(col[highlight], 0.6)
+          col[!highlight] <- ggplot2::alpha(col[!highlight], 0.1)
 
         }
 
@@ -2559,7 +2455,12 @@ moduleMriPlaneServer <- function(id,
 
         if(selection_tool() == "margin"){
 
-          voxels_show <- dplyr::filter(interaction_template(), selected | is_margin_cand)
+          voxels_show <-
+            dplyr::filter(
+              .data = interaction_template(),
+              selected |
+              id %in% mri_control_input$voxels_margin_cand
+              )
 
         } else if(selection_tool() == "paintbrush") {
 
@@ -2569,24 +2470,22 @@ moduleMriPlaneServer <- function(id,
               selected | id %in% paintbrush_selected_ids()
               ) %>%
             dplyr::mutate(
-              color = dplyr::if_else(
-                condition = id %in% paintbrush_selected_ids(),
-                true = alpha(color, 0.6),
-                false = color
-                )
+              color = dplyr::case_when(
+                id %in% data$paintbrush & id %in% non_brain_template$id ~ ggplot2::alpha(color, 0.2),
+                id %in% data$paintbrush & !id %in% non_brain_template$id ~ ggplot2::alpha(color, alpha_val),
+                TRUE ~ color
+              )
             )
 
         } else if(selection_tool() == "paintbrush_erase"){
 
-          erased_ids <- data$paintbrush_erase
-
           voxels_show <-
             dplyr::mutate(
               .data = dplyr::filter(interaction_template(), selected),
-              color = dplyr::if_else(
-                condition = id %in% {{erased_ids}},
-                true = alpha("red", alpha_val),
-                false = color
+              color = dplyr::case_when(
+                id %in% data$paintbrush_erase & id %in% non_brain_template$id ~ ggplot2::alpha("red", 0.2),
+                id %in% data$paintbrush_erase & !id %in% non_brain_template$id ~ ggplot2::alpha("red", alpha_val),
+                TRUE ~ color
               )
             )
 
@@ -2613,7 +2512,7 @@ moduleMriPlaneServer <- function(id,
 
         shiny::req(mri_slice())
 
-        plot_mri_frame(col = col_seq(), row = row_seq(), bg = "green")
+        plot_mri_frame(col = col_seq(), row = row_seq())
 
         graphics::rasterImage(
           image = mri_slice()[row_seq(), col_seq()],
@@ -2625,11 +2524,6 @@ moduleMriPlaneServer <- function(id,
         )
 
       })
-
-
-
-      # Output ------------------------------------------------------------------
-
 
       # 2. Mode: Selection ------------------------------------------------------
 
@@ -2646,10 +2540,6 @@ moduleMriPlaneServer <- function(id,
 
       drawing_outline_confirmed <- shiny::reactiveVal(value = data.frame(col = numeric(), row = numeric()))
 
-      selection_backward_count <- shiny::reactiveVal(value = 0)
-
-      paintbrush_selection_mask <- shiny::reactiveVal(value = data.frame())
-
       selection_tool <- shiny::reactiveVal(value = "region_click")
 
       # ----- Reactive (Expressions)
@@ -2665,38 +2555,11 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      nbt <- shiny::reactive({
-
-        dplyr::mutate(
-          .data = non_brain_template,
-          color = NA,
-          selected = FALSE
-        )
-
-      })
-
-      # only voxels of the currently selected slice (=pixels) !!!!remove?
-      selected_pixels <- shiny::reactive({
-
-        selection_template() %>%
-          dplyr::filter(selected) %>%
-          dplyr::pull(id)
-
-      })
-
-      selected_voxels <- shiny::reactive({ voxel_df()$id[voxel_df()$selected] })
-
-      selected_voxels_control <- shiny::reactive({ mri_control_input$selected_voxels })
-
       selection_color <- shiny::reactive({
 
-        ifelse(
-          test = !selection_erase(),
-          yes = selection_color_input(),
-          no = "red"
-          )
+        ifelse(!selection_erase(), yes = "forestgreen", no = "red")
 
-        })
+      })
 
       selection_erase <- shiny::reactive({ mri_control_input$selection_erase })
 
@@ -2704,33 +2567,37 @@ moduleMriPlaneServer <- function(id,
 
         if(mri_control_input$paintbrush_mode == "Ray"){
 
-          if(mri_control_input$paintbrush_direction == "forward") {
+          if(ray_depth() == 0){
 
-            if(plane == "cor"){
-
-              out <- (slice_idx()+mri_control_input$paintbrush_depth):slice_idx()
-
-            } else {
-
-              out <- (slice_idx()-mri_control_input$paintbrush_depth):slice_idx()
-
-            }
-
-          } else if(mri_control_input$paintbrush_direction == "backward"){
-
-            if(plane == "cor"){
-
-              out <- slice_idx():(slice_idx()-mri_control_input$paintbrush_depth)
-
-            } else {
-
-              out <- slice_idx():(slice_idx()+mri_control_input$paintbrush_depth)
-
-            }
+            out <- slice_idx()
 
           } else {
 
-            out <- NULL
+            if(mri_control_input$paintbrush_direction == "forward") {
+
+              if(plane == "cor"){
+
+                out <- (slice_idx()+mri_control_input$paintbrush_depth):slice_idx()
+
+              } else {
+
+                out <- (slice_idx()-mri_control_input$paintbrush_depth):slice_idx()
+
+              }
+
+            } else if(mri_control_input$paintbrush_direction == "backward"){
+
+              if(plane == "cor"){
+
+                out <- slice_idx():(slice_idx()-mri_control_input$paintbrush_depth)
+
+              } else {
+
+                out <- slice_idx():(slice_idx()+mri_control_input$paintbrush_depth)
+
+              }
+
+            }
 
           }
 
@@ -2748,14 +2615,24 @@ moduleMriPlaneServer <- function(id,
 
         shiny::req(nrow(voxel_df()) != 0)
 
+        out <-
+          dplyr::rename(voxel_df()[voxel_df()[[plane_ccs]]==slice_idx(),], !!!ra_ccs) %>%
+          dplyr::mutate(
+            color = dplyr::case_when(
+              selected & id %in% mri_control_input$voxels_margin ~ ggplot2::alpha(colorsCB$margin, alpha = alpha_val),
+              selected ~ ggplot2::alpha(color_selected(), alpha = alpha_val),
+              id %in% mri_control_input$voxels_margin_cand ~ ggplot2::alpha(colorsCB$margin_cand, alpha = alpha_val),
+              TRUE ~ ggplot2::alpha(colorsCB$not_selected, alpha = alpha_val)
+            )
+          )
+
         if(stringr::str_detect(selection_tool(), "paintbrush")){
 
-          out <-
-            dplyr::left_join(
-              x = identify_obs_in_polygon(mri_grid, brain_outlines[[plane]][[slice_idx()]], strictly = TRUE),
-              y = dplyr::rename(voxel_df()[voxel_df()[[axis_ccs]]==slice_idx(),], !!!ra_ccs),
-              by = c("col", "row")
-            )
+          nbt_slice <-
+            dplyr::rename(non_brain_template[non_brain_template[[plane_ccs]]==slice_idx(),], !!!ra_ccs) %>%
+            dplyr::mutate(color = ggplot2::alpha(colorsCB$not_selected, 0.1), selected = FALSE)
+
+          out <- dplyr::add_row(.data = out, nbt_slice)
 
           # during drawing: highlight NEW drawing by increasing transparency of old selection
           if(drawing_active()){
@@ -2763,24 +2640,15 @@ moduleMriPlaneServer <- function(id,
             out <-
               dplyr::mutate(
                 .data = out,
-                color = dplyr::if_else(selected, true = alpha(color, 0.3), false = alpha(color, 0.6))
+                color = dplyr::case_when(
+                  selected | id %in% non_brain_template$id ~ ggplot2::alpha(color, 0.3),
+                  TRUE ~ ggplot2::alpha(color, 0.6)
+                  )
               )
 
           }
 
-        } else {
-
-          out <-
-            dplyr::rename(
-              .data = voxel_df()[voxel_df()[[axis_ccs]] == slice_idx(), ],
-              !!!ra_ccs
-            )
-
         }
-
-
-
-
 
         return(out)
 
@@ -2829,30 +2697,17 @@ moduleMriPlaneServer <- function(id,
 
       # ----- Observers
 
-
-
-      # Observe Events ----------------------------------------------------------
-
-      # ensure that no erasing is possible if the current plane does not
-      # have any selected pixels
-
-      # --- ensure that selection_backward increases linearly
-      # (circumvent weird behavior in MRI control, where the AB value sometimes resets to 1)
-      shiny::observeEvent(input$selection_backward,{
-
-        selection_backward_count({ selection_backward_count() + 1 })
-
-      })
-
-      # --- reset selection completely
-      shiny::observeEvent(input$selection_reset,{
-
-        voxel_df({ dplyr::mutate(voxel_df(), selected = FALSE) })
-
-      })
-
-
       # Observe Events (MRI Interaction) ----------------------------------------
+
+      shiny::observeEvent(input$mriPlot_dblclick, {
+
+        shiny::req(mode() == "inspection")
+
+        slice_pos[[plane]] <- slice_idx()
+        slice_pos[[col_axis]] <- round(cursor_pos()[1])
+        slice_pos[[row_axis]] <- round(cursor_pos()[2])
+
+      })
 
       # --- (de-)selection by region click
       # --- dblclick + region_click -> updates voxel_df() immediately
@@ -2877,48 +2732,39 @@ moduleMriPlaneServer <- function(id,
         brain_region <- slice_df_hover()[[hvar]]
         hemisphere <- slice_df_hover()[["hemisphere"]]
 
-        # 1. scenario: not erasing
         # extract required data
-        if(FALSE){ #interaction_dims() == "2D"
-
-          slice_indices <- slice_idx()
-
-          voxel_subset <-
-            slice_df()[slice_df()[[selection_scope()]] == brain_region, ] %>%
-            dplyr::filter(hemisphere == {{hemisphere}})
-
-        } else if(TRUE){ # interaction_dims() == "3D"
-
-          voxel_subset <-
-            dplyr::filter(
-              .data = voxel_df(),
-              !!rlang::sym(hvar) == {{brain_region}} & hemisphere == {{hemisphere}}
-            )
-
-        }
+        voxel_subset <-
+          dplyr::filter(
+            .data = voxel_df(),
+            !!rlang::sym(hvar) == {{brain_region}} & hemisphere == {{hemisphere}}
+          )
 
         # apply
         voxel_ids_area <- voxel_subset$id
 
         if(!slice_df_hover()$selected){
 
-          voxel_df({
+          plane_selection_state({
 
             dplyr::mutate(
               .data = voxel_df(),
               selected = id %in% {{voxel_ids_area}} | selected
-            )
+            ) %>%
+              dplyr::filter(selected) %>%
+              dplyr::pull(var = "id")
 
           })
 
         } else if(slice_df_hover()$selected){
 
-          voxel_df({
+          plane_selection_state({
 
             dplyr::mutate(
               .data = voxel_df(),
               selected = dplyr::if_else(id %in% {{voxel_ids_area}}, true = FALSE, false = selected)
-            )
+            ) %>%
+              dplyr::filter(selected) %>%
+              dplyr::pull(var = "id")
 
           })
 
@@ -2927,8 +2773,6 @@ moduleMriPlaneServer <- function(id,
         # Done. End of the observer updates slice position.
 
         # --- update slice position --- #
-        slice_pos[[plane]] <- slice_idx()
-
         shinyWidgets::updateNoUiSliderInput(
           session = session,
           inputId = "mri_slider_col",
@@ -2940,6 +2784,8 @@ moduleMriPlaneServer <- function(id,
           inputId = "mri_slider_row",
           value = round(input$mriPlot_dblclick$y)
         )
+
+        slice_pos[[plane]] <- slice_idx()
 
         # Observer done.
 
@@ -3116,7 +2962,6 @@ moduleMriPlaneServer <- function(id,
 
           drawing_active(TRUE)
 
-          # from drawing to stop drawing: update paintbrush_selection_mask()
         } else if(drawing_active()){
 
           drawing_active(FALSE)
@@ -3142,7 +2987,7 @@ moduleMriPlaneServer <- function(id,
 
         if(mri_control_input$paintbrush_mode == "Sphere"){
 
-          voxel_df({
+          plane_selection_state({
 
             apply_paintbrush_sphere(
               voxel_df = voxel_df(),
@@ -3152,7 +2997,9 @@ moduleMriPlaneServer <- function(id,
               radius = paintbrush_radius(),
               selection_scope = NULL,
               erase = FALSE
-            )
+            ) %>%
+              dplyr::filter(selected) %>%
+              dplyr::pull(var = "id")
 
           })
 
@@ -3160,40 +3007,21 @@ moduleMriPlaneServer <- function(id,
 
         } else if(mri_control_input$paintbrush_mode == "Ray"){
 
-          out <-
-            tryCatch({
+          plane_selection_state({
 
-              propagate_selection_3D(
-                voxel_df = voxel_df(),
-                selection_mask = dplyr::mutate(selection_template(), selected = id %in% data$paintbrush),
-                selection_plane = plane,
-                selection_scope = selection_scope(),
-                selection_slice = slice_idx(),
-                selection_slices = selection_slices(),
-                unscope_white_matter = FALSE,
-                erase = selection_erase()
-              )
+            propagate_selection_3D(
+              voxel_df = voxel_df(),
+              selection_mask = dplyr::mutate(selection_template(), selected = id %in% data$paintbrush),
+              selection_plane = plane,
+              selection_scope = selection_scope(),
+              selection_slice = slice_idx(),
+              selection_slices = selection_slices(),
+              erase = FALSE
+            ) %>%
+              dplyr::filter(selected) %>%
+              dplyr::pull(var = "id")
 
-            }, error = function(error){
-
-              FALSE
-
-            })
-
-          if(is.data.frame(out)){
-
-            voxel_df({ out })
-
-          } else {
-
-            shinyWidgets::sendSweetAlert(
-              session = session,
-              title = "Unkown Error",
-              text = "We are sorry. An unknown error occured during the 3D propagation. Please try again.",
-              type = "info"
-            )
-
-          }
+          })
 
         }
 
@@ -3267,7 +3095,7 @@ moduleMriPlaneServer <- function(id,
 
         if(mri_control_input$paintbrush_mode == "Sphere"){
 
-          voxel_df({
+          plane_selection_state({
 
             apply_paintbrush_sphere(
               voxel_df = voxel_df(),
@@ -3277,7 +3105,9 @@ moduleMriPlaneServer <- function(id,
               radius = paintbrush_radius(),
               selection_scope = selection_scope(),
               erase = TRUE
-            )
+            ) %>%
+              dplyr::filter(selected) %>%
+              dplyr::pull(var = "id")
 
           })
 
@@ -3285,40 +3115,21 @@ moduleMriPlaneServer <- function(id,
 
         } else if(mri_control_input$paintbrush_mode == "Ray"){
 
-          out <-
-            tryCatch({
+          plane_selection_state({
 
-              propagate_selection_3D(
-                voxel_df = voxel_df(),
-                selection_mask = dplyr::mutate(selection_template(), selected = id %in% data$paintbrush_erase),
-                selection_plane = plane,
-                selection_scope = selection_scope(),
-                selection_slice = slice_idx(),
-                selection_slices = selection_slices(),
-                unscope_white_matter = FALSE,
-                erase = TRUE
-              )
+            propagate_selection_3D(
+              voxel_df = voxel_df(),
+              selection_mask = dplyr::mutate(selection_template(), selected = id %in% data$paintbrush_erase),
+              selection_plane = plane,
+              selection_scope = selection_scope(),
+              selection_slice = slice_idx(),
+              selection_slices = selection_slices(),
+              erase = TRUE
+            ) %>%
+              dplyr::filter(selected) %>%
+              dplyr::pull(var = "id")
 
-            }, error = function(error){
-
-              FALSE
-
-            })
-
-          if(is.data.frame(out)){
-
-            voxel_df({ out })
-
-          } else {
-
-            shinyWidgets::sendSweetAlert(
-              session = session,
-              title = "Unkown Error",
-              text = "We are sorry. An unknown error occured during the 3D propagation. Please try again.",
-              type = "info"
-            )
-
-          }
+          })
 
         }
 
@@ -3344,9 +3155,6 @@ moduleMriPlaneServer <- function(id,
 
       }, ignoreInit = TRUE)
 
-
-      # SORT --------------------------------------------------------------------
-
       # LAST: Module Output -----------------------------------------------------
 
       paintbrushed_ids <- shiny::reactiveVal(value = character(0))
@@ -3357,15 +3165,13 @@ moduleMriPlaneServer <- function(id,
           cursor_on_mri = cursor_on_mri(),
           drawing_outline_confirmed = drawing_outline_confirmed(),
           paintbrushed_ids = paintbrushed_ids(),
-          slice_pos = slice_pos,
-          voxel_df = voxel_df()
+          plane_selection_state = plane_selection_state(),
+          slice_pos = slice_pos
         )
 
         })
 
-
       return(module_output)
-
 
     }
   )

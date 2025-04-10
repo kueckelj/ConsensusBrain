@@ -140,7 +140,7 @@ apply_paintbrush_sphere <- function(voxel_df,
                                     selection_scope = NULL,
                                     erase = FALSE){
 
-  if(TRUE){
+  if(FALSE){
 
     assign("cp_list", cp_list, envir = .GlobalEnv)
     assign("voxel_df", voxel_df, envir = .GlobalEnv)
@@ -183,7 +183,7 @@ apply_paintbrush_sphere <- function(voxel_df,
 
   for(i in seq_along(cp_list)){
 
-    presel_ids <- purrr::flatten_chr(selected_ids)
+    presel_ids <- purrr::flatten_int(selected_ids)
 
     selected_ids[[i]] <-
       identify_obs_within_radius3D(
@@ -195,7 +195,7 @@ apply_paintbrush_sphere <- function(voxel_df,
 
   }
 
-  selected_ids_flat <- purrr::flatten_chr(selected_ids)
+  selected_ids_flat <- purrr::flatten_int(selected_ids)
 
   if(erase){
 
@@ -219,110 +219,37 @@ apply_paintbrush_sphere <- function(voxel_df,
 
 }
 
+assign_remaining_scores_by_NN <- function(voxel_df){
+
+  if(any(voxel_df$CBscore == 0)){
+
+    score_missing <- dplyr::filter(voxel_df, CBscore == 0)
+    score_exists <- dplyr::filter(voxel_df, CBscore != 0)
+
+    nn_out <-
+      RANN::nn2(
+        data = score_exists[,c("x", "y", "z")],
+        query = score_missing[,c("x", "y", "z")],
+        k = 1
+      )
+
+    score_missing$CBscore <- score_exists$CBscore[as.vector(nn_out$nn.idx)]
+
+    voxel_df <-
+      rbind(score_exists, score_missing) %>%
+      dplyr::arrange(id, .by_group = FALSE)
+
+  }
+
+  return(voxel_df)
+
+}
+
 ccs_to_plane <- function(axis){
 
   out <- c("x" = "sag", "y" = "axi", "z" = "cor")[axis]
 
   unname(out)
-
-}
-
-#' Blend Multiple Color Vectors
-#'
-#' Blends multiple color vectors by computing a weighted average of their RGB values.
-#'
-#' @param color_list A list of character vectors containing color values in HEX format.
-#'   Each vector must be of the same length or length 1.
-#' @param weights A numeric vector specifying the weight for each color vector.
-#'   If `NULL`, equal weights are assigned. The weights are normalized to sum to 1.
-#'
-#' @details
-#' This function takes multiple color vectors and blends them based on a weighted average
-#' of their RGB values. If a color vector has length 1, it is recycled to match the longest
-#' vector. If `weight` is provided, it must be numeric and match the number of color vectors.
-#' Otherwise, equal weights are used.
-#'
-#' @return A character vector of blended colors in HEX format.
-#'
-#' @examples
-#' blend_colors(
-#'   list(c("red", "blue"), c("yellow", "green")),
-#'   weights = c(0.7, 0.3)
-#' )
-#'
-#' blend_colors(
-#'   list("red", "blue", "yellow"),
-#'   weights = c(0.4, 0.4, 0.2)
-#' )
-#'
-#' @export
-blend_colors <- function(color_list, weights = NULL) {
-
-  stopifnot(length(color_list) >= 1)
-
-  color_list <- purrr::map(color_list, unname)
-  num_colors <- length(color_list)
-
-  if(num_colors == 1){
-
-    out <- color_list[[1]]
-
-  } else {
-
-    max_length <- max(sapply(color_list, length))
-
-    color_list <-
-      purrr::map(
-        .x = color_list,
-        .f = function(col){
-
-          if(length(col) == 1){
-
-            out <- rep(col, max_length)
-
-          } else if(length(col) != max_length){
-
-            stop("All color vectors must be of the same length or length 1.")
-
-          } else {
-
-            out <- col
-
-          }
-
-          return(out)
-
-        })
-
-    rgb_matrices <-
-      purrr::map(.x = color_list, .f= ~ grDevices::col2rgb(.x) / 255)
-
-    if(is.null(weights)){
-
-      weights <- rep(1, num_colors)
-
-    } else if(!is.numeric(weights) | length(weights) != num_colors){
-
-      stop("`weight` must be numeric and as long as the number of color vectors provided.")
-
-    }
-
-    # ensure range from 0/1
-    weights <- weights / sum(weights)
-
-    blended_rgb <- Reduce(`+`, Map(function(rgb, w) rgb * w, rgb_matrices, weights))
-
-    out <-
-      grDevices::rgb(
-        red = blended_rgb[1, ],
-        green = blended_rgb[2, ],
-        blue = blended_rgb[3, ],
-        maxColorValue = 1
-      )
-
-  }
-
-  return(out)
 
 }
 
@@ -334,7 +261,6 @@ buffer_range <- function(r, buffer){
   return(r)
 
 }
-
 
 
 circular_progress_plot <- function(voxel_df, score_set_up) {
@@ -402,15 +328,23 @@ comp_dist_to_closest_voxel <- function(voxel_margin, voxel_ref){
   # of the reference tissue -> prevent self-matching
   voxel_margin <- voxel_margin[!voxel_margin$id %in% voxel_ref$id, ]
 
-  nn_out <-
-    RANN::nn2(
-      data = as.matrix(voxel_ref[, ccs_labels]),
-      query = as.matrix(voxel_margin[, ccs_labels]),
-      searchtype = "priority",
-      k = 1
-    )
+  if(nrow(voxel_margin) != 0 & nrow(voxel_ref) != 0){
 
-  voxel_margin$dist <- as.numeric(nn_out$nn.dists[,1])
+    nn_out <-
+      RANN::nn2(
+        data = as.matrix(voxel_ref[, ccs_labels]),
+        query = as.matrix(voxel_margin[, ccs_labels]),
+        searchtype = "priority",
+        k = 1
+      )
+
+    voxel_margin$dist <- as.numeric(nn_out$nn.dists[,1])
+
+  } else {
+
+    voxel_margin$dist <- NA
+
+  }
 
   return(voxel_margin)
 
@@ -501,12 +435,9 @@ ConsensusBrain <- function(nifti_object = NULL){
   # draw from package data
   if(is.null(nifti_object)){ nifti_object <- mni_template }
 
-  print("Nifti Object:")
-  print(nifti_object)
-
   shiny::runApp(
     appDir =
-      shinyApp(
+      shiny::shinyApp(
         ui = ConsensusBrainUI,
         server = function(input, output, session){
 
@@ -522,7 +453,6 @@ ConsensusBrain <- function(nifti_object = NULL){
     )
 
 }
-
 
 
 CBscore_label_var <- function(voxel_df, score_set_up){
@@ -701,6 +631,14 @@ exchange_raster_colors <- function(mri_list,
 
 }
 
+
+
+comp_progress <- function(voxel_df){
+
+  floor((sum(voxel_df$CBscore != 0)/nrow(voxel_df))*100)
+
+}
+
 get_slice <- function(nifti, plane, slice){
 
   if(plane == "sag"){
@@ -855,10 +793,12 @@ identify_debris <- function(voxel_df, eps = 1.5, minPts = 8, min_size = 250){
 
 identify_edge_voxels <- function(selection_mask, slice_template, selection_scope = "smart_label"){
 
+  slice_template[[selection_scope]][!slice_template$is_brain] <- NA
+
   nn_out <-
     RANN::nn2(
-      data = slice_template[,c("col", "row")],
-      query = selection_mask[,c("col", "row")],
+      data = slice_template[, c("col", "row")],
+      query = selection_mask[selection_mask$is_brain & selection_mask$selected,c("col", "row")],
       k = 9
     )
 
@@ -871,9 +811,11 @@ identify_edge_voxels <- function(selection_mask, slice_template, selection_scope
 
   label_mtr <- label_mtr[,2:9]
 
-  rownames(label_mtr) <- selection_mask$id
+  rownames(label_mtr) <- selection_mask$id[selection_mask$is_brain & selection_mask$selected]
 
-  selection_mask$is_edge <- selection_mask$id %in% rownames(label_mtr)[rowSums(label_mtr) >=2]
+  selection_mask$is_edge <-
+    selection_mask$id %in% rownames(label_mtr)[rowSums(label_mtr) >=2] &
+    selection_mask$is_brain
 
   return(selection_mask)
 
@@ -934,7 +876,6 @@ identify_obs_in_outlines <- function(voxel_df, outlines){
   ids_selected <- names(ids_count[ids_count == length(outlines)])
 
   return(ids_selected)
-
 
 }
 
@@ -1097,18 +1038,7 @@ identify_updated_voxels <- function(new, old){
 
 }
 
-
-leave_refinement_mode <- function(voxel_df){
-
-  dplyr::mutate(
-    .data = voxel_df,
-    color = dplyr::if_else(selected, alpha(color, 0.45), alpha("forestgreen", 0.45)),
-    broi = FALSE
-  )
-
-}
-
-load_consensus_template <- function(as_df = TRUE){
+load_consensus_template <- function(as_df = TRUE, t1 = TRUE, subcortical = TRUE){
 
   data("consensus_template")
 
@@ -1121,19 +1051,27 @@ load_consensus_template <- function(as_df = TRUE){
       ) %>%
       dplyr::left_join(x = ., y = consensus_template$ann_macro, by = "ann_dk_adj") %>%
       dplyr::mutate(
-        subcortical =
-          dplyr::case_when(
-            stringr::str_detect(ann_macro, pattern = "subcortical|corpus_callosum") ~ ann_dk_adj,
-            stringr::str_detect(ann_macro, pattern = "wm_tract") ~ ann_macro,
-            TRUE ~ "none"
-          ),
-        # ann_macro == "white_matter" -> subcortical structures hold priority (e.g. Thalamus > Radiatio thalamica)
-        is_tract = wm_tract != "none" & !stringr::str_detect(wm_tract, pattern = "wma_"),
         hemisphere = dplyr::if_else(x > 127, true = "left", false = "right"),
-        id = paste0("x", x, "y", y, "z", z),
-        tissue_type = dplyr::if_else(condition = is_wm, true = "White Matter", false = "Grey Matter")
+        id = dplyr::row_number()
       ) %>%
       tibble::as_tibble()
+
+    if(isFALSE(t1)){ consensus_template$t1 <- NULL }
+
+    if(isTRUE(subcortical)){
+
+      consensus_template <-
+        dplyr::mutate(
+          .data = consensus_template,
+          subcortical =
+            dplyr::case_when(
+             stringr::str_detect(ann_macro, pattern = "subcortical|corpus_callosum") ~ ann_dk_adj,
+            stringr::str_detect(ann_macro, pattern = "wm_tract") ~ ann_macro,
+           TRUE ~ "none"
+          )
+        )
+
+    }
 
   }
 
@@ -1147,7 +1085,6 @@ load_non_brain_template <- function(){
 
   dplyr::mutate(
     .data = tibble::as_tibble(non_brain_template),
-    id = paste0("x", x, "y", y, "z", z),
     hemisphere = dplyr::if_else(x > 127, true = "left", false = "right")
   )
 
@@ -1184,32 +1121,6 @@ make_pretty_label <- function(labels){
     stringr::str_replace_all(string = ., pattern = "^Wmt", replacement = "WM-Tract")
 
   return(pretty)
-
-}
-
-make_empty_mri_raster_list <- function(n_slices = c(sag = 256, axi = 256, cor = 256), value = "black"){
-
-  stopifnot(all(mri_planes %in% names(n_slices)))
-  stopifnot(all(is.numeric(n_slices)))
-
-  n_slices <- purrr::map_int(.x = n_slices, ~ as.integer(.x))
-
-  purrr::imap(
-    .x = n_slices,
-    .f = function(n, plane){
-
-      req_axes <- req_axes_2d(plane = plane, mri = TRUE)
-
-      nc = unname(n_slices[req_axes["col"]])
-      nr = unname(n_slices[req_axes["row"]])
-
-      purrr::map(
-        .x = 1:n,
-        .f = ~ as.raster(matrix(data = rep(value, nc*nr), ncol = nc, nrow = nr))
-      )
-
-    }
-  )
 
 }
 
@@ -1311,18 +1222,12 @@ plot_mri_frame <- function(col,
                            bg = NA,
                            ...){
 
-  # Remove extra margins and ensure no padding
   par(mar = c(0, 0, 0, 0), oma = c(0, 0, 0, 0), xaxs = "i", yaxs = "i", bg = bg)
-
-  # room for text
-  #col[1]<-col[1]-col[2]*0.05
-  #row[1]<-row[1]-row[2]*0.05
 
   # default to col/row; allow specifics if drawing
   if(is.null(xlim)){ xlim <- range(col) }
   if(is.null(ylim)){ ylim <- rev(range(row)) }
 
-  # Plot with exact limits matching the MRI image
   plot(
     x = col,
     y = row,
@@ -1348,7 +1253,7 @@ plane_to_ccs <- function(plane){
 
 }
 
-prepare_margin_selection <- function(voxel_df, dist_max){
+prepare_margin_selection <- function(voxel_df, dist_max, voxels_margin){
 
   voxel_df <- identify_brois(voxel_df)
 
@@ -1360,7 +1265,7 @@ prepare_margin_selection <- function(voxel_df, dist_max){
       .x = brois,
       .f = function(broi){
 
-        voxel_broi <- dplyr::filter(voxel_df, broi == {{broi}} & !is_margin)
+        voxel_broi <- dplyr::filter(voxel_df, broi == {{broi}} & !id %in% {{voxels_margin}})
 
         voxel_margin <- dplyr::filter(voxel_df, !selected)
 
@@ -1395,18 +1300,9 @@ prepare_margin_selection <- function(voxel_df, dist_max){
     ) %>%
     dplyr::distinct()
 
-  out <-
-    dplyr::left_join(
-      x = dplyr::select(voxel_df, -dplyr::any_of("dist")),
-      y = cand_df,
-      by = "id"
-    )
-
-  return(out)
+  return(cand_df)
 
 }
-
-
 
 propagate_selection_unscoped <- function(voxel_df,
                                          selection_mask,
@@ -1456,10 +1352,9 @@ propagate_selection_scoped <- function(voxel_df,
                                        selection_slice,
                                        selection_scope,
                                        selection_slices = NULL,
-                                       unscope_white_matter = TRUE,
                                        erase = FALSE){
 
-  if(TRUE){
+  if(FALSE){
 
     assign("voxel_df", voxel_df, envir = .GlobalEnv)
     assign("selection_mask", selection_mask, envir = .GlobalEnv)
@@ -1475,20 +1370,14 @@ propagate_selection_scoped <- function(voxel_df,
   ccs_axis <- switch_axis_label(selection_plane)
   ra_ccs <- req_axes_2d(selection_plane, mri = FALSE)
 
+  voxel_df <-
+    dplyr::add_row(
+      .data = dplyr::mutate(voxel_df, non_brain = FALSE),
+      dplyr::mutate(load_non_brain_template(), non_brain = TRUE)
+    )
+
   selection_mask <- dplyr::filter(selection_mask, selected)
   selected_hemispheres <- unique(selection_mask$hemisphere)
-
-  if(isTRUE(unscope_white_matter)){
-
-    # selection mask already has white_matter values
-    scope_var_orig <- voxel_df[[selection_scope]]
-    voxel_df[[selection_scope]][voxel_df$is_wm] <- "white_matter"
-
-  } else {
-
-    voxel_df <- dplyr::add_row(voxel_df, load_non_brain_template())
-
-  }
 
   scope_labels <- unique(selection_mask[[selection_scope]])
 
@@ -1612,25 +1501,18 @@ propagate_selection_scoped <- function(voxel_df,
         ids_out <-
           purrr::discard(selection_masks, .p = is.null) %>%
           purrr::map(.f = ~ .x[["id"]]) %>%
-          purrr::flatten_chr()
+          purrr::flatten_int()
 
         return(ids_out)
 
       }
     )
 
-  # remove temporary var if required
- if(unscope_white_matter){
-
-    voxel_df[[selection_scope]] <- scope_var_orig
-
-  }
-
   # extract and apply selection
-  ids_all <- purrr::flatten_chr(ids_by_scope_label)
+  ids_all <- purrr::flatten_int(ids_by_scope_label)
 
-  # remove non brain voxels
-  voxel_df <- dplyr::filter(voxel_df, !is.na(selected))
+  # remove non brain voxels ()
+  voxel_df <- dplyr::filter(voxel_df, !non_brain)
 
   if(erase){
 
@@ -1641,6 +1523,8 @@ propagate_selection_scoped <- function(voxel_df,
     voxel_df$selected <- voxel_df$selected | voxel_df$id %in% ids_all
 
   }
+
+  print("Done.")
 
   return(voxel_df)
 
@@ -1653,7 +1537,6 @@ propagate_selection_3D <- function(voxel_df,
                                    selection_slice,
                                    selection_scope = NULL,
                                    selection_slices = NULL,
-                                   unscope_white_matter = TRUE,
                                    erase = FALSE){
 
   if(is.null(selection_scope)){
@@ -1675,7 +1558,6 @@ propagate_selection_3D <- function(voxel_df,
       selection_slice = selection_slice,
       selection_scope = selection_scope,
       selection_slices = selection_slices,
-      unscope_white_matter = unscope_white_matter,
       erase = erase
     )
 
@@ -1943,8 +1825,6 @@ plot_brain_3d <- function(voxel_df,
                           paper_bgcolor = "white",
                           ...){ # Default frontal perspective
 
-  require(plotly)
-
   type <- type[1]
   ## Create dynamic formula for `color`
   color_formula <- as.formula(paste("~", color_by))
@@ -1959,7 +1839,12 @@ plot_brain_3d <- function(voxel_df,
 
       var_name <-
         stringr::str_remove(var, pattern = "^ann_") %>%
-        stringr::str_remove(string = ., pattern = "_adj$")
+        stringr::str_remove(string = ., pattern = "_adj$") %>%
+        stringr::str_to_title()
+
+      if(var != "ann_macro"){ var_name <- toupper(var_name) }
+
+      if(var != color_by){ voxel_df[[var]] <- make_pretty_label(voxel_df[[var]]) }
 
       voxel_df$hoverinfo <-
         paste0(voxel_df$hoverinfo, "<br>", var_name, ": ", voxel_df[[var]])
@@ -2014,7 +1899,7 @@ plot_brain_3d <- function(voxel_df,
   if(is.numeric(voxel_df[[color_by]])){
 
     # Numeric values
-    p <- plot_ly(
+    p <- plotly::plot_ly(
       data = voxel_df,
       x = ~x, y = ~z, z = ~y, # exchange z and y axis, cause plotly rotates around z axis
       color = color_formula,
@@ -2026,7 +1911,7 @@ plot_brain_3d <- function(voxel_df,
   } else {
 
     # Grouped (categorical) values
-    p <- plot_ly()
+    p <- plotly::plot_ly()
 
     for (i in seq_along(unique_labels)) {
 
@@ -2055,7 +1940,7 @@ plot_brain_3d <- function(voxel_df,
 
       set.seed(123)
 
-      p <- add_trace(
+      p <- plotly::add_trace(
         p = p,
         data = dplyr::slice_sample(voxel_df_subset, n = n),
         x = ~x, y = ~z, z = ~y, # exchange z and y axis, cause plotly rotates around z axis
@@ -2072,7 +1957,7 @@ plot_brain_3d <- function(voxel_df,
   }
 
   ## Add camera with user-defined `eye`
-  p <- layout(
+  p <- plotly::layout(
     p,
     scene = list(
       xaxis = list(title = "Sagittal (x)", range = c(min(voxel_df$x), max(voxel_df$x))),
@@ -2088,96 +1973,6 @@ plot_brain_3d <- function(voxel_df,
   )
 
   return(p)
-
-}
-
-plot_color_legend <- function(colors){
-
-  clr_df <-
-    as.data.frame(colors) %>%
-    tibble::rownames_to_column(var = "label") %>%
-    dplyr::arrange(desc(label)) %>%
-    dplyr::mutate(
-      xmin = 1,
-      xmax = dplyr::n()*4,
-      ymin = seq_along(colors)*5,
-      ymax = ymin+5,
-      x = (xmin+xmax)/2,
-      y = (ymin+ymax)/2,
-      label =
-        stringr::str_to_title(label) %>%
-        stringr::str_replace_all(pattern = "_", replacement = " ")
-    )
-
-  ggplot2::ggplot(data = clr_df, mapping = ggplot2::aes(fill = colors)) +
-    ggplot2::scale_fill_identity() +
-    ggplot2::geom_rect(
-      mapping = ggplot2::aes(xmin = xmin, ymin = ymin, xmax = xmax, ymax = ymax),
-      color = "black"
-    ) +
-    ggplot2::geom_text(
-      mapping = ggplot2::aes(x = x, y = y, label = label)
-    ) +
-    ggplot2::coord_equal() +
-    ggplot2::theme_void()
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-read_consensus_clrp <- function(){
-
-  readRDS("data/meta/consensus_clrp.RDS")
-
-}
-
-read_consensus_template <- function(as_df = TRUE){
-
-  ctp <- readRDS("data_dev/meta/consensus_template.RDS")
-
-  cbind(
-    as.data.frame(ctp$numeric),
-    as.data.frame(ctp$labels)
-  ) %>%
-    dplyr::mutate(
-      subcortical =
-        dplyr::case_when(
-          stringr::str_detect(ann_macro, pattern = "subcortical|corpus_callosum") ~ ann_dk_adj,
-          stringr::str_detect(ann_macro, pattern = "wm_tract") ~ ann_macro,
-          TRUE ~ "none"
-          ),
-      is_cereb = stringr::str_detect(ann_macro, "cerebellum"),
-      # contains the non-white-matter (=cortex) parcellation (see 'add macroanatomical annotation')
-      is_cortex = stringr::str_detect(ann_macro, pattern = "lobe$"),
-      # ann_macro == "white_matter" -> subcortical structures hold priority (e.g. Thalamus > Radiatio thalamica)
-      is_tract = wm_tract != "none" & !stringr::str_detect(wm_tract, pattern = "wma_"),
-      is_wm = stringr::str_detect(ann_macro, pattern = "^wm"),
-      id = paste0("x", x, "y", y, "z", z)
-    ) %>%
-    tibble::as_tibble()
-
-}
-
-read_non_brain_template<- function(path = "data/meta/non_brain_template.RDS"){
-
-  readRDS(path) %>%
-    dplyr::mutate(
-      x = stringr::str_extract(id, pattern = "x[0-9]*") %>% stringr::str_remove(pattern = "x") %>% as.integer(),
-      y = stringr::str_extract(id, pattern = "y[0-9]*") %>% stringr::str_remove(pattern = "y") %>% as.integer(),
-      z = stringr::str_extract(id, pattern = "z[0-9]*") %>% stringr::str_remove(pattern = "z") %>% as.integer(),
-      is_brain = FALSE,
-      selected = FALSE
-    ) %>%
-    tibble::as_tibble()
 
 }
 
@@ -2226,27 +2021,56 @@ score_label_colors <- function(score_set_up){
 
 trim_brain_3d <- function(plot_input, var, val_missing, fct = 0.5){
 
+  # pre-deselect infratentorial
+  contains_cerebellum <-
+    dplyr::filter(plot_input, ann_dk_adj == "Cerebellum") %>%
+    dplyr::summarise(test = any(!!rlang::sym(var) != {{val_missing}}))
+
+  if(!contains_cerebellum$test){
+
+    plot_input <- dplyr::filter(plot_input, ann_dk_adj != "Cerebellum")
+
+  }
+
+  contains_brainstem <-
+    dplyr::filter(plot_input, ann_dk_adj == "Brain-Stem") %>%
+    dplyr::summarise(test = any(!!rlang::sym(var) != {{val_missing}}))
+
+  if(!contains_brainstem$test){
+
+    plot_input <- dplyr::filter(plot_input, ann_dk_adj != "Brain-Stem")
+
+  }
+
+  # select hemispheres
+  hemispheres <-
+    dplyr::filter(plot_input, !!rlang::sym(var) != {{val_missing}}) %>%
+    dplyr::pull(var = "hemisphere") %>%
+    unique()
+
+  plot_input <- dplyr::filter(plot_input, hemisphere %in% {{hemispheres}})
+
+  # trim remaining
   plot_input_main <- dplyr::filter(plot_input, !!rlang::sym(var) != {{val_missing}} | !is_wm)
 
   plot_input_side <- dplyr::filter(plot_input, !id %in% plot_input_main$id)
-  keep <- round(nrow(plot_input_side)*0.5)
+
+  keep <- round(nrow(plot_input_side)*fct)
   plot_input_side <- dplyr::slice_sample(plot_input_side, n = {{keep}})
 
+  # merge back to output
   rbind(plot_input_main, plot_input_side)
 
 }
 
-# Function to convert color input to 'rgb(r, g, b)' format
 to_rgb_format <- function(color) {
-  # Convert color to RGB using grDevices::col2rgb
+
   rgb_values <- grDevices::col2rgb(color)
 
-  # Extract red, green, and blue components
   r <- rgb_values[1]
   g <- rgb_values[2]
   b <- rgb_values[3]
 
-  # Format as 'rgb(r, g, b)'
   formatted_rgb <- sprintf("rgb(%d, %d, %d)", r, g, b)
 
   return(formatted_rgb)
@@ -2256,32 +2080,36 @@ to_rgb_format <- function(color) {
 update_CBscore <- function(cb_df, update_df){
 
   out <-
-    dplyr::left_join(x = cb_df, y = update_df[,c("id", "CBscore_new")], by = "id") %>%
-      dplyr::mutate(
-        CBscore =
-          dplyr::case_when(
-            is.na(CBscore_new) ~ CBscore,
-            CBscore_new > CBscore ~ CBscore_new,
-            TRUE ~ CBscore)
-        ) %>%
-      dplyr::select(-CBscore_new)
+    dplyr::left_join(x = cb_df, y = update_df[,c("id", "force", "CBscore_new")], by = "id") %>%
+    dplyr::mutate(
+      CBscore =
+        dplyr::case_when(
+          is.na(CBscore_new) ~ CBscore,
+          CBscore_new > CBscore ~ CBscore_new,
+          CBscore_new < CBscore & force ~ CBscore_new,
+          TRUE ~ CBscore
+        )
+    ) %>%
+    dplyr::select(-CBscore_new, -force)
+
+  return(out)
+
+}
+
+CBscore_to_label <- function(cb_df){
 
   for(i in seq_along(score_set_up$choices)){
 
     num_val <- unname(score_set_up$choices)[i]
     label <- names(score_set_up$choices)[i]
 
-    out$CBscore_label[out$CBscore == num_val] <- label
+    cb_df$CBscore_label[cb_df$CBscore == num_val] <- label
 
   }
 
-  return(out)
+  return(cb_df)
 
 }
-
-
-us <- function(x){ unique(x) %>% sort() }
-
 
 within_range <- function(x, r){
 

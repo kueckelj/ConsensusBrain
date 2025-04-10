@@ -1,7 +1,7 @@
 
 
 
-moduleMriUI <- function(id = "mri", ...){
+moduleMriUI <- function(id = "mri", width = 500, ...){
 
   ns <- shiny::NS(id)
 
@@ -13,21 +13,21 @@ moduleMriUI <- function(id = "mri", ...){
       shiny::column(
         width = 4,
         align = "center",
-        moduleMriPlaneUI(id = ns("mri_plane_sag"), plane = "sag", ...)
+        moduleMriPlaneUI(id = ns("mri_plane_sag"), plane = "sag", width = width, ...)
       ),
 
       # MRI column 2
       shiny::column(
         width = 4,
         align = "center",
-        moduleMriPlaneUI(id = ns("mri_plane_axi"), plane = "axi", ...),
+        moduleMriPlaneUI(id = ns("mri_plane_axi"), plane = "axi", width = width, ...),
       ),
 
       # MRI column 3
       shiny::column(
         width = 4,
         align = "center",
-        moduleMriPlaneUI(id = ns("mri_plane_cor"), plane = "cor", ...),
+        moduleMriPlaneUI(id = ns("mri_plane_cor"), plane = "cor", width = width, ...),
       )
 
     ),
@@ -45,10 +45,10 @@ moduleMriUI <- function(id = "mri", ...){
 }
 
 moduleMriServer <- function(id = "mri",
-                            non_brain_template = data.frame(),
                             voxel_df = function(){ load_consensus_template() },
                             nifti_input = function(){ mni_template },
                             mode_init = "inspection",
+                            color_selected = function(){ colorsCB$selected },
                             external_selection = function(){ NULL },
                             external_selection_opts = list()){
 
@@ -61,30 +61,33 @@ moduleMriServer <- function(id = "mri",
       mri_plane_sag <-
         moduleMriPlaneServer(
           id = "mri_plane_sag",
-          non_brain_template = non_brain_template,
           mode_init = mode_init,
+          color_selected = shiny::reactive({ color_selected() }),
           mri_control = shiny::reactive({ mri_control() }),
           nifti_input = shiny::reactive({ nifti_input() }),
+          voxel_df_input = shiny::reactive({ voxel_df() }),
           plane = "sag"
         )
 
       mri_plane_axi <-
         moduleMriPlaneServer(
           id = "mri_plane_axi",
-          non_brain_template = non_brain_template,
           mode_init = mode_init,
+          color_selected = shiny::reactive({ color_selected() }),
           mri_control = shiny::reactive({ mri_control() }),
           nifti_input = shiny::reactive({ nifti_input() }),
+          voxel_df_input = shiny::reactive({ voxel_df() }),
           plane = "axi"
         )
 
       mri_plane_cor <-
         moduleMriPlaneServer(
           id = "mri_plane_cor",
-          non_brain_template = non_brain_template,
           mode_init = mode_init,
+          color_selected = shiny::reactive({ color_selected() }),
           mri_control = shiny::reactive({ mri_control() }),
           nifti_input = shiny::reactive({ nifti_input() }),
+          voxel_df_input = shiny::reactive({ voxel_df() }),
           plane = "cor"
         )
 
