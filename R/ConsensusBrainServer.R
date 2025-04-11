@@ -161,14 +161,14 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
                 inputId = "first_name",
                 label = shiny::tagList(shiny::icon("person"), "Username:"),
                 width = "95%",
-                value = "",
+                value = "Test",
                 placeholder = "First Name"
               ),
               shiny::textInput(
                 inputId = "last_name",
                 label = NULL,
                 width = "95%",
-                value = "",
+                value = "Person",
                 placeholder = "Last Name"
               ),
               shiny::uiOutput(outputId = "helptext_username")
@@ -213,7 +213,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
       if(!valid_username_length() | !valid_username_parts()){
 
-        shiny::helpText("Please enter first and last name. (Two letters minimum each.)")
+        shiny::helpText("Please enter first and last name. (Three letters minimum each.)")
 
       } else {
 

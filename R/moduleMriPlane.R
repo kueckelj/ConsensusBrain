@@ -410,6 +410,7 @@ moduleMriPlaneUI <- function(id,
       ),
       shiny::fluidRow(
         #shiny::actionButton(ns("test"), "Test"),
+        shiny::textOutput(ns("text")),
         shiny::uiOutput(outputId = ns("options_bottom"))
       )
     )
@@ -1672,6 +1673,8 @@ moduleMriPlaneServer <- function(id,
 
         shiny::req(stringr::str_detect(selection_tool(), "paintbrush"))
 
+        t1 <- Sys.time()
+
         # plotting context for all drawing options
         plot_mri_frame(col = col_seq(), row = row_seq())
 
@@ -1719,9 +1722,28 @@ moduleMriPlaneServer <- function(id,
           )
 
         }
-
+print("saving time")
+        time_diff({ append(shiny::isolate(time_diff()), round(as.numeric(Sys.time() - t1)*1000, 3))})
 
       }, bg = "transparent")
+
+      time_text <- shiny::reactiveVal(value = "Waiting")
+      time_diff <- shiny::reactiveVal(value = list())
+
+      shiny::observeEvent(paintbrushed_ids(), {
+
+        m <- round(mean(purrr::map_dbl(time_diff(), ~ .x)), 2)
+        v <- round(var(purrr::map_dbl(time_diff(), ~ .x)), 2)
+
+        time_text({  as.character(glue::glue("Mean: {m} | Var: {v}")) })
+
+      })
+
+      output$text <- renderPrint({
+
+        time_text()
+
+      })
 
 
       output$mriOutlinePlot <- shiny::renderPlot({
