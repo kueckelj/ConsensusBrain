@@ -1672,13 +1672,9 @@ moduleMriPlaneServer <- function(id,
 
         shiny::req(stringr::str_detect(selection_tool(), "paintbrush"))
 
-        print("frame")
         # plotting context for all drawing options
         plot_mri_frame(col = col_seq(), row = row_seq())
-        toc()
 
-        print("rect")
-        tic()
         if(drawing_active() & selection_tool() == "paintbrush"){
 
           graphics::rect(
@@ -1708,10 +1704,7 @@ moduleMriPlaneServer <- function(id,
           )
 
         }
-        toc()
 
-        print("cursor")
-        tic()
         if(cursor_on_mri()){
 
           symbols(
@@ -1726,7 +1719,7 @@ moduleMriPlaneServer <- function(id,
           )
 
         }
-        toc()
+
 
       }, bg = "transparent")
 
