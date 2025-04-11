@@ -454,6 +454,17 @@ ConsensusBrain <- function(nifti_object = NULL){
 
 }
 
+#' @export
+ConsensusBrain <- function() {
+  shiny::runApp(
+    shiny::shinyApp(
+      ui = fluidPage(h2("🚀 Hello from ConsensusBrain!")),
+      server = function(input, output, session) {}
+    )
+  )
+}
+
+
 
 CBscore_label_var <- function(voxel_df, score_set_up){
 
