@@ -185,9 +185,10 @@ moduleMriControlServer <- function(id,
         } else {
 
           shiny::column(
-            width = 4,
+            width = 5,
+            align = "left",
             shiny::h5(shiny::strong("Margin [mm]:")),
-            shiny::helpText("No tissue selected.")
+            shiny::helpText("No tissue selected to which as margin can be added.")
           )
 
         }
@@ -1048,41 +1049,6 @@ moduleMriControlServer <- function(id,
       })
 
       shiny::observeEvent(input$selection_tool, {
-
-        # prerequisites for selection tools
-        if(input$selection_tool == "margin" & length(shiny::isolate({ selection_state() })) == 0){
-
-          shiny::showNotification(
-            ui = "The margin tool can not be used without a selection.",
-            type = "warning"
-          )
-
-          shinyWidgets::updateRadioGroupButtons(
-            session = session,
-            inputId = "selection_tool",
-            selected = selection_tool()
-          )
-
-          shiny::req(FALSE)
-
-        }
-
-        if(input$selection_tool == "paintbrush_erase" & length(shiny::isolate({ selection_state() })) == 0){
-
-          shiny::showNotification(
-            ui = "The paintbrush eraser tool can not be used without a selection.",
-            type = "warning"
-          )
-
-          shinyWidgets::updateRadioGroupButtons(
-            session = session,
-            inputId = "selection_tool",
-            selected = selection_tool()
-          )
-
-          shiny::req(FALSE)
-
-        }
 
         # ensure certain things before switching
         if(selection_tool() == "margin"){

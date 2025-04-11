@@ -263,7 +263,9 @@ buffer_range <- function(r, buffer){
 }
 
 
-circular_progress_plot <- function(voxel_df, score_set_up) {
+circular_progress_plot <- function(voxel_df, ...) {
+
+  score_set_up <- ConsensusBrain::score_set_up
 
   voxel_df <- make_CBscore_label(voxel_df, score_set_up)
 
@@ -278,11 +280,15 @@ circular_progress_plot <- function(voxel_df, score_set_up) {
 
   # Add missing factor levels explicitly (ensures unused labels still show in legend)
   missing_levels <- setdiff(names(score_set_up$choices), df_summary$CBscore_label)
+
   if (length(missing_levels) > 0) {
-    df_summary <- dplyr::bind_rows(
+
+    df_summary <-
+      dplyr::bind_rows(
       df_summary,
       tibble::tibble(CBscore_label = missing_levels, fraction = 0, ymin = 0, ymax = 0, n = 0)
     )
+
   }
 
   # Ensure correct ordering of factor levels in df_summary
@@ -313,6 +319,7 @@ circular_progress_plot <- function(voxel_df, score_set_up) {
     ) +
     ggplot2::labs(fill = "Score") +
     ggplot2::xlim(0, 2)
+
 }
 
 
@@ -1228,8 +1235,8 @@ plot_mri_frame <- function(col,
   if(is.null(ylim)){ ylim <- rev(range(row)) }
 
   plot(
-    x = col,
-    y = row,
+    x = NA,
+    y = NA,
     type = type,
     xaxt = "n",
     yaxt = "n",
@@ -1243,6 +1250,9 @@ plot_mri_frame <- function(col,
   )
 
 }
+
+
+
 
 plane_to_ccs <- function(plane){
 
@@ -1869,6 +1879,7 @@ plot_brain_3d <- function(voxel_df,
     n_labels <- length(unique_labels)
     colors <- scales::hue_pal()(n_labels)
     color_map <- setNames(colors, unique_labels)
+
     if(!is.null(clrp_adjust)){
 
       for(n in names(clrp_adjust)){
@@ -1898,14 +1909,15 @@ plot_brain_3d <- function(voxel_df,
   if(is.numeric(voxel_df[[color_by]])){
 
     # Numeric values
-    p <- plotly::plot_ly(
-      data = voxel_df,
-      x = ~x, y = ~z, z = ~y, # exchange z and y axis, cause plotly rotates around z axis
-      color = color_formula,
-      type = type,
-      mode = "markers",
-      marker = list(size = pt_size, colorscale = pt_clrsp, colorbar = list(title = color_by))
-    )
+    p <-
+      plotly::plot_ly(
+        data = voxel_df,
+        x = ~x, y = ~z, z = ~y, # exchange z and y axis, cause plotly rotates around z axis
+        color = color_formula,
+        type = type,
+        mode = "markers",
+        marker = list(size = pt_size, colorscale = pt_clrsp, colorbar = list(title = color_by))
+      )
 
   } else {
 
@@ -1915,7 +1927,7 @@ plot_brain_3d <- function(voxel_df,
     for (i in seq_along(unique_labels)) {
 
       label <- unique_labels[i]
-      voxel_df_subset <- filter(voxel_df, !!rlang::sym(color_by) == {{label}})
+      voxel_df_subset <- dplyr::filter(voxel_df, !!rlang::sym(color_by) == {{label}})
 
       if(is.character(group_highlight)){
 
@@ -1939,18 +1951,19 @@ plot_brain_3d <- function(voxel_df,
 
       set.seed(123)
 
-      p <- plotly::add_trace(
-        p = p,
-        data = dplyr::slice_sample(voxel_df_subset, n = n),
-        x = ~x, y = ~z, z = ~y, # exchange z and y axis, cause plotly rotates around z axis
-        type = type,
-        mode = mode,
-        text = ~ hoverinfo,
-        hoverinfo = "text",
-        marker = list(size = pt_size, opacity = opacity, color = color_map[[label]]),
-        name = label,
-        showlegend = show_legend
-      )
+      p <-
+        plotly::add_trace(
+          p = p,
+          data = dplyr::slice_sample(voxel_df_subset, n = n),
+          x = ~x, y = ~z, z = ~y, # exchange z and y axis, cause plotly rotates around z axis
+          type = type,
+          mode = mode,
+          text = ~ hoverinfo,
+          hoverinfo = "text",
+          marker = list(size = pt_size, opacity = opacity, color = color_map[[label]]),
+          name = label,
+          showlegend = show_legend
+        )
 
     }
   }

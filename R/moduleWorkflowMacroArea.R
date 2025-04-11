@@ -195,12 +195,12 @@ moduleWorkflowMacroAreaServer <- function(id,
         if(macro_area() == "wm_tract"){
 
           dplyr::filter(voxel_df_input(), wm_tract != "none") %>%
-            circular_progress_plot(score_set_up = score_set_up)
+            circular_progress_plot()
 
         } else {
 
           dplyr::filter(voxel_df_input(), ann_macro %in% macro_area()) %>%
-            circular_progress_plot(score_set_up = score_set_up)
+            circular_progress_plot()
 
         }
 

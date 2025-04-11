@@ -341,7 +341,7 @@ moduleMriPlaneUI <- function(id,
             click = shiny::clickOpts(id = ns("mriPlot_click"), clip = TRUE),
             brush = shiny::brushOpts(id = ns("mriPlot_brush"), delayType = "debounce", resetOnNew = TRUE),
             dblclick = shiny::dblclickOpts(id = ns("mriPlot_dblclick"), clip = TRUE),
-            hover = shiny::hoverOpts(id = ns("mriPlot_hover"), delay = 100, delayType = "throttle", clip = TRUE)
+            hover = shiny::hoverOpts(id = ns("mriPlot_hover"), delay = 50, delayType = "throttle", clip = TRUE)
           )
         ),
         shiny::div( # Vertical Slider
@@ -659,8 +659,6 @@ moduleMriPlaneServer <- function(id,
 
         }
 
-
-
       })
 
 
@@ -907,7 +905,13 @@ moduleMriPlaneServer <- function(id,
 
         } else  if(mode() == "selection"){
 
-          selection_template()
+          # filter for voxels in range to speed up paintbrush (de)-selection
+          # when zooming in
+           dplyr::filter(
+             .data = selection_template(),
+             within_range(x = col, r = range(col_seq())) &
+             within_range(x = row, r = range(row_seq()))
+           )
 
         }
 
@@ -1668,9 +1672,13 @@ moduleMriPlaneServer <- function(id,
 
         shiny::req(stringr::str_detect(selection_tool(), "paintbrush"))
 
+        print("frame")
         # plotting context for all drawing options
         plot_mri_frame(col = col_seq(), row = row_seq())
+        toc()
 
+        print("rect")
+        tic()
         if(drawing_active() & selection_tool() == "paintbrush"){
 
           graphics::rect(
@@ -1700,8 +1708,11 @@ moduleMriPlaneServer <- function(id,
           )
 
         }
+        toc()
 
-        if(FALSE){
+        print("cursor")
+        tic()
+        if(cursor_on_mri()){
 
           symbols(
             x = cursor_pos()[1],
@@ -1715,8 +1726,10 @@ moduleMriPlaneServer <- function(id,
           )
 
         }
+        toc()
 
       }, bg = "transparent")
+
 
       output$mriOutlinePlot <- shiny::renderPlot({
 

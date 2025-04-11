@@ -2,5 +2,6 @@
 
 export(ConsensusBrain)
 export(ProgressCB)
+export(score_set_up)
 exportClasses(ProgressCB)
 importFrom(magrittr,"%>%")

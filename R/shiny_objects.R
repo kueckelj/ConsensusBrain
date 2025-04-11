@@ -46,10 +46,12 @@ css_styles <-
   )
 
 
+
 # rules:
 # 1. first value of choices must correspond to the missing (not-yet-assigned) value
 # 2. all values of choices must be of the same class
 # 3. length of $choices must be equal to length of $colors
+#' @export
 score_set_up = list(
   label = "Resection Risk",
   choices = c("Missing" = 0,
