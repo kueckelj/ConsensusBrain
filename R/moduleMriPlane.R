@@ -1142,6 +1142,8 @@ moduleMriPlaneServer <- function(id,
 
         } else if(drawing_active() & selection_tool() == "paintbrush"){
 
+          t1 <- Sys.time()
+
           new_ids <-
             identify_obs_within_radius2D(
               cursor_pos = cursor_pos(),
@@ -1162,6 +1164,8 @@ moduleMriPlaneServer <- function(id,
             }
 
           }
+
+          time_diff({ append(shiny::isolate(time_diff()), round(as.numeric(Sys.time() - t1)*1000, 3))})
 
         } else if(drawing_active() & selection_tool() == "paintbrush_erase"){
 
@@ -1673,8 +1677,6 @@ moduleMriPlaneServer <- function(id,
 
         shiny::req(stringr::str_detect(selection_tool(), "paintbrush"))
 
-        t1 <- Sys.time()
-
         # plotting context for all drawing options
         plot_mri_frame(col = col_seq(), row = row_seq())
 
@@ -1722,8 +1724,6 @@ moduleMriPlaneServer <- function(id,
           )
 
         }
-print("saving time")
-        time_diff({ append(shiny::isolate(time_diff()), round(as.numeric(Sys.time() - t1)*1000, 3))})
 
       }, bg = "transparent")
 
