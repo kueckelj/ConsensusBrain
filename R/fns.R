@@ -300,7 +300,7 @@ circular_progress_plot <- function(voxel_df, score_set_up) {
     ggplot2::coord_polar(theta = "y") +  # Convert to polar coordinates
     ggplot2::theme_void() +  # Remove background, axis, and grid
     ggplot2::scale_fill_manual(
-      values = set_names(nm = names(score_set_up$choices), x = score_set_up$colors),
+      values = purrr::set_names(nm = names(score_set_up$choices), x = score_set_up$colors),
       drop = FALSE,  # Ensures unused levels appear in the legend
       limits = names(score_set_up$choices),  # Ensures correct order in legend
       guide = ggplot2::guide_legend(override.aes = list(alpha = 1, color = NA))  # Ensure visibility

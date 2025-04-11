@@ -22,6 +22,7 @@ Imports:
     ggsci,
     glue,
     magrittr,
+    oro.nifti,
     plotly,
     purrr,
     RANN,
