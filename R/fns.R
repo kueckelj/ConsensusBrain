@@ -435,22 +435,19 @@ ConsensusBrain <- function(nifti_object = NULL){
   # draw from package data
   if(is.null(nifti_object)){ nifti_object <- mni_template }
 
-  shiny::runApp(
-    appDir =
-      shiny::shinyApp(
-        ui = ConsensusBrainUI,
-        server = function(input, output, session){
+  shiny::shinyApp(
+    ui = ConsensusBrainUI,
+    server = function(input, output, session){
 
-          ConsensusBrainServer(
-            input = input,
-            output = output,
-            session = session,
-            nifti_object = nifti_object
-            )
-
-        }
+      ConsensusBrainServer(
+        input = input,
+        output = output,
+        session = session,
+        nifti_object = nifti_object
       )
-    )
+
+    }
+  )
 
 }
 
