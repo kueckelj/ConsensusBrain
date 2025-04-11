@@ -194,7 +194,6 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
           ),
           shiny::column(width = 2)
         ),
-
         easyClose = FALSE,
         size = "xl"
       )

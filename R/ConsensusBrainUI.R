@@ -97,7 +97,7 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_workflow", # tab_frontal_lobe
 
-          moduleWorkflowMacroAreaUI(id = "workflow")
+          moduleWorkflowMacroAreaUI(id = "workflow", width = 475)
 
         ),
 
@@ -105,7 +105,7 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_remaining",
 
-          moduleWorkflowRemainingUI(id = "workflow_remaining")
+          moduleWorkflowRemainingUI(id = "workflow_remaining", width = 500)
 
         ),
 
@@ -133,7 +133,7 @@ ConsensusBrainUI <- function(){
             shiny::fluidRow(
               shiny::column(
                 width = 12,
-                moduleMriUI(id = "progress", width = 540)
+                moduleMriUI(id = "progress", width = 500)
               )
             )
           ),

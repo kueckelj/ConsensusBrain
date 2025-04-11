@@ -433,7 +433,7 @@ comp_selection_bb <- function(voxel_df, distance = NULL){
 ConsensusBrain <- function(nifti_object = NULL){
 
   # draw from package data
-  if(is.null(nifti_object)){ nifti_object <- mni_template }
+  if(is.null(nifti_object)){ nifti_object <- ConsensusBrain::mni_template }
 
   shiny::shinyApp(
     ui = ConsensusBrainUI,
