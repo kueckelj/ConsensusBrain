@@ -451,13 +451,6 @@ ConsensusBrain <- function(nifti_object = NULL){
 
 }
 
-#' @export
-ConsensusBrain2 <- function() {
-  shiny::shinyApp(
-    ui = fluidPage(h2("🚀 Hello from ConsensusBrain!")),
-    server = function(input, output, session) {}
-  )
-}
 
 
 

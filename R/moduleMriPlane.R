@@ -1701,7 +1701,7 @@ moduleMriPlaneServer <- function(id,
 
         }
 
-        if(cursor_on_mri()){
+        if(FALSE){
 
           symbols(
             x = cursor_pos()[1],
