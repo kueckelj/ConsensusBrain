@@ -923,9 +923,9 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      localizer_col_v <- shiny::reactive({ ifelse(cursor_on_mri(), alpha("red", 0.5), "red") })
+      localizer_col_v <- shiny::reactive({ ifelse(cursor_on_mri(), ggplot2::alpha("red", 0.5), "red") })
 
-      localizer_col_h <- shiny::reactive({ ifelse(cursor_on_mri(), alpha("red", 0.5), "red") })
+      localizer_col_h <- shiny::reactive({ ifelse(cursor_on_mri(), ggplot2::alpha("red", 0.5), "red") })
 
       localizer_lty <- shiny::reactive({ ifelse(cursor_on_mri(), "solid", "solid") })
 
