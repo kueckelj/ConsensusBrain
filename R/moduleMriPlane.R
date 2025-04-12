@@ -341,7 +341,7 @@ moduleMriPlaneUI <- function(id,
             click = shiny::clickOpts(id = ns("mriPlot_click"), clip = TRUE),
             brush = shiny::brushOpts(id = ns("mriPlot_brush"), delayType = "debounce", resetOnNew = TRUE),
             dblclick = shiny::dblclickOpts(id = ns("mriPlot_dblclick"), clip = TRUE),
-            hover = shiny::hoverOpts(id = ns("mriPlot_hover"), delay = 50, delayType = "throttle", clip = TRUE)
+            hover = shiny::hoverOpts(id = ns("mriPlot_hover"), delay = 150, delayType = "throttle", clip = TRUE)
           )
         ),
         shiny::div( # Vertical Slider
