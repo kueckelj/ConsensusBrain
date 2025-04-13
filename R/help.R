@@ -12,10 +12,34 @@ CB_help <-
         type = "inline"
       ),
 
+    "force_score" =
+      list(
+        content = c(
+          "When refining your selection using the interaction tools, it's common for your selection to include voxels that already have an assigned score.
+          By default, **score assignment will not overwrite higher scores**.
+          For example, if your selection overlaps voxels already scored as 'Low-Medium' and you assign 'Safely', the existing 'Low-Medium' voxels will remain unchanged,
+          while unscored voxels will receive the new 'Safely' score.",
+          "",
+          "To allow lower scores to overwrite higher ones, check the **Force** option before assigning."
+        ),
+        type = "inline"
+      ),
+
     "hemisphere" =
       list(
         content = c(
           "Select the hemisphere of interest. At least one must be chosen."
+        ),
+        type = "inline"
+      ),
+
+    "highlight_control" =
+      list(
+        content = c(
+          "You can highlight specific brain regions on the MRI to make them stand out.
+           Use the selection options on the right to choose which regions to highlight.
+           Click 'Highlight' to apply your selection.
+           Use 'Reset' to remove the current highlighting."
         ),
         type = "inline"
       ),
@@ -134,7 +158,7 @@ CB_help <-
           is selected that has not received a score yet if you use the same selection
           criteria again.",
           "",
-          "Disregard:",
+          "All:",
           "Selection criteria apply to the whole brain, regardless of
           whether the certain regions have already been scored."
         ),

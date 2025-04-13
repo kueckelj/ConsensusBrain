@@ -1,5 +1,5 @@
 
-moduleScoreAssignmentUI <- function(id, height = 300, width = 525) {
+moduleScoreAssignmentUI <- function(id, height = 300) {
 
   ns <- shiny::NS(id)
 
@@ -12,8 +12,8 @@ moduleScoreAssignmentUI <- function(id, height = 300, width = 525) {
         flex-direction: column;
         padding: 10px;
         border: 1px solid #ccc;
+        width: 100%;
         height: {height}px;
-        width: {width}px;
         border-radius: 5px;"),
 
       # Header (Top)
@@ -51,8 +51,6 @@ moduleScoreAssignmentUI <- function(id, height = 300, width = 525) {
           shiny::uiOutput(ns("clear_score"))
         )
       )
-
-
     )
   )
 }
@@ -143,7 +141,7 @@ moduleScoreAssignmentServer <- function(id,
           selected = character(),
           inline = TRUE,
           status = "primary"
-        )
+        ) %>% add_helper("force_score")
 
       })
 

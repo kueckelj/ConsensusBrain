@@ -4,13 +4,15 @@
 
 # Lobes -------------------------------------------------------------------
 
-moduleBrainTissueSelectionUI <- function(id, height = 300, width = 525){
+moduleBrainTissueSelectionUI <- function(id, height = 300){
 
   ns <- shiny::NS(id)
 
   shiny::tagList(
-    tags$head(
-      tags$style(shiny::HTML("
+    shiny::tags$head(
+      shiny::tags$style(
+        shiny::HTML(
+        "
         .CB-action-btn {
           background-color: rgba(200, 200, 200, 0.2);
           color: black;
@@ -19,31 +21,33 @@ moduleBrainTissueSelectionUI <- function(id, height = 300, width = 525){
           padding: 8px 16px;
           font-weight: bold;
           transition: all 0.2s ease-in-out;
-          width: 50%;  /* Make the button fill 50% of the column */
+          width: 50%;
           display: block;
-          margin: 0 auto; /* Center it */
+          margin: 0 auto;
           text-align: center;
         }
 
         .CB-action-btn:hover {
-          background-color: rgba(200, 200, 200, 0.4); /* Slightly darker on hover */
+          background-color: rgba(200, 200, 200, 0.4);
         }
-      ")
+      "
+        )
       )
     ),
+    # Overall Box
     shiny::div(
       style = paste0(
         "background-color: white;",
-        "box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);",
+        "border: 1px solid #ccc;",
         "border-radius: 5px;",
-        "width: ", width, "px;",
+        "box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);",
         "display: flex;",
         "flex-direction: column;",
-        "padding: 10px;",
-        "border: 1px solid #ccc;",
         "flex-wrap: wrap;",
-        "height: ", height, "px;",
         "justify-content: space-between;",  # Ensures even distribution
+        "padding: 1.5%;",
+        "width: 100%;",
+        "height:", height, "px;",
         sep = " "
       ),
 
@@ -234,7 +238,7 @@ moduleBrainTissueSelectionServer <- function(id,
           label = "Scoring Filter",
           size = "normal",
           onLabel = "Unscored Only",
-          offLabel = "Disregard",
+          offLabel = "All",
           value = FALSE,
           width = "100%"
         ) %>%

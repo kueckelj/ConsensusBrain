@@ -1,6 +1,6 @@
 
 
-moduleWorkflowMacroAreaUI <- function(id, width = 530, height = 275) {
+moduleWorkflowMacroAreaUI <- function(id, height = 275) {
 
   ns <- shiny::NS(id)
 
@@ -12,7 +12,6 @@ moduleWorkflowMacroAreaUI <- function(id, width = 530, height = 275) {
           shiny::column(
             width = 12,
             shiny::div(
-              style = "margin-top: -5px; margin-bottom: -7.5px;",
               shinyWidgets::radioGroupButtons(
                 inputId = "workflow_region",
                 label = NULL,
@@ -24,38 +23,37 @@ moduleWorkflowMacroAreaUI <- function(id, width = 530, height = 275) {
                 justified = TRUE
               )
             )
-          ),
+          )
+        ),
+        shiny::fluidRow(
           shiny::column(
             width = 4,
             align = "center",
-            moduleBrainTissueSelectionUI(id = ns("selection"), width = width, height = height)
+            moduleBrainTissueSelectionUI(id = ns("selection"),  height = height)
           ),
           shiny::column(
             width = 4,
-            align = "center",
+            align = "left",
             shiny::div(
               style = paste0(
                 "background-color: white;",
-                "box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);",
                 "border: 1px solid #ccc;",
                 "border-radius: 5px;",
-                "width: ", width, "px;",
-                "height: ", height, "px;",
-                "position: relative;"
+                "box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);",
+                "padding: 1.5%;",
+                "position: relative;",
+                "height: ", height, "px;"
               ),
               # Header positioned in the first 50px
               shiny::div(
                 style = paste0(
                   "position: absolute;",
-                  "padding-top: 7.5px;",
-                  "padding-left: 7.5px;",
                   "width: 100%",
                   "text-align: left;",
                   "z-index: 2;",
                   "font-size: 16px;",
                   "font-weight: bold;",
                   "border-radius: 5px;"
-
                 ),
                 shiny::uiOutput(ns("header_progress"))
 
@@ -66,24 +64,24 @@ moduleWorkflowMacroAreaUI <- function(id, width = 530, height = 275) {
                   "left: 0;",
                   "width: 100%;",
                   "border-radius: 5px;",
+                  "padding: 1.5%;",
                   "height: ", height, "px;",
-                  "margin-top: ", height*0.025, "px;",
                   "z-index: 1;"
                 ),
-                shiny::plotOutput(outputId = ns("progress_plot"), width = "90%", height = paste0(height*0.95, "px"))
+                shiny::plotOutput(outputId = ns("progress_plot"), width = "95%", height = paste0(height*0.9, "px"))
               )
             )
           ),
           shiny::column(
             width = 4,
             align = "center",
-            moduleScoreAssignmentUI(id = ns("score_assignment"), width = width, height = height)
+            moduleScoreAssignmentUI(id = ns("score_assignment"), height = height)
           )
         ),
         shiny::fluidRow(
           shiny::column(
             width = 12,
-            moduleMriUI(id = ns("mri"), width = width)
+            moduleMriUI(id = ns("mri"))
           )
         )
       )

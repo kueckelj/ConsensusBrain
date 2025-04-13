@@ -1,420 +1,178 @@
 
-colors <- c("green",
-            "blue",
-            "yellow",
-            "red",
-            "orange",
-            "purple",
-            "brown")
 
 moduleMriPlaneUI <- function(id,
                              plane,
                              title = "MRI",
                              slider_min = 1,
                              slider_max = 256,
-                             showValue = TRUE,
-                             width = 525) {
+                             ...) {
 
   ns <- shiny::NS(id)
 
-  # for debugging
-  cf = F
-  bgc <- function(cf){
-
-    if(!cf){ "white" } else {
-
-      sample(colors, size = 1)
-
-    }
-
-  }
-
-  width <- width-10
-  pd <- round(width*0.01)
-  siamp <- round(width*0.065)
-  samp <- round(width*0.05)
-  wmp <- round(width*0.95)
-
-  # HTML + CSS
-  {shiny::tagList(
+  shiny::tagList(
     shiny::tags$head(
-      shiny::tags$script(
-        shiny::HTML(
-          "$(document).ready(function(){
-           $('[data-toggle=\"tooltip\"]').tooltip();});"
-        )
-      ),
       shiny::tags$style(
         shiny::HTML(
-          glue::glue("
-                    .CB-checkbox-group {
-                      display: flex;
-                      flex-direction: column;
-                      align-items: center;
-                      justify-content: flex-start;
-                      width: auto;
-                    }
+          "
+             .mri-btn {
+              align-items: center;
+              cursor: pointer;
+              justify-content: center;
+              border: 1px solid #ccc;
+              background-color: rgba(200, 200, 200, 0.2);
+              transition: all 0.2s ease-in-out;
+              }
 
-                    .CB-checkbox-group .btn-group {
-                      flex-direction: column !important;  /* Force buttons to stack vertically */
-                      display: flex !important;
-                      align-items: center !important;
-                      width: auto !important;
-                    }
+            .mri-btn-icon {
+             font-size: 1.5em;
+             }
 
-                    .CB-checkbox-group .btn {
-                      width: {{siamp}}px !important;  /* Square button width */
-                      height: {{siamp}}px !important; /* Square button height */
-                      padding: 0 !important;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      border: 1px solid #ccc;
-                      transition: all 0.2s ease-in-out
-                    }
+            .irs-min, .irs-max { display: none !important; }
 
-                    .CB-checkbox-group .btn.active {
-                      background-color: steelblue !important;
-                      color: white !important;
-                      border-color: steelblue !important;
-                    }
+            .mri-container {
+             background-color: white;
+             border-radius: 5px;
+             box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+             display: flex;
+             flex-direction: column;
+             padding: 1.5%;
+             width: 100%;
+             margin: 0 !important;
+            }
 
-                    .CB-checkbox-group .btn.active i {
-                      color: white !important;
-                    }
+           .mri-container .btn > .fa {
+            font-size: 4em;
+            vertical-align: middle;
+            }
 
-                    .CB-btn {
-                      width: {{siamp}}px !important;  /* Square button width */
-                      height: {{siamp}}px !important; /* Square button height */
-                      padding: 0 !important;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      border: 1px solid #ccc;
-                      background-color: rgba(200, 200, 200, 0.2);
-                      font-size: 18px;
-                      cursor: pointer;
-                      transition: all 0.2s ease-in-out;
-                    }
+           .multiple-plots-wrapper {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            }
 
-                    .CB-btn-group {
-                      display: flex;
-                      flex-direction: column;
-                      align-items: center;
-                      gap: 2.5px; /* Adds spacing between buttons */
-                    }
+           .multiple-plots {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            margin: 0 !important;
+            padding: 0 !important;
+           }
 
-                    .CB-btn-slider {
-                      width: {{siamp}}px !important;  /* Square button width */
-                      height: {{siamp}}px !important; /* Square button height */
-                      padding: 0 !important;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      border: 1px solid #ccc;
-                      border-radius: 5px;
-                      background-color: rgba(200, 200, 200, 0.2);
-                      font-size: 18px;
-                      cursor: pointer;
-                      transition: all 0.2s ease-in-out;
-                    }
+           .multiple-plots > * {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+           }
 
-                    .CB-btn:hover {
-                      background-color: rgba(200, 200, 200, 0.5);
-                    }
+           .slider-container {
+            display: flex;
+            flex-direction: column-reverse;
+            align-items: center;
+            width: 100%;
+            }
 
-                    .btn-dropdownbutton{
-                      width: {{siamp}}px;
-                      height: {{siamp}}px;
-                      padding: 0;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      border: 1px solid #ccc;
-                      border-radius: 5px;
-                      background-color: rgba(200, 200, 200, 0.2);
-                      font-size: 18px;
-                      cursor: pointer;
-                      transition: all 0.2s ease-in-out;
-                      }
-
-                    .irs-min, .irs-max { display: none !important; }
-
-                    .slider-container {
-                      display: flex;
-                      flex-direction: column-reverse; /* Moves labels above the slider */
-                      align-items: center;
-                      width: 100%;
-                    }
-
-                    .slider-labels {
-                      display: flex;
-                      justify-content: space-between;
-                      width: 100%;
-                      font-weight: bold;
-                      color: grey; /* Grey label color */
-                      margin-bottom: -15px; Space between label and slider */
-                    }
-                     ",
-          .open = "{{", .close = "}}")
+           .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-weight: bold;
+            color: grey;
+            margin-bottom: -15px;
+            }
+          "
         )
       )
     ),
-    shiny::div( # MRI Box
-      style =
-        glue::glue("
-                    background-color: white;
-                    border-radius: 5px;
-                    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
-                    display: flex;
-                    flex-direction: column;
-                    padding: 5px;
-                    margin-top: -7.5px;
-                    width: {width+10}px;
-                    height:100%;"),
-      #shiny::actionButton(ns("test"), label= "Test"),
-      shiny::div( # Above MRI Plot
-        style = glue::glue("
-                      display: flex;
-                      align-items: flex-end;
-                      justify-content: center;
-                      height: {samp*2.5}px;
-                      width: {width}px;
-                      margin-bottom: -10px;
-                      background-color: white"),
+
+    shiny::div(
+      class = "mri-container",
+      # Top Control
+      shiny::div(
+        style = "display: flex; justify-content: space-between; align-items: center; gap: 5%;",
+        # Left Control group
         shiny::div(
-          style = glue::glue("
-                             display: flex;
-                             align-itmes: flex-end;
-                             justify-content: center;
-                             height: {samp};
-                             width: {samp*1.5};
-                             margin: 10px;
-                             margin-left: 5px;
-                             margin-bottom: 20px;
-                             background-color: {bgc(cf)};
-                             gap: 2.5px;"),
-            shiny::actionButton(
-              inputId = ns("zoom_in"),
-              label = NULL,
-              class = "CB-btn-slider",
-              icon = shiny::icon("search-plus")
+          style = "display: flex; gap: 2.5%;",
+          shiny::actionButton(
+            inputId = ns("zoom_in"),
+            label = NULL,
+            icon = shiny::icon("search-plus", class = "mri-btn-icon"),
+            class = "mri-btn"
             ),
-            shiny::actionButton(
-              inputId = ns("zoom_out"),
-              label = NULL,
-              class = "CB-btn-slider",
-              icon = shiny::icon("search-minus")
-            )
+          shiny::actionButton(
+            inputId = ns("zoom_out"),
+            label = NULL,
+            icon = shiny::icon("search-minus", class = "mri-btn-icon"),
+            class = "mri-btn"
+          )
         ),
+        # Right Control Group
         shiny::div(
-          style = glue::glue("
-                        display: flex;
-                        justify-content: flex-end;
-                        width: {samp*1.5}px;
-                        margin: 10px;
-                        margin-bottom: 20px;
-                        background-color: {bgc(cf)}"),
+          style = "display: flex; gap: 2.5%; align-items: center; flex: 1;",
           shiny::actionButton(
             inputId = ns("mri_backward"),
             label = NULL,
-            class = "CB-btn-slider",
-            icon = shiny::icon("step-backward")
-          )
-        ),
-        shiny::div(
-          style = glue::glue("
-                        display: flex;
-                        justify-content: center;
-                        padding-top:5px;
-                        background-color: {bgc(cf)}"),
-          class = "slider-container",
-          shiny::sliderInput(
-            inputId = ns("mri_slider_slice"),
-            label = NULL,
-            min = slider_min,
-            max = slider_max,
-            value = round(slider_max/2),
-            ticks = FALSE,
-            width = "100%"
-          ),
+            icon = shiny::icon("step-backward", class = "mri-btn-icon"),
+            class = "mri-btn"
+            ),
           shiny::div(
-            class = "slider-labels",
-            shiny::span(mri_slider_labels[[plane]][1]),
-            shiny::span(mri_slider_labels[[plane]][2])
+            class = "slider-container",
+            shiny::sliderInput(
+              inputId = ns("mri_slider_slice"),
+              label = NULL,
+              min = slider_min,
+              max = slider_max,
+              value = round(slider_max/2),
+              ticks = FALSE,
+              width = "100%"
+            ),
+            shiny::div(
+              class = "slider-labels",
+              shiny::span(mri_slider_labels[[plane]][1]),
+              shiny::span(mri_slider_labels[[plane]][2])
             )
-        ),
-        shiny::div(
-          style = glue::glue("
-                        display: flex;
-                        justify-content: flex-start;
-                        width: {samp*3}px;
-                        margin: 10px;
-                        margin-bottom: 20px;
-                        background-color: {bgc(cf)};
-                        gap: 10px;"),
+          ),
           shiny::actionButton(
             inputId = ns("mri_forward"),
             label = NULL,
-            class = "CB-btn-slider",
-            icon = shiny::icon("step-forward")
-          ),
-          shiny::actionButton(
-            inputId = ns("mri_refresh"),
-            label = NULL,
-            class = "CB-btn-slider",
-            icon = shiny::icon("refresh")
+            icon = shiny::icon("step-forward", class = "mri-btn-icon"),
+            class = "mri-btn"
+            )
           )
-        )
-      ),
-
-      shiny::div( # Buttons + MRI Plot + Vertical Slider
-        style = glue::glue("
-                            display: flex;
-                            flex-direction: row;
-                            height: {wmp}px;
-                            width: {width}px;"),
-        shiny::div( # MRI Plot
-          style = glue::glue("
-                              display: flex;
-                              width: {wmp}px;
-                              height: {wmp}px"),
+        ),
+      # MRI Plot
+      shiny::div(
+        class = "multiple-plots-wrapper",
+        shiny::div(
           class = "multiple-plots",
-          shiny::tags$style(
-            glue::glue(".multiple-plots { position: relative; width: {{wmp}}px; height: {{wmp}}px; }
-                        #{{ns('mriSlicePlot')}} { position: absolute; width: {{wmp}}px; height: {{wmp}}px; }
-                        #{{ns('mriInspectionPlot')}} { position: absolute; width: {{wmp}}px; height: {{wmp}}px; }
-                        #{{ns('mriSelectionStatePlot')}} { position: absolute; width: {{wmp}}px; height: {{wmp}}px; }
-                        #{{ns('mriVisualAidPlot')}} { position: absolute; width: {{wmp}}px; height: {{wmp}}px; }
-                        #{{ns('mriLocalizerPlot')}} { position: absolute; width: {{wmp}}px; height: {{wmp}}px; }
-                        #{{ns('mriHoverInfoPlot')}} { position: absolute; width: {{wmp}}px; height: {{wmp}}px; }
-                        #{{ns('mriOutlinePlot')}} { position: absolute; width: {{wmp}}px; height: {{wmp}}px; }
-                        #{{ns('mriPaintbrushPlot')}} { position: absolute; width: {{wmp}}px; height: {{wmp}}px; }
-                        #{{ns('mriInteractionPlot')}} { position: absolute; width: {{wmp}}px; height: {{wmp}}px; }", # always top
-                       .open = "{{",
-                       .close = "}}")
-          ),
+          style = "background-color: white;",
+          shiny::plotOutput(ns("mriSlicePlot"), height = "100%"),
+          shiny::plotOutput(ns("mriInspectionPlot"), height = "100%"),
+          shiny::plotOutput(ns("mriSelectionStatePlot"), height = "100%"),
+          shiny::plotOutput(ns("mriVisualAidPlot"), height = "100%"),
+          shiny::plotOutput(ns("mriLocalizerPlot"), height = "100%"),
+          shiny::plotOutput(ns("mriHoverInfoPlot"), height = "100%"),
+          shiny::plotOutput(ns("mriPaintbrushPlot"), height = "100%"),
+          shiny::plotOutput(ns("mriOutlinePlot"), height = "100%"),
           shiny::plotOutput(
-            outputId = ns("mriSlicePlot"),
-            height = glue::glue("{wmp}px"),
-            width = glue::glue("{wmp}px")
-          ),
-          shiny::plotOutput(
-            outputId = ns("mriInspectionPlot"),
-            height = glue::glue("{wmp}px"),
-            width = glue::glue("{wmp}px")
-          ),
-          shiny::plotOutput(
-            outputId = ns("mriSelectionStatePlot"),
-            height = glue::glue("{wmp}px"),
-            width = glue::glue("{wmp}px")
-          ),
-          shiny::plotOutput(
-            outputId = ns("mriVisualAidPlot"),
-            height = glue::glue("{wmp}px"),
-            width = glue::glue("{wmp}px")
-          ),
-          shiny::plotOutput(
-            outputId = ns("mriLocalizerPlot"),
-            height = glue::glue("{wmp}px"),
-            width = glue::glue("{wmp}px")
-          ),
-          shiny::plotOutput(
-            outputId = ns("mriHoverInfoPlot"),
-            height = glue::glue("{wmp}px"),
-            width = glue::glue("{wmp}px")
-          ),
-          shiny::plotOutput(
-            outputId = ns("mriPaintbrushPlot"),
-            height = glue::glue("{wmp}px"),
-            width = glue::glue("{wmp}px")
-          ),
-          shiny::plotOutput(
-            outputId = ns("mriOutlinePlot"),
-            height = glue::glue("{wmp}px"),
-            width = glue::glue("{wmp}px")
-          ),
-          shiny::plotOutput(
-            outputId = ns("mriInteractionPlot"), # always top layer
-            height = glue::glue("{wmp}px"),
-            width = glue::glue("{wmp}px"),
+            outputId = ns("mriInteractionPlot"),
+            height = "100%",
             click = shiny::clickOpts(id = ns("mriPlot_click"), clip = TRUE),
             brush = shiny::brushOpts(id = ns("mriPlot_brush"), delayType = "debounce", resetOnNew = TRUE),
             dblclick = shiny::dblclickOpts(id = ns("mriPlot_dblclick"), clip = TRUE),
-            hover = shiny::hoverOpts(id = ns("mriPlot_hover"), delay = 150, delayType = "throttle", clip = TRUE)
-          )
-        ),
-        shiny::div( # Vertical Slider
-          style =
-            glue::glue("
-                        display: flex;
-                        justify-content: center;
-                        width: {samp}px;
-                        height: {wmp}px;
-                        background-color: {bgc(cf)};"),
-          shinyWidgets::noUiSliderInput(
-            inputId = ns("mri_slider_row"),
-            label = NULL,
-            min = slider_min,
-            max = slider_max,
-            step = 1,
-            value = round(slider_max/2),
-            orientation = "vertical",
-            direction = "ltr",
-            update_on = "end",
-            color = "steelblue",
-            height = glue::glue("{wmp}px"),
-            tooltips = FALSE
+            hover = shiny::hoverOpts(id = ns("mriPlot_hover"), delay = 100, delayType = "throttle", clip = TRUE)
           )
         )
       ),
-      shiny::div( # Below MRI Plot
-        style = glue::glue("
-                            display: flex;
-                            flex-direction: row;
-                            width: {width};
-                            height: {samp};
-                            background-color: white"),
-        shiny::div( # Horizontal Slider
-          style = glue::glue("
-                              display: flex;
-                              align-items: center;
-                              justify-content: center;
-                              height: {samp}px;
-                              width: {wmp}px;
-                              padding-top: {pd*4}px;
-                              margin-bottom: {pd*2}px;
-                              background-color: white"),
-          shinyWidgets::noUiSliderInput(
-            inputId = ns("mri_slider_col"),
-            label = NULL,
-            min = slider_min,
-            max = slider_max,
-            step = 1,
-            value = round(slider_max/2),
-            orientation = "horizontal",
-            direction = "ltr",
-            update_on = "end",
-            color = "steelblue",
-            width = "100%",
-            tooltips = FALSE
-          )
-        ),
-        shiny::div( # empty
-          style = glue::glue("
-                              display: flex;
-                              width: {samp}px;
-                              height: {samp}px;
-                              background-color: {bgc(cf)}")
-        )
-      ),
-      shiny::fluidRow(
-        #shiny::actionButton(ns("test"), "Test"),
-        shiny::textOutput(ns("text")),
-        shiny::uiOutput(outputId = ns("options_bottom"))
+      # Bottom Options
+      shiny::div(
+        style = "margin-top: 1.5%; margin-bottom: 1%",
+        shiny::uiOutput(ns("options_bottom"))
       )
+
     )
-  )}
+  )
 }
 
 moduleMriPlaneServer <- function(id,

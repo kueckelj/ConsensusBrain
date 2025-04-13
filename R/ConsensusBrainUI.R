@@ -97,7 +97,7 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_workflow", # tab_frontal_lobe
 
-          moduleWorkflowMacroAreaUI(id = "workflow", width = 475)
+          moduleWorkflowMacroAreaUI(id = "workflow")
 
         ),
 
@@ -105,7 +105,7 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_remaining",
 
-          moduleWorkflowRemainingUI(id = "workflow_remaining", width = 500)
+          moduleWorkflowRemainingUI(id = "workflow_remaining")
 
         ),
 
@@ -128,50 +128,44 @@ ConsensusBrainUI <- function(){
               )
             )
           ),
-          shiny::div(
-            style = "width: 100%; padding-right: 10px;",
-            shiny::fluidRow(
-              shiny::column(
-                width = 12,
-                moduleMriUI(id = "progress", width = 500)
-              )
+          shiny::fluidRow(
+            shiny::column(
+              width = 12,
+              moduleMriUI(id = "progress")
             )
           ),
-          shiny::div(
-            style = "width: 100%; margin-top: 30px;",
-            shiny::fluidRow(
-              shiny::column(width = 3),
-              shiny::column(
-                width = 3,
-                align = "center",
-                shiny::div(
-                  style = "display: block; width: 100%;",
-                  shiny::downloadButton(
-                    outputId = "save_progress_button",
-                    label = "Save Progress",
-                    style = c(
-                      "background-color: #0275d8;
-                       color: white;
-                       font-weight: 600;
-                       font-size: 16px;
-                       padding: 12px 24px;
-                       border-radius: 6px;
-                       border: none;
-                       width: 100%;
-                       text-align: center;
-                       box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
-                       "),
-                    width = "80%"
-                  )
+          shiny::fluidRow(
+            shiny::column(width = 3),
+            shiny::column(
+              width = 3,
+              align = "center",
+              shiny::div(
+                style = "display: block; width: 100%; margin-top: 1.25%;",
+                shiny::downloadButton(
+                  outputId = "save_progress_button",
+                  label = "Save Progress",
+                  style = c(
+                    "background-color: #0275d8;
+                     color: white;
+                     font-weight: 600;
+                     font-size: 16px;
+                     padding: 12px 24px;
+                     border-radius: 6px;
+                     border: none;
+                     width: 100%;
+                     text-align: center;
+                     box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+                     "),
+                  width = "80%"
                 )
-              ),
-              shiny::column(
-                width = 3,
-                align = "center",
-                shiny::uiOutput(outputId = "save_finalized_results")
-              ),
-              shiny::column(width = 3)
-            )
+              )
+            ),
+            shiny::column(
+              width = 3,
+              align = "center",
+              shiny::uiOutput(outputId = "save_finalized_results")
+            ),
+            shiny::column(width = 3)
           )
         )
       )

@@ -458,7 +458,14 @@ ConsensusBrain <- function(nifti_object = NULL){
 
 }
 
+launchCB <- function(){
 
+  shiny::runApp(
+    appDir = ConsensusBrain(),
+    launch.browser = TRUE
+  )
+
+}
 
 
 CBscore_label_var <- function(voxel_df, score_set_up){
@@ -1820,6 +1827,7 @@ plot_brain_3d <- function(voxel_df,
                           type = c("scatter3d", "mesh3d"),
                           group_highlight = NULL,
                           hoverinfo = NULL,
+                          hover_axes = FALSE,
                           side_highlight = NULL,
                           clrp_adjust = NULL, # predefined, named vectors
                           clrp_adjust2 = NULL, # adjustemnts to clrp_adjust
@@ -1832,6 +1840,7 @@ plot_brain_3d <- function(voxel_df,
                           mode = "markers",
                           plot_bgcolor = "white",
                           paper_bgcolor = "white",
+                          source = "plotly_source",
                           ...){ # Default frontal perspective
 
   type <- type[1]
@@ -1863,6 +1872,23 @@ plot_brain_3d <- function(voxel_df,
   } else {
 
     voxel_df$hoverinfo <- ""
+
+  }
+
+  if(isTRUE(hover_axes)){
+
+    for(i in 1:3){
+
+      ccs_label <- ccs_labels[i]
+      mri_label <- mri_planes[i]
+
+      voxel_df$hoverinfo <-
+        paste0(
+          voxel_df$hoverinfo,
+          "<br>", stringr::str_to_title(mri_label), ": ", voxel_df[[ccs_label]]
+          )
+
+    }
 
   }
 
@@ -1922,7 +1948,7 @@ plot_brain_3d <- function(voxel_df,
   } else {
 
     # Grouped (categorical) values
-    p <- plotly::plot_ly()
+    p <- plotly::plot_ly(source = source)
 
     for (i in seq_along(unique_labels)) {
 

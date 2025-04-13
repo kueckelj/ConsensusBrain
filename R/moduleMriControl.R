@@ -4,13 +4,9 @@ moduleMriControlUI <- function(id){
 
   ns <- shiny::NS(id)
 
-  shiny::tagList(
-    shiny::uiOutput(ns("mri_control_ui")),
-    #shiny::actionButton(ns("test"), "Test"),
-    NULL
-    )
+  shiny::uiOutput(ns("mri_control_ui"))
 
-  }
+}
 
 moduleMriControlServer <- function(id,
                                    mri_sag_out,
@@ -50,13 +46,11 @@ moduleMriControlServer <- function(id,
           "background-color: white;
            border-radius: 5px;
            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
-           margin-top: 10px;
-           padding-left: 10px;
-           padding-right: 10px;
+           margin-top: 1.25%;
+           padding: 0.125%;
            display: flex;
            flex-direction: column;
-           width: 95%;
-           height: 90px;"
+           height: 100%"#90px;"
         )
 
       output$highlight_groups <- shiny::renderUI({
@@ -188,7 +182,7 @@ moduleMriControlServer <- function(id,
             width = 5,
             align = "left",
             shiny::h5(shiny::strong("Margin [mm]:")),
-            shiny::helpText("No tissue selected to which as margin can be added.")
+            shiny::helpText("No brain tissue selected to which a margin can be added.")
           )
 
         }
@@ -217,7 +211,7 @@ moduleMriControlServer <- function(id,
             shiny::column(
               width = 2,
               align = "left",
-              shiny::h5(shiny::strong("Highlight Control:")),
+              shiny::h5(shiny::strong("Highlight Control:")) %>% add_helper("highlight_control"),
               shiny::splitLayout(
                 cellWidths = "50%",
                 shiny::actionButton(
@@ -397,23 +391,16 @@ moduleMriControlServer <- function(id,
 
         if(mode() == "inspection"){
 
-          shiny::fluidRow(
-            #shiny::actionButton(ns("test"), "Test"),
-            shiny::div(style = "height: 20px;"),
-            shiny::div(
-              style = style_box,
-              shiny::uiOutput(outputId = ns("mri_buttons"))
-            )
+          shiny::div(
+            style = style_box,
+            shiny::uiOutput(outputId = ns("mri_buttons"))
           )
 
         } else if(mode() == "selection"){
 
-          shiny::fluidRow(
-            #shiny::actionButton(ns("test"), "Test"),
-            shiny::div(
-              style = style_box,
-              shiny::uiOutput(outputId = ns("mri_buttons"))
-            )
+          shiny::div(
+            style = style_box,
+            shiny::uiOutput(outputId = ns("mri_buttons"))
           )
 
         }
@@ -1659,6 +1646,8 @@ moduleMriControlServer <- function(id,
         }
 
       })
+
+
 
       # Module Output ----------------------------------------------------------
 

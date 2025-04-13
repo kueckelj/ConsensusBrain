@@ -1,7 +1,7 @@
 
 
 
-moduleMriUI <- function(id = "mri", width = 500, ...){
+moduleMriUI <- function(id = "mri", ...){
 
   ns <- shiny::NS(id)
 
@@ -13,21 +13,21 @@ moduleMriUI <- function(id = "mri", width = 500, ...){
       shiny::column(
         width = 4,
         align = "center",
-        moduleMriPlaneUI(id = ns("mri_plane_sag"), plane = "sag", width = width, ...)
+        moduleMriPlaneUI(id = ns("mri_plane_sag"), plane = "sag", ...)
       ),
 
       # MRI column 2
       shiny::column(
         width = 4,
         align = "center",
-        moduleMriPlaneUI(id = ns("mri_plane_axi"), plane = "axi", width = width, ...),
+        moduleMriPlaneUI(id = ns("mri_plane_axi"), plane = "axi", ...),
       ),
 
       # MRI column 3
       shiny::column(
         width = 4,
         align = "center",
-        moduleMriPlaneUI(id = ns("mri_plane_cor"), plane = "cor", width = width, ...),
+        moduleMriPlaneUI(id = ns("mri_plane_cor"), plane = "cor", ...),
       )
 
     ),

@@ -73,14 +73,15 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
   # Dynamic UI
   output$save_finalized_results <- shiny::renderUI({
 
+    style <- "display: block; width: 100%; margin-top: 5%;"
     if(progress() < 95){
 
-      style <- "opacity: 0.4"
+      style <- paste0(style, "opacity: 0.4")
       text <- "A progress of 95% or higher is required for finalization."
 
     } else {
 
-      style <- "opacity: 1"
+      style <- paste0(style, "opacity: 1")
       text <- "Click to finish!"
 
     }

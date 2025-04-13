@@ -1,5 +1,5 @@
 
-moduleWorkflowRemainingUI <- function(id, height = 275, width = 550){
+moduleWorkflowRemainingUI <- function(id, height = 275){
 
   ns <- shiny::NS(id)
 
@@ -19,7 +19,7 @@ moduleWorkflowRemainingUI <- function(id, height = 275, width = 550){
               "padding: 10px;",
               "border: 1px solid #ccc;",
               "border-radius: 5px;",
-              "width:", width, "px;",
+              "width: 100%;",
               "flex-wrap: wrap;",
               "height:", height, "px;",
               "align-items: center;",
@@ -41,7 +41,7 @@ moduleWorkflowRemainingUI <- function(id, height = 275, width = 550){
               "padding: 10px;",
               "border: 1px solid #ccc;",
               "border-radius: 5px;",
-              "width: ", width, "px;",
+              "width: 100%",
               "flex-wrap: wrap;",
               "height: ", height, "px;",
               "align-items: center;",  # <-- Added to center horizontally
@@ -54,13 +54,13 @@ moduleWorkflowRemainingUI <- function(id, height = 275, width = 550){
         shiny::column(
           width = 4,
           align = "center",
-          moduleScoreAssignmentUI(id = ns("score_assignment"), height = height, width = width)
+          moduleScoreAssignmentUI(id = ns("score_assignment"), height = height)
         )
       ),
       shiny::fluidRow(
         shiny::column(
           width = 12,
-          moduleMriUI(id = ns("mri"), width = width)
+          moduleMriUI(id = ns("mri"))
         )
       )
     )
