@@ -28,7 +28,7 @@ moduleWorkflowMacroAreaUI <- function(id, height = 275) {
         shiny::fluidRow(
           shiny::column(
             width = 4,
-            align = "center",
+            align = "left",
             moduleBrainTissueSelectionUI(id = ns("selection"),  height = height)
           ),
           shiny::column(
@@ -153,15 +153,15 @@ moduleWorkflowMacroAreaServer <- function(id,
 
       output$header_progress <- shiny::renderUI({
 
-        if(macro_area() == "wm_tract"){
+        if(macro_area() == "fiber_tract"){
 
           n_assigned <-
             sum(
-              voxel_df_input()[["wm_tract"]] != "none" &
+              voxel_df_input()[["fiber_tract"]] != "none" &
               voxel_df_input()[["CBscore"]] != 0
             )
 
-          n_obs <- sum(voxel_df_input()[["wm_tract"]] != "none")
+          n_obs <- sum(voxel_df_input()[["fiber_tract"]] != "none")
 
         } else {
 
@@ -186,8 +186,8 @@ moduleWorkflowMacroAreaServer <- function(id,
       macro_area_label <- shiny::reactive({
 
         ifelse(
-          test = macro_area() == "wm_tract",
-          yes = "White Matter Tract",
+          test = macro_area() == "fiber_tract",
+          yes = "Fiber Tract",
           no = make_pretty_label(macro_area())
         )
 
@@ -256,35 +256,70 @@ moduleWorkflowMacroAreaServer <- function(id,
           append(
             values =
               purrr::set_names(
-                x = "#4DB6AC",
+                x = "lightgrey",
                 nm = as.character(glue::glue("Not {macro_area_label()}"))
                 )
           )
 
-        dplyr::mutate(
-          .data = voxel_df_input(),
-          P = dplyr::if_else(
-            condition = ann_macro == macro_area(),
-            true = names(ConsensusBrain::score_set_up$choices)[CBscore+1],
-            false = as.character(glue::glue("Not {macro_area_label()}"))
-          )
-        ) %>%
-          trim_brain_3d(
-            var = "P",
-            val_missing = as.character(glue::glue("Not {macro_area_label()}")),
-            fct = 0.05
-          ) %>%
-          plot_brain_3d(
-            voxel_df = .,
-            color_by = "P",
-            group_highlight = names(ConsensusBrain::score_set_up$choices)[-1],
-            opacity_hide = 0.025,
-            pt_size = 1.25,
-            clrp_adjust = clrp_adjust,
-            paper_bgcolor = "black",
-            show_legend = FALSE,
-            hoverinfo = "P"
-          )
+        if(macro_area() == "fiber_tract"){
+
+          #clrp_adjust <- ggplot2::alpha(clrp_adjust, 0.75)
+
+          #dplyr::filter(voxel_df_input(), fiber_tract != "none") %>%
+            dplyr::mutate(
+              .data = voxel_df_input(),
+              P = dplyr::if_else(
+                condition = fiber_tract != "none",
+                true = names(ConsensusBrain::score_set_up$choices)[CBscore+1],
+                false = as.character(glue::glue("Not {macro_area_label()}"))
+              )
+            ) %>%
+           # dplyr::mutate(P = names(ConsensusBrain::score_set_up$choices)[CBscore+1]) %>%
+            trim_brain_3d(
+              var = "P",
+              val_missing = as.character(glue::glue("Not {macro_area_label()}")),
+              fct = 0.05
+            ) %>%
+            plot_brain_3d(
+              voxel_df = .,
+              color_by = "P",
+              group_highlight = names(ConsensusBrain::score_set_up$choices),
+              opacity_hide = 0.025,
+              pt_size = 1.25,
+              clrp_adjust = clrp_adjust,
+              paper_bgcolor = "black",
+              show_legend = FALSE,
+              hoverinfo = c("P", "fiber_tract")
+            )
+
+        } else {
+
+            dplyr::mutate(
+              .data = voxel_df_input(),
+              P = dplyr::if_else(
+                condition = ann_macro == macro_area(),
+                true = names(ConsensusBrain::score_set_up$choices)[CBscore+1],
+                false = as.character(glue::glue("Not {macro_area_label()}"))
+              )
+            ) %>%
+            trim_brain_3d(
+              var = "P",
+              val_missing = as.character(glue::glue("Not {macro_area_label()}")),
+              fct = 0.05
+            ) %>%
+            plot_brain_3d(
+              voxel_df = .,
+              color_by = "P",
+              group_highlight = names(ConsensusBrain::score_set_up$choices),
+              opacity_hide = 0.025,
+              pt_size = 1.25,
+              clrp_adjust = clrp_adjust,
+              paper_bgcolor = "black",
+              show_legend = FALSE,
+              hoverinfo = "P"
+            )
+
+        }
 
       })
 
@@ -292,9 +327,9 @@ moduleWorkflowMacroAreaServer <- function(id,
 
       output$progress_plot <- shiny::renderPlot({
 
-        if(macro_area() == "wm_tract"){
+        if(macro_area() == "fiber_tract"){
 
-          dplyr::filter(voxel_df_input(), wm_tract != "none") %>%
+          dplyr::filter(voxel_df_input(), fiber_tract != "none") %>%
             circular_progress_plot()
 
         } else {

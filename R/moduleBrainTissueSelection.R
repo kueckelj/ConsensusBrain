@@ -128,7 +128,7 @@ moduleBrainTissueSelectionServer <- function(id,
 
       label <- shiny::reactive({
 
-        ifelse(macro_area() == "wm_tract", "White Matter Tract", "Brain Area")
+        ifelse(macro_area() == "fiber_tract", "Fiber Tract", "Brain Area")
 
       })
 
@@ -157,8 +157,8 @@ moduleBrainTissueSelectionServer <- function(id,
 
         macro_area_label <-
           ifelse(
-            test = macro_area() == "wm_tract",
-            yes = "White Matter Tract",
+            test = macro_area() == "fiber_tract",
+            yes = "Fiber Tract",
             no = make_pretty_label(macro_area())
             )
 
@@ -260,9 +260,9 @@ moduleBrainTissueSelectionServer <- function(id,
           shiny::req(input$parc_atlas)
           input$parc_atlas
 
-        } else if(macro_area() == "wm_tract") {
+        } else if(macro_area() == "fiber_tract") {
 
-          "wm_tract"
+          "fiber_tract"
 
         } else {
 
@@ -277,9 +277,9 @@ moduleBrainTissueSelectionServer <- function(id,
 
         shiny::req(ann_var())
 
-        if(ann_var() == "wm_tract"){
+        if(ann_var() == "fiber_tract"){
 
-          choices_out <- sort(unique(voxel_df_input()[["wm_tract"]]))
+          choices_out <- sort(unique(voxel_df_input()[["fiber_tract"]]))
           choices_out <- choices_out[choices_out != "none"]
 
         } else {

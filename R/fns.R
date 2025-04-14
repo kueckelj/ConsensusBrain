@@ -298,7 +298,8 @@ circular_progress_plot <- function(voxel_df, ...) {
   perc <- paste0(round(perc * 100, 0), "%")  # Ensures percentage formatting
 
   # Create the optimized donut plot with ordered legend and center text
-  ggplot2::ggplot(
+  p1 <-
+    ggplot2::ggplot(
     data = df_summary,
     mapping = ggplot2::aes(ymin = ymin, ymax = ymax, xmin = 0.8, xmax = 1.6, fill = CBscore_label)
   ) +
@@ -319,6 +320,10 @@ circular_progress_plot <- function(voxel_df, ...) {
     ) +
     ggplot2::labs(fill = "Score") +
     ggplot2::xlim(0, 2)
+
+  require(ggplot2)
+  ggplot(mtcars, aes(wt, mpg)) +
+    geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 5)
 
 }
 

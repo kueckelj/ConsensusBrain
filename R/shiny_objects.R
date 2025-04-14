@@ -12,14 +12,14 @@ global_settings_default <-
   )
 
 
-vars_brain_ann <- c("hemisphere", "ann_macro", "ann_dk_adj", "ann_dt_adj", "wm_tract")
+vars_brain_ann <- c("hemisphere", "ann_macro", "ann_dk_adj", "ann_dt_adj", "fiber_tract")
 
 ann_var_names <-
   c("hemisphere" = "Hemisphere",
     "ann_macro" = "Macroanatomical",
     "ann_dk_adj" = "Desikan-Kiliany",
     "ann_dt_adj" = "Destrieux",
-    "wm_tract" = "White Matter Tract")
+    "fiber_tract" = "Fiber Tract")
 
 ann_var_names_rev <- purrr::set_names(x = names(ann_var_names), nm = unname(ann_var_names))
 
@@ -59,7 +59,7 @@ score_set_up = list(
               "Low-Medium" = 2,
               "Medium-High" = 3,
               "Not Resectable" = 4),
-  colors = c("lightgrey", "#8BC34A", "#FFEB3B", "#FF9800", "#F44336")
+  colors = c("steelblue", "#8BC34A", "#FFEB3B", "#FF9800", "#F44336")
 )
 
 
@@ -243,11 +243,9 @@ macroanatomical_regions <-
   )
 
 workflow_tabs <-
-  c('frontal_lobe', 'parietal_lobe', 'occipital_lobe', 'temporal_lobe',
-    'insular_lobe', 'cingulate_lobe', 'corpus_callosum', 'subcortical',
-    'infratentorial', "wm_tract")
+  c('frontal_lobe', 'insular_lobe', 'temporal_lobe', 'parietal_lobe', 'occipital_lobe',
+    'cingulate_lobe', 'corpus_callosum', 'subcortical', 'infratentorial', "fiber_tract")
 
 names(workflow_tabs) <-
-  c('Frontal Lobe', 'Parietal Lobe', 'Occipital Lobe', 'Temporal Lobe',
-    'Insular Lobe', 'Cingulate Lobe','Corpus Callosum', 'Subcortical',
-    'Infratentorial', 'White Matter Tracts')
+  c('Frontal Lobe', 'Insular Lobe', 'Temporal Lobe', 'Parietal Lobe', 'Occipital Lobe',
+     'Cingulate Lobe','Corpus Callosum', 'Subcortical','Infratentorial', 'Fiber Tracts')
