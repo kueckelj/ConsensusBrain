@@ -5,11 +5,15 @@ ConsensusBrainUI <- function(){
   shinydashboard::dashboardPage(
 
     # header =
-    shinydashboard::dashboardHeader(title = "ConsensusBrain"),
+    shinydashboard::dashboardHeader(
+      title = shiny::HTML("ConsensusBrain")
+      ),
 
     # sidebar =
     shinydashboard::dashboardSidebar(
       collapsed = FALSE,
+
+      # Menu
       shinydashboard::sidebarMenu(
         id = "sidebar_menu",
         shinydashboard::menuItem(
@@ -34,7 +38,10 @@ ConsensusBrainUI <- function(){
           selected = FALSE
         )
       ),
+
       shiny::br(),
+
+      # Logout button
       shiny::column(
         width = 12,
         align = "center",
@@ -42,20 +49,40 @@ ConsensusBrainUI <- function(){
           inputId = "logout",
           label = "Logout",
           icon = shiny::icon("sign-out-alt"),
-          style = c(
-          "width: 90%;
-           height: 36px;
-           line-height: 36px;
-           padding: 0;
-           margin: 0;
-           display: inline-block;
-           text-align: center;
-           color: black;
-           font-weight: bold;
-           background-color: white;
-           border: 2px solid black;
-           border-left: 0;")
+          style = "
+        width: 90%;
+        height: 36px;
+        line-height: 36px;
+        padding: 0;
+        margin: 0;
+        display: inline-block;
+        text-align: center;
+        color: black;
+        font-weight: bold;
+        background-color: white;
+        border: 2px solid black;
+        border-left: 0;"
         )
+      ),
+
+      # Help text at bottom
+      shiny::tags$div(
+        style = "
+      position: absolute;
+      bottom: 10px;
+      width: 100%;
+      text-align: center;
+      font-size: 11px;
+      color: gray;
+      padding: 5px;",
+        shiny::tags$img(
+          src = "www/rano_resect_logo_nbg.png",
+          style = "width: 100%;"
+        ),
+        shiny::helpText(
+          shiny::HTML("ConsensusBrain<sup style='font-size: 7.5px; color: gray;'>&copy;</sup> was developed by Jan Kückelhaus and Philipp Karschnia.")
+        )
+
       )
     ),
 
@@ -140,7 +167,7 @@ ConsensusBrainUI <- function(){
               width = 3,
               align = "center",
               shiny::div(
-                style = "display: block; width: 100%; margin-top: 1.25%;",
+                style = "display: block; width: 100%; margin-top: 5%;",
                 shiny::downloadButton(
                   outputId = "save_progress_button",
                   label = "Save Progress",

@@ -69,6 +69,28 @@ moduleWorkflowMacroAreaUI <- function(id, height = 275) {
                   "z-index: 1;"
                 ),
                 shiny::plotOutput(outputId = ns("progress_plot"), width = "95%", height = paste0(height*0.9, "px"))
+              ),
+              shiny::div(
+                style = paste0(
+                  "position: absolute;",
+                  "bottom: 10px;",
+                  "left: 10px;",
+                  "z-index: 3;"  # ensures it's above background layers
+                ),
+                shiny::actionButton(
+                  inputId = ns("viewer3D"),
+                  label = "3D View",
+                  icon = shiny::icon("brain"),
+                  width = "100%",
+                  style = paste0(
+                    "font-size: 14px;",
+                    "padding: 6px 12px;",
+                    "background-color: white;",
+                    "color: black;",
+                    "border-radius: 4px;",
+                    "box-shadow: 1px 1px 5px rgba(0,0,0,0.2);"
+                  )
+                )
               )
             )
           ),
@@ -183,6 +205,86 @@ moduleWorkflowMacroAreaServer <- function(id,
           dplyr::pull(var = "CBscore")
 
         any(scores_macro_area != 0)
+
+      })
+
+      # 3D viewer
+      shiny::observeEvent(input$viewer3D, {
+
+        shiny::showNotification(
+          ui = "Rendering 3D visualization.",
+          type = "message",
+          duration = 3
+        )
+
+        footer <- shiny::div(
+          style = "display: flex; align-items: center; gap: 10px;",
+          shiny::actionButton(
+            inputId = ns("close_modal3D"),
+            label = "Close",
+          )
+        )
+
+        shiny::showModal(
+          shiny::modalDialog(
+            shinycssloaders::withSpinner(
+              ui_element = plotly::plotlyOutput(outputId = ns("plot3D")),
+              id = ns("plot3D_spinner")
+            ),
+            easyClose = FALSE,
+            size = "l",
+            footer = footer
+          )
+        )
+      })
+
+      shiny::observeEvent(input$close_modal3D, {
+
+        shinyjs::runjs(sprintf("Plotly.purge('%s');", ns("plot3D")))
+
+        shiny::removeModal()
+
+      })
+
+      output$plot3D <- plotly::renderPlotly({
+
+        clrp_adjust <-
+          purrr::set_names(
+            x = ConsensusBrain::score_set_up$colors,
+            nm = names(ConsensusBrain::score_set_up$choices)
+          ) %>%
+          append(
+            values =
+              purrr::set_names(
+                x = "#4DB6AC",
+                nm = as.character(glue::glue("Not {macro_area_label()}"))
+                )
+          )
+
+        dplyr::mutate(
+          .data = voxel_df_input(),
+          P = dplyr::if_else(
+            condition = ann_macro == macro_area(),
+            true = names(ConsensusBrain::score_set_up$choices)[CBscore+1],
+            false = as.character(glue::glue("Not {macro_area_label()}"))
+          )
+        ) %>%
+          trim_brain_3d(
+            var = "P",
+            val_missing = as.character(glue::glue("Not {macro_area_label()}")),
+            fct = 0.05
+          ) %>%
+          plot_brain_3d(
+            voxel_df = .,
+            color_by = "P",
+            group_highlight = names(ConsensusBrain::score_set_up$choices)[-1],
+            opacity_hide = 0.025,
+            pt_size = 1.25,
+            clrp_adjust = clrp_adjust,
+            paper_bgcolor = "black",
+            show_legend = FALSE,
+            hoverinfo = "P"
+          )
 
       })
 

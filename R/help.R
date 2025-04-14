@@ -36,7 +36,7 @@ CB_help <-
     "highlight_control" =
       list(
         content = c(
-          "You can highlight specific brain regions on the MRI to make them stand out.
+          "You can highlight specific brain regions on the MRI to make them stand out for easier inspection.
            Use the selection options on the right to choose which regions to highlight.
            Click 'Highlight' to apply your selection.
            Use 'Reset' to remove the current highlighting."
@@ -222,7 +222,9 @@ CB_help <-
         content = c(
           "**Undo**: Reverts the most recent selection or deselection action. Useful for correcting accidental edits.",
           "",
-          "**Clean Debris**: Identifies and removes small groups of spatially isolated voxels that are not part of any meaningful structure.",
+          "**Clean Debris**: Automatically removes small, isolated clusters of voxels that are likely not part of the intended selection.
+          This is especially useful after manually erasing with the paintbrush tool, where only a few voxels might remain in scattered locations.
+          These leftover voxels may not be easily visible but can still affect further processing. The cleanup ensures that only meaningful selections are kept.",
           "",
           "**Trash All**: Clears the entire current selection, including manually and automatically selected voxels. This action cannot be undone."
         ),

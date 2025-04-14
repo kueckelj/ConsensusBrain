@@ -1000,6 +1000,28 @@ moduleMriPlaneServer <- function(id,
 
           slice_pos[[plane]] <- slice_pos[[plane]]-1
 
+          shiny::updateSliderInput(
+            session = session,
+
+          )
+
+        }
+
+      })
+
+      shiny::observeEvent(slice_pos[[plane]], {
+
+        shiny::req(input$mri_slider_slice)
+
+        if(shiny::isolate(input$mri_slider_slice) != slice_pos[[plane]]){
+
+          #shinyWidgets::updateNoUiSliderInput(
+          shiny::updateSliderInput(
+            session = session,
+            inputId = "mri_slider_slice",
+            value = slice_pos[[plane]]
+          )
+
         }
 
       })
@@ -1093,21 +1115,6 @@ moduleMriPlaneServer <- function(id,
 
         }
 
-        # update localizer
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_row",
-          range = nmr$row,
-          value = round(mean(nmr$row))
-        )
-
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_col",
-          range = nmr$col,
-          value = round(mean(nmr$col))
-        )
-
         # stack zoom ranges
         stacks <- add_to_stack(stacks, which = "zoom", what = nmr)
 
@@ -1121,19 +1128,6 @@ moduleMriPlaneServer <- function(id,
 
           stacks <- reduce_stack(stacks, which = "zoom")
 
-          # update localizer
-          shinyWidgets::updateNoUiSliderInput(
-            session = session,
-            inputId = "mri_slider_row",
-            range = dplyr::last(stacks$zoom)$row
-          )
-
-          shinyWidgets::updateNoUiSliderInput(
-            session = session,
-            inputId = "mri_slider_col",
-            range = dplyr::last(stacks$zoom)$col
-          )
-
         }
 
       }, ignoreInit = TRUE)
@@ -1145,32 +1139,6 @@ moduleMriPlaneServer <- function(id,
 
           slice_pos$sag <- slice_sag()
 
-          # zoom out if new slice pos is not within current zoom range
-          if(plane != "sag" & length(stacks$zoom) != 0){
-
-            mri_side <- unname(req_axes_2d(plane, ccs_val = FALSE, mri = TRUE)["sag"])
-
-            if(!within_range(slice_pos$sag, mri_range()[[mri_side]])){
-
-              # update localizer
-              shinyWidgets::updateNoUiSliderInput(
-                session = session,
-                inputId = "mri_slider_row",
-                range = c(1, 256)
-              )
-
-              shinyWidgets::updateNoUiSliderInput(
-                session = session,
-                inputId = "mri_slider_col",
-                range = c(1, 256)
-              )
-
-              stacks$zoom <- list()
-
-            }
-
-          }
-
         }
 
       })
@@ -1180,32 +1148,6 @@ moduleMriPlaneServer <- function(id,
         if(!is.null(slice_axi()) && shiny::isolate({slice_pos$axi}) != slice_axi()) {
 
           slice_pos$axi <- slice_axi()
-
-          # zoom out if new slice pos is not within current zoom range
-          if(plane != "axi" & length(stacks$zoom) != 0){
-
-            mri_side <- unname(req_axes_2d(plane, ccs_val = FALSE, mri = TRUE)["axi"])
-
-            if(!within_range(slice_pos$axi, mri_range()[[mri_side]])){
-
-              # update localizer
-              shinyWidgets::updateNoUiSliderInput(
-                session = session,
-                inputId = "mri_slider_row",
-                range = c(1, 256)
-              )
-
-              shinyWidgets::updateNoUiSliderInput(
-                session = session,
-                inputId = "mri_slider_col",
-                range = c(1, 256)
-              )
-
-              stacks$zoom <- list()
-
-            }
-
-          }
 
         }
 
@@ -1217,210 +1159,17 @@ moduleMriPlaneServer <- function(id,
 
           slice_pos$cor <- slice_cor()
 
-          # zoom out if new slice pos is not within current zoom range
-          if(plane != "cor" & length(stacks$zoom) != 0){
-
-            mri_side <- unname(req_axes_2d(plane, ccs_val = FALSE, mri = TRUE)["cor"])
-
-            if(!within_range(slice_pos$cor, mri_range()[[mri_side]])){
-
-              # update localizer
-              shinyWidgets::updateNoUiSliderInput(
-                session = session,
-                inputId = "mri_slider_row",
-                range = c(1, 256)
-              )
-
-              shinyWidgets::updateNoUiSliderInput(
-                session = session,
-                inputId = "mri_slider_col",
-                range = c(1, 256)
-              )
-
-              stacks$zoom <- list()
-
-            }
-
-          }
-
         }
 
       })
 
       # Observe Events (Internal Slider Updates) --------------------------------
 
-      shiny::observeEvent(input$mri_slider_col,{
-
-        if(input$mri_slider_col != shiny::isolate(slice_pos[[col_axis]])){
-
-          slice_pos[[col_axis]] <- input$mri_slider_col
-
-        }
-
-      })
-
-      shiny::observeEvent(input$mri_slider_row,{
-
-        if(input$mri_slider_row != shiny::isolate({slice_pos[[row_axis]]})){
-
-          slice_pos[[row_axis]] <- input$mri_slider_row
-
-        }
-
-      })
-
       shiny::observeEvent(input$mri_slider_slice,{
 
         slice_pos[[plane]] <- input$mri_slider_slice
 
       })
-
-      # Observe Events (Slice Pos Effect) ---------------------------------------
-
-      shiny::observeEvent(input$mri_refresh, {
-
-        stacks$zoom <- list()
-
-        # update localizer
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_row",
-          range = c(1, 256),
-          value = 128
-        )
-
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_col",
-          range = c(1, 256),
-          value = 128
-        )
-
-        slice_pos[[plane]] <- 128
-
-      })
-
-      # - plane
-      shiny::observeEvent(slice_pos[[plane]], {
-
-        shiny::req(input$mri_slider_slice)
-
-        if(shiny::isolate(input$mri_slider_slice) != slice_pos[[plane]]){
-
-          #shinyWidgets::updateNoUiSliderInput(
-          shiny::updateSliderInput(
-            session = session,
-            inputId = "mri_slider_slice",
-            value = slice_pos[[plane]]
-          )
-
-        }
-
-      })
-
-      # - col & row
-      if(plane == "sag"){
-
-        shiny::observeEvent(slice_pos$axi, {
-
-          shiny::req(input$mri_slider_row)
-
-          if(shiny::isolate({input$mri_slider_row}) != slice_pos$axi){
-
-            shinyWidgets::updateNoUiSliderInput(
-              session = session,
-              inputId = "mri_slider_row",
-              value = slice_pos$axi
-            )
-
-          }
-
-        })
-
-        shiny::observeEvent(slice_pos$cor, {
-
-          shiny::req(input$mri_slider_col)
-
-          if(shiny::isolate({input$mri_slider_col}) != slice_pos$cor) {
-
-            shinyWidgets::updateNoUiSliderInput(
-              session = session,
-              inputId = "mri_slider_col",
-              value = slice_pos$cor
-            )
-
-          }
-
-        })
-
-      } else if(plane == "axi") {
-
-        shiny::observeEvent(slice_pos$cor, {
-
-          shiny::req(input$mri_slider_row)
-
-          if(shiny::isolate({input$mri_slider_row}) != slice_pos$cor) {
-
-            shinyWidgets::updateNoUiSliderInput(
-              session = session,
-              inputId = "mri_slider_row",
-              value = slice_pos$cor
-            )
-
-          }
-
-        })
-
-        shiny::observeEvent(slice_pos$sag, {
-
-          shiny::req(input$mri_slider_col)
-
-          if(shiny::isolate({input$mri_slider_col}) != slice_pos$sag){
-
-            shinyWidgets::updateNoUiSliderInput(
-              session = session,
-              inputId = "mri_slider_col",
-              value = slice_pos$sag
-            )
-
-          }
-
-        })
-
-      } else if (plane == "cor") {
-
-        shiny::observeEvent(slice_pos$axi, {
-
-          shiny::req(input$mri_slider_row)
-
-          if(shiny::isolate({input$mri_slider_row}) != slice_pos$axi) {
-
-            shinyWidgets::updateNoUiSliderInput(
-              session = session,
-              inputId = "mri_slider_row",
-              value = slice_pos$axi
-            )
-
-          }
-        })
-
-        shiny::observeEvent(slice_pos$sag, {
-
-          shiny::req(input$mri_slider_col)
-
-          if(shiny::isolate({input$mri_slider_col}) != slice_pos$sag) {
-
-            shinyWidgets::updateNoUiSliderInput(
-              session = session,
-              inputId = "mri_slider_col",
-              value = slice_pos$sag
-            )
-
-          }
-
-        })
-
-      }
 
 
       # Outputs (Plots) ---------------------------------------------------------
@@ -1497,12 +1246,7 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      output$text <- renderPrint({
-
-        time_text()
-
-      })
-
+      output$text <- renderPrint({ time_text() })
 
       output$mriOutlinePlot <- shiny::renderPlot({
 
@@ -2311,6 +2055,23 @@ moduleMriPlaneServer <- function(id,
 
       })
 
+
+
+      # 1. Mode: Inspection -----------------------------------------------------
+
+      # Observe Events (MRI Interaction) ----------------------------------------
+
+      shiny::observeEvent(input$mriPlot_dblclick, {
+
+        shiny::req(mode() == "inspection")
+
+        slice_pos[[plane]] <- slice_idx()
+        slice_pos[[col_axis]] <- round(cursor_pos()[1])
+        slice_pos[[row_axis]] <- round(cursor_pos()[2])
+
+      })
+
+
       # 2. Mode: Selection ------------------------------------------------------
 
       # ----- Reactive Values
@@ -2483,18 +2244,6 @@ moduleMriPlaneServer <- function(id,
 
       # ----- Observers
 
-      # Observe Events (MRI Interaction) ----------------------------------------
-
-      shiny::observeEvent(input$mriPlot_dblclick, {
-
-        shiny::req(mode() == "inspection")
-
-        slice_pos[[plane]] <- slice_idx()
-        slice_pos[[col_axis]] <- round(cursor_pos()[1])
-        slice_pos[[row_axis]] <- round(cursor_pos()[2])
-
-      })
-
       # --- (de-)selection by region click
       # --- dblclick + region_click -> updates voxel_df() immediately
       shiny::observeEvent(input$mriPlot_dblclick, {
@@ -2556,24 +2305,9 @@ moduleMriPlaneServer <- function(id,
 
         }
 
-        # Done. End of the observer updates slice position.
-
-        # --- update slice position --- #
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_col",
-          value = round(input$mriPlot_dblclick$x)
-        )
-
-        shinyWidgets::updateNoUiSliderInput(
-          session = session,
-          inputId = "mri_slider_row",
-          value = round(input$mriPlot_dblclick$y)
-        )
-
+        slice_pos[[col_axis]] <- round(input$mriPlot_dblclick$x)
+        slice_pos[[row_axis]] <- round(input$mriPlot_dblclick$y)
         slice_pos[[plane]] <- slice_idx()
-
-        # Observer done.
 
       })
 

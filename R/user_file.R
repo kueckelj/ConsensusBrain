@@ -23,4 +23,23 @@ ProgressCB <-
     )
   )
 
+UserCB <-
+  setClass(
+    Class = "UserCB",
+    slots = list(
+      created = "POSIXct",
+      last_update = "POSIXct",
+      progress = "data.frame",
+      user_meta = "list",
+      user_name = "character"
+    )
+  )
+
+
+userName <- function(object){
+
+  stringr::str_c(object@user_meta$first_name, object@user_meta$last_name, sep = " ")
+
+}
+
 

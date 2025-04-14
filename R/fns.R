@@ -442,6 +442,8 @@ ConsensusBrain <- function(nifti_object = NULL){
   # draw from package data
   if(is.null(nifti_object)){ nifti_object <- ConsensusBrain::mni_template }
 
+  shiny::addResourcePath("www", "inst/app/www")
+
   shiny::shinyApp(
     ui = ConsensusBrainUI,
     server = function(input, output, session){
@@ -2034,6 +2036,13 @@ reduce_stack <- function(stacks, which){
 
 }
 
+local_launch <- function(session){
+
+  hostname <- session$clientData$url_hostname
+  grepl("localhost", hostname) || grepl("^127\\.0\\.0\\.1$", hostname)
+
+}
+
 
 saturate_colors <- function(cols, sat = 1.5) {
   # Convert colors to HSV
@@ -2152,6 +2161,25 @@ CBscore_to_label <- function(cb_df){
 within_range <- function(x, r){
 
   x > min(r) & x < max(r)
+
+}
+
+valid_name_length <- function(name){
+
+  is.character(name) &&
+  length(strsplit(name, split = "")[[1]]) >= 2
+
+}
+
+valid_name_symbols <- function(name){
+
+  is.character(name) &&
+  all(
+    purrr::map_lgl(
+      .x = strsplit(name, split = "")[[1]],
+      .f = ~ stringr::str_detect(.x, pattern = stringr::str_c(unique(c(letters, LETTERS, " ")), collapse = "|"))
+    )
+  )
 
 }
 

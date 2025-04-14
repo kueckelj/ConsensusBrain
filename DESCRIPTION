@@ -16,6 +16,7 @@ Depends:
     R (>= 2.10)
 LazyData: true
 Imports: 
+    countrycode,
     dbscan,
     dplyr,
     ggplot2,
@@ -38,5 +39,6 @@ Imports:
     shinyhelper,
     shinyjs,
     shinyWidgets,
+    shinyvalidate,
     sp,
-    stringr,
+    stringr

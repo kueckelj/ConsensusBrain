@@ -142,10 +142,23 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
     shiny::showModal(
       ui = shiny::modalDialog(
-        title = shiny::tags$h2(shiny::strong("Welcome to ConsensusBrain!"), style = "padding-top: 0;"),
+        title = shiny::tags$div(
+          style = "display: flex; align-items: center; justify-content: space-between;",
+
+          shiny::tags$h2(
+            shiny::strong("Welcome!"),
+            style = "margin: 0; padding-top: 0; width = 70%;"
+          ),
+
+          shiny::tags$img(
+            src = "www/rano_resect_logo.jpeg",
+            style = "width: 30%;"  # You can adjust this as needed
+          )
+        ),
+
 
         shiny::helpText(
-          "If this is your first time here, please enter your name on the left and click on Login.
+          "If this is your first time here at ConsensusBrain, please click on New User.
           If you've visited before and want to continue where you left off, click 'Browse...' and select the file you previously
           downloaded that contains your saved progress - a file that ends with .rds!"
         ),
@@ -158,43 +171,26 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
               width = 6,
               align = "left",
               style = "border-right: 1px solid lightgrey; height: 100%;",
-              shiny::textInput(
-                inputId = "first_name",
-                label = shiny::tagList(shiny::icon("person"), "Username:"),
-                width = "95%",
-                value = "Test",
-                placeholder = "First Name"
-              ),
-              shiny::textInput(
-                inputId = "last_name",
-                label = NULL,
-                width = "95%",
-                value = "Person",
-                placeholder = "Last Name"
-              ),
-              shiny::uiOutput(outputId = "helptext_username")
+              shiny::actionButton(
+                inputId = "new_user",
+                label = "New User",
+                icon = shiny::icon("person"),
+                width = "100%"
+              )
             ),
             shiny::column(
               width = 6,
               align = "left",
               shiny::fileInput(
                 inputId = "upload_file",
-                label = shiny::tagList(shiny::icon("upload"), "Upload Progress File:"),
+                label = NULL,
                 width = "100%",
                 accept = ".RDS"
               )
             )
           )
         ),
-
-        footer = shiny::fluidRow(
-          shiny::column(width = 2),
-          shiny::column(
-            width = 8, align = "center",
-            shiny::actionButton(inputId = "login_username", label = "Login", width = "60%", disabled = TRUE)
-          ),
-          shiny::column(width = 2)
-        ),
+        footer = shiny::tagList(),
         easyClose = FALSE,
         size = "xl"
       )
@@ -203,24 +199,182 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
   # ignoreInit = FALSE !!! -> is displayed when opening the app
   }, ignoreNULL = FALSE, ignoreInit = FALSE)
 
-  # Dynamic UI
-  output$helptext_username <- shiny::renderUI({
+  # Input Validation
+  iv <- shinyvalidate::InputValidator$new()
 
-    if(valid_username()){
+  iv$add_rule("userInp_first_name", shinyvalidate::sv_required())
+  iv$add_rule("userInp_last_name", shinyvalidate::sv_required())
+  iv$add_rule("userInp_affiliation", shinyvalidate::sv_required())
+  iv$add_rule("userInp_country", shinyvalidate::sv_required())
+  iv$add_rule("userInp_email", shinyvalidate::sv_required())
+  iv$add_rule("userInp_email_confirm", shinyvalidate::sv_required())
+  iv$add_rule("userInp_years_of_experience", shinyvalidate::sv_required())
+  iv$add_rule("userInp_annual_case_load", shinyvalidate::sv_required())
+
+  iv$add_rule("userInp_first_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
+  iv$add_rule("userInp_last_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
+
+  iv$add_rule("userInp_first_name", ~ if(!valid_name_symbols(.)) "Only letters are allowed.")
+  iv$add_rule("userInp_last_name", ~ if(!valid_name_symbols(.)) "Only letters are allowed.")
+
+  iv$add_rule("userInp_email", shinyvalidate::sv_email())
+  iv$add_rule("userInp_email_confirm", function(value) {
+    if(value != input$userInp_email){
+      "The email addresses do not match."
+    }
+  })
+
+  iv$enable()
+
+  shiny::observeEvent(input$new_user, {
+
+    shiny::removeModal()
+
+    shiny::showModal(
+      ui = shiny::modalDialog(
+        title = shiny::tags$h2(shiny::strong("New User"), style = "padding-top: 0;"),
+        shiny::column(
+          width = 12,
+          align = "left",
+          shiny::splitLayout(
+            cellWidths = "50%",
+            shiny::textInput(
+              inputId = "userInp_first_name",
+              label = shiny::tagList(shiny::icon("person"), "First Name:"),
+              value = ifelse(local_launch(session), "Jan", ""),
+              width = "100%"
+            ),
+            shiny::textInput(
+              inputId = "userInp_last_name",
+              label = "Last Name:",
+              value = ifelse(local_launch(session), "Kueckelhaus", ""),
+              width = "100%"
+            )
+          ),
+          shiny::splitLayout(
+            cellWidths = "50%",
+            shiny::textInput(
+              inputId = "userInp_email",
+              value = ifelse(local_launch(session), "jankueckelhaus@gmx.de", ""),
+              label = shiny::tagList(shiny::icon("envelope"), "E-Mail:")
+            ),
+            shiny::textInput(
+              inputId = "userInp_email_confirm",
+              value = ifelse(local_launch(session), "jankueckelhaus@gmx.de", ""),
+              label = shiny::tagList(shiny::icon("envelope"), "E-Mail (Confirm):")
+            )
+          ),
+          shiny::textInput(
+            inputId = "userInp_affiliation",
+            label = shiny::tagList(shiny::icon("institution"), "Affiliation:"),
+            width = "100%",
+            value = ifelse(local_launch(session), "Department of Neurosurgery, University Clinic Erlangen", ""),
+            placeholder = "As denoted in publications."
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 4,
+              shiny::selectInput(
+                inputId = "userInp_country",
+                label = shiny::tagList(shiny::icon("globe"), "Country:"),
+                choices = c("", countrycode::codelist$country.name.en),
+                selected = ifelse(local_launch(session), "Germany", ""),
+                width = "100%"
+              )
+            ),
+            shiny::column(
+              width = 4,
+              shiny::numericInput(
+                inputId = "userInp_years_of_experience",
+                label = shiny::tagList(shiny::icon("briefcase"), "Years of Experience:"),
+                value = ifelse(local_launch(session), 20, NA_integer_),
+                min = 0,
+                max = 100,
+                step = 1
+              )
+            ),
+            shiny::column(
+              width = 4,
+              shiny::numericInput(
+                inputId = "userInp_annual_case_load",
+                label = shiny::tagList(shiny::icon("notes-medical"), "Annual Case Load:"),
+                value = ifelse(local_launch(session), 250, NA_integer_),
+                min = 0,
+                max = 1000,
+                step = 50
+              )
+            )
+          )
+        ),
+        footer = shiny::fluidRow(
+          shiny::column(width = 2),
+          shiny::column(
+            width = 8,
+            align = "center",
+            shiny::actionButton(inputId = "login", label = "Login", width = "75%", disabled = TRUE),
+            shiny::uiOutput(outputId = "helptext_login")
+          ),
+          shiny::column(width = 2)
+        )
+      )
+    )
+
+  })
+
+  valid_user_info <- shiny::reactiveVal(value = FALSE)
+
+  user_meta <- shiny::reactive({
+
+    list(
+      affiliation = input$userInp_affiliation,
+      annual_case_load = input$userInp_annual_case_load,
+      country = input$userInp_country,
+      email = input$userInp_email,
+      first_name = stringr::str_to_title(input$userInp_first_name),
+      last_name = stringr::str_to_title(input$userInp_last_name),
+      years_of_experience = input$userInp_years_of_experience
+    )
+
+  })
+
+  shiny::observeEvent(user_meta(), {
+
+    print(local_launch(session))
+
+    if(iv$is_valid()){
+
+      valid_user_info({ TRUE })
+
+      shiny::updateActionButton(
+        session = session,
+        inputId = "login",
+        disabled = FALSE
+      )
+
+    } else {
+
+      valid_user_info({ FALSE })
+
+      shiny::updateActionButton(
+        session = session,
+        inputId = "login",
+        disabled = TRUE
+      )
+
+    }
+
+  })
+
+  # Dynamic UI
+  output$helptext_login <- shiny::renderUI({
+
+    if(valid_user_info()){
 
       shiny::helpText("Click on Login to proceed.")
 
     } else {
 
-      if(!valid_username_length() | !valid_username_parts()){
-
-        shiny::helpText("Please enter first and last name. (Three letters minimum each.)")
-
-      } else {
-
-        shiny::helpText("Invalid username. Only letters and empty space is allowed.")
-
-      }
+     shiny::helpText("Please enter the required information.")
 
     }
 
@@ -230,7 +384,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
     shiny::req(CBfile())
 
-    if(!methods::is(CBfile(), "ProgressCB")){
+    if(!methods::is(CBfile(), "UserCB")){
 
       shiny::helpText("Invalid file.")
 
@@ -245,53 +399,6 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
   # Reactive Values and Expressions
   CBfile <- shiny::reactiveVal(value = NULL)
 
-  input_username <- shiny::reactive({
-
-    paste0(
-      stringr::str_to_title(input$first_name),
-      " ",
-      stringr::str_to_title(input$last_name)
-    )
-
-  })
-
-  valid_username <- shiny::reactive({
-
-     valid_username_length() &
-     valid_username_parts() &
-     valid_username_symbols()
-
-  })
-
-  valid_username_length <- shiny::reactive({
-
-    length(strsplit(input_username(), split = " ")[[1]]) >= 2
-
-  })
-
-  valid_username_parts <- shiny::reactive({
-
-    all(
-      purrr::map_lgl(
-        .x = strsplit(input_username(), split = " ")[[1]],
-        .f = ~ stringr::str_length(.x) > 2
-      )
-    )
-
-  })
-
-  valid_username_symbols <- shiny::reactive({
-
-    all(
-      purrr::map_lgl(
-        .x = strsplit(input_username(), split = "")[[1]],
-        .f = ~ stringr::str_detect(.x, pattern = stringr::str_c(unique(c(letters, LETTERS, " ")), collapse = "|"))
-      )
-    )
-
-  })
-
-
   # misc observers
   shiny::observeEvent(input$upload_file, {
 
@@ -301,12 +408,12 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
     cb_file <- readRDS(file_path)
 
-    if(!methods::is(cb_file, "ProgressCB")){
+    if(!methods::is(cb_file, "UserCB")){
 
       shinyWidgets::sendSweetAlert(
         session = session,
         title = "Invalid Input File!",
-        text = "The selected file does not contain progress of a ConsensusBrain session.",
+        text = "The selected file does not contain user information of a ConsensusBrain session.",
         type = "error"
       )
 
@@ -322,33 +429,17 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
   }, ignoreNULL = TRUE, ignoreInit = TRUE)
 
-  shiny::observeEvent(valid_username(), {
-
-    if(valid_username()){
-
-      shiny::updateActionButton(
-        session = session,
-        inputId = "login_username",
-        disabled = FALSE
-      )
-
-    } else {
-
-      shiny::updateActionButton(
-        session = session,
-        inputId = "login_username",
-        disabled = TRUE
-      )
-
-    }
-
-  })
-
   # process login data
-  shiny::observeEvent(input$login_username, {
+  shiny::observeEvent(input$login, {
 
-    # get directory and load CBfile
-    CBfile({ ProgressCB(user_name = input_username()) })
+    cb_file <-
+      UserCB(
+        created = Sys.time(),
+        last_update = Sys.time(),
+        user_meta = user_meta()
+      )
+
+    CBfile({ cb_file })
 
   })
 
@@ -356,7 +447,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
     shiny::removeModal(session = session)
 
-    if(nrow(CBfile()@scores_assigned) != 0){
+    if(nrow(CBfile()@progress) != 0){
 
       shinyWidgets::sendSweetAlert(
         session = session,
@@ -370,7 +461,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
         dplyr::left_join(
           x = dplyr::select(cb_df(), -dplyr::any_of("CBscore")),
-          y = CBfile()@scores_assigned,
+          y = CBfile()@progress,
           by = c("x", "y", "z")
         )
 
@@ -389,7 +480,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     filename = function() {
 
       name_abbr <-
-        strsplit(CBfile()@user_name, split = " ")[[1]]%>%
+        strsplit(userName(CBfile()), split = " ")[[1]]%>%
         purrr::map_chr(.f = ~ toupper(strsplit(.x, split = "")[[1]][1])) %>%
         stringr::str_c(collapse = "")
 
@@ -400,7 +491,9 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
       cb_file <- CBfile()
 
-      cb_file@scores_assigned <- dplyr::select(cb_df(), x, y, z, CBscore)
+      cb_file@progress <- dplyr::select(cb_df(), x, y, z, CBscore)
+
+      cb_file@last_update <- Sys.time()
 
       saveRDS(cb_file, file)
 
@@ -413,7 +506,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
       name <-
         stringr::str_replace_all(
-          string = CBfile()@user_name,
+          string = userName(CBfile()),
           pattern = " ",
           replacement = "_"
           )
@@ -427,7 +520,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
       cb_df({ assign_remaining_scores_by_NN(cb_df()) })
 
-      cb_file@scores_assigned <-
+      cb_file@progress <-
         dplyr::select(cb_df(), x, y, z, CBscore)
 
       saveRDS(cb_file, file)
