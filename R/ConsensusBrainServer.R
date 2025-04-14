@@ -140,64 +140,16 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
   # open login modal
   shiny::observeEvent(input$logout, {
 
-    shiny::showModal(
-      ui = shiny::modalDialog(
-        title = shiny::tags$div(
-          style = "display: flex; align-items: center; justify-content: space-between;",
-
-          shiny::tags$h2(
-            shiny::strong("Welcome!"),
-            style = "margin: 0; padding-top: 0; width = 70%;"
-          ),
-
-          shiny::tags$img(
-            src = "rano_resect_logo.jpeg",
-            style = "width: 30%;"  # You can adjust this as needed
-          )
-        ),
-
-
-        shiny::helpText(
-          "If this is your first time here at ConsensusBrain, please click on New User.
-          If you've visited before and want to continue where you left off, click 'Browse...' and select the file you previously
-          downloaded that contains your saved progress - a file that ends with .rds!"
-        ),
-
-        shiny::div(
-          id = "login_panel",
-          style = "width: 500px; max-width: 100%; margin: 0 auto; padding: 20px;",
-          shiny::fluidRow(
-            shiny::column(
-              width = 6,
-              align = "left",
-              style = "border-right: 1px solid lightgrey; height: 100%;",
-              shiny::actionButton(
-                inputId = "new_user",
-                label = "New User",
-                icon = shiny::icon("person"),
-                width = "100%"
-              )
-            ),
-            shiny::column(
-              width = 6,
-              align = "left",
-              shiny::fileInput(
-                inputId = "upload_file",
-                label = NULL,
-                width = "100%",
-                accept = ".RDS"
-              )
-            )
-          )
-        ),
-        footer = shiny::tagList(),
-        easyClose = FALSE,
-        size = "xl"
-      )
-    )
+    showModalWelcome()
 
   # ignoreInit = FALSE !!! -> is displayed when opening the app
   }, ignoreNULL = FALSE, ignoreInit = FALSE)
+
+  shiny::observeEvent(input$back_to_welcome, {
+
+    showModalWelcome()
+
+  }, ignoreNULL = TRUE, ignoreInit = TRUE)
 
   # Input Validation
   iv <- shinyvalidate::InputValidator$new()
@@ -236,6 +188,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
         shiny::column(
           width = 12,
           align = "left",
+          shiny::br(),
           shiny::splitLayout(
             cellWidths = "50%",
             shiny::textInput(
@@ -304,18 +257,37 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
                 step = 50
               )
             )
+          ),
+          shiny::br(),
+          shiny::fluidRow(
+            shiny::column(
+              width = 2,
+              shiny::actionButton(
+                inputId = "back_to_welcome",
+                label = shiny::tagList(shiny::icon("arrow-left"), "Back"),
+                width = "100%"
+              )
+            ),
+            shiny::column(width = 2),
+            shiny::column(
+              width = 4,
+              shiny::actionButton(
+                inputId = "login",
+                label = shiny::tagList(shiny::icon("sign-in-alt"), "Login"),
+                width = "100%"
+              )
+            ),
+            shiny::column(width = 4)
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 12,
+              align = "center",
+              shiny::uiOutput(outputId = "helptext_login")
+              ),
           )
         ),
-        footer = shiny::fluidRow(
-          shiny::column(width = 2),
-          shiny::column(
-            width = 8,
-            align = "center",
-            shiny::actionButton(inputId = "login", label = "Login", width = "75%", disabled = TRUE),
-            shiny::uiOutput(outputId = "helptext_login")
-          ),
-          shiny::column(width = 2)
-        )
+        footer = shiny::tagList()
       )
     )
 
@@ -337,38 +309,10 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
   })
 
-  shiny::observeEvent(user_meta(), {
-
-    print(local_launch(session))
-
-    if(iv$is_valid()){
-
-      valid_user_info({ TRUE })
-
-      shiny::updateActionButton(
-        session = session,
-        inputId = "login",
-        disabled = FALSE
-      )
-
-    } else {
-
-      valid_user_info({ FALSE })
-
-      shiny::updateActionButton(
-        session = session,
-        inputId = "login",
-        disabled = TRUE
-      )
-
-    }
-
-  })
-
   # Dynamic UI
   output$helptext_login <- shiny::renderUI({
 
-    if(valid_user_info()){
+    if(iv$is_valid()){
 
       shiny::helpText("Click on Login to proceed.")
 
@@ -431,6 +375,18 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
   # process login data
   shiny::observeEvent(input$login, {
+
+    if(!iv$is_valid()){
+
+      shinyWidgets::sendSweetAlert(
+        session = session,
+        title = "Incomplete User Credentials",
+        shiny::helpText("Please provide all the required information.")
+      )
+
+      shiny::req(FALSE)
+
+    }
 
     cb_file <-
       UserCB(

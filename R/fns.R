@@ -322,8 +322,10 @@ circular_progress_plot <- function(voxel_df, ...) {
     ggplot2::xlim(0, 2)
 
   require(ggplot2)
-  ggplot(mtcars, aes(wt, mpg)) +
-    geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 5)
+  pie <-
+    ggplot(mtcars, aes(x = factor(1), fill = factor(cyl))) +
+    geom_bar(width = 1)
+  pie + coord_polar(theta = "y")
 
 }
 
@@ -447,7 +449,7 @@ ConsensusBrain <- function(nifti_object = NULL){
   # draw from package data
   if(is.null(nifti_object)){ nifti_object <- ConsensusBrain::mni_template }
 
-  #if(local_launch()){ shiny::addResourcePath("www", "inst/app/www") }
+  if(local_launch()){ shiny::addResourcePath("www", "inst/app/www") }
 
   shiny::shinyApp(
     ui = ConsensusBrainUI,
@@ -2041,10 +2043,18 @@ reduce_stack <- function(stacks, which){
 
 }
 
-local_launch <- function(session){
+local_launch <- function(session = NULL){
 
-  hostname <- session$clientData$url_hostname
-  grepl("localhost", hostname) || grepl("^127\\.0\\.0\\.1$", hostname)
+  if(!is.null(session)){
+
+    hostname <- session$clientData$url_hostname
+    grepl("localhost", hostname) || grepl("^127\\.0\\.0\\.1$", hostname)
+
+  } else {
+
+    dir.exists("/Users/heilandr/lab/projects/ConsensusBrain")
+
+  }
 
 }
 
@@ -2062,6 +2072,65 @@ saturate_colors <- function(cols, sat = 1.5) {
   names(out) <- names(cols)
 
   return(out)
+
+}
+
+showModalWelcome <- function(){
+
+  shiny::showModal(
+    ui = shiny::modalDialog(
+      title = shiny::tags$div(
+        style = "display: flex; align-items: center; justify-content: space-between;",
+
+        shiny::tags$h2(
+          shiny::strong("Welcome!"),
+          style = "margin: 0; padding-top: 0; width = 70%;"
+        ),
+
+        shiny::tags$img(
+          src = ifelse(local_launch(), "www/rano_resect_logo.jpeg", "rano_resect_logo.jpeg"),
+          style = "width: 30%;"
+        )
+      ),
+
+      shiny::helpText(
+        "If this is your first time here at ConsensusBrain, please click on New User.
+          If you've visited before and want to continue where you left off, click 'Browse...' and select the file you previously
+          downloaded that contains your saved progress - a file that ends with .rds!"
+      ),
+
+      shiny::div(
+        id = "login_panel",
+        style = "width: 500px; max-width: 100%; margin: 0 auto; padding: 20px;",
+        shiny::fluidRow(
+          shiny::column(
+            width = 6,
+            align = "left",
+            style = "border-right: 1px solid lightgrey; height: 100%;",
+            shiny::actionButton(
+              inputId = "new_user",
+              label = "New User",
+              icon = shiny::icon("person"),
+              width = "100%"
+            )
+          ),
+          shiny::column(
+            width = 6,
+            align = "left",
+            shiny::fileInput(
+              inputId = "upload_file",
+              label = NULL,
+              width = "100%",
+              accept = ".RDS"
+            )
+          )
+        )
+      ),
+      footer = shiny::tagList(),
+      easyClose = FALSE,
+      size = "xl"
+    )
+  )
 
 }
 
