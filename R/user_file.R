@@ -23,6 +23,7 @@ ProgressCB <-
     )
   )
 
+#' @export
 UserCB <-
   setClass(
     Class = "UserCB",
