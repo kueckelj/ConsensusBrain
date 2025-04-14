@@ -151,7 +151,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
           ),
 
           shiny::tags$img(
-            src = "www/rano_resect_logo.jpeg",
+            src = "rano_resect_logo.jpeg",
             style = "width: 30%;"  # You can adjust this as needed
           )
         ),

@@ -76,7 +76,7 @@ ConsensusBrainUI <- function(){
       color: gray;
       padding: 5px;",
         shiny::tags$img(
-          src = "www/rano_resect_logo_nbg.png",
+          src = "rano_resect_logo_nbg.png",
           style = "width: 100%;"
         ),
         shiny::helpText(
