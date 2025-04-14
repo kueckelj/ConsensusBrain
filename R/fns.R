@@ -442,7 +442,7 @@ ConsensusBrain <- function(nifti_object = NULL){
   # draw from package data
   if(is.null(nifti_object)){ nifti_object <- ConsensusBrain::mni_template }
 
-  shiny::addResourcePath("www", "inst/app/www")
+  if(local_launch()){ shiny::addResourcePath("www", "inst/app/www") }
 
   shiny::shinyApp(
     ui = ConsensusBrainUI,
