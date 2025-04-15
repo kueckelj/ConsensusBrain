@@ -137,7 +137,7 @@ ConsensusBrainUI <- function(){
         shinydashboard::tabItem(
           tabName = "tab_introduction",
           shiny::tags$iframe(
-            src = "www/Introduction.html",
+            src = ifelse(local_launch(), "www/Introduction.html", "Introduction.html"),
             width = '100%',
             height = 1000,
             style = "border:none;"
