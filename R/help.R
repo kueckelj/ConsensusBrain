@@ -223,8 +223,9 @@ CB_help <-
           "**Undo**: Reverts the most recent selection or deselection action. Useful for correcting accidental edits.",
           "",
           "**Clean Debris**: Automatically removes small, isolated clusters of voxels that are likely not part of the intended selection.
-          This is especially useful after manually erasing with the paintbrush tool, where only a few voxels might remain in scattered locations.
-          These leftover voxels may not be easily visible but can still affect further processing. The cleanup ensures that only meaningful selections are kept.",
+          This is especially useful after manually erasing with the paintbrush tool, where a few voxels might remain in scattered locations.
+          The cleanup ensures that only meaningful selections are kept. If the cleanup removed selections you want to keep, you can always undo
+          the removal by clicking on Undo!",
           "",
           "**Trash All**: Clears the entire current selection, including manually and automatically selected voxels. This action cannot be undone."
         ),

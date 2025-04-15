@@ -1,6 +1,7 @@
 
 ConsensusBrainServer <- function(input, output, session, nifti_object){
 
+
   # Global ------------------------------------------------------------------
   shinyhelper::observe_helpers()
 
@@ -16,6 +17,11 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
   global_settings <- global_settings_default
 
   nifti_input <- shiny::reactiveVal(value = nifti_object)
+
+  reminder_disabled <- shiny::reactiveVal(value = FALSE)
+
+  saving_counter <- shiny::reactiveVal(value = -1) # initiating adds 1 -> 0
+  saving_reminder <- shiny::reactiveVal(value = 5)
 
   # debug
   shiny::observeEvent(input$test, {
@@ -66,6 +72,93 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
     })
 
   }, ignoreInit = TRUE)
+
+
+  # Reminder ----------------------------------------------------------------
+
+  shiny::observeEvent(cb_df(), {
+
+    if(!reminder_disabled()){
+
+      saving_counter({ saving_counter() + 1 })
+
+      if(saving_counter() == saving_reminder()){
+
+        shiny::showModal(
+          session = session,
+          ui = shiny::modalDialog(
+            title = "Better safe than sorry!",
+            shiny::helpText("If you want to save your progress, click on the button below!"),
+            footer = shiny::tagList(
+              shiny::column(
+                width = 12,
+                align = "center", # applies to all column-children
+                shiny::fluidRow(
+                  shiny::column(
+                    width = 3,
+                    shiny::numericInput(
+                      inputId = "saving_reminder",
+                      label = NULL,
+                      value = saving_reminder(),
+                      min = 1,
+                      max = Inf,
+                      step = 1,
+                      width = "80%"
+                    ),
+                    shiny::helpText("Remind counter.")
+                  ),
+                  shiny::column(
+                    width = 3,
+                    shinyWidgets::awesomeCheckboxGroup(
+                      inputId = "reminder_disabled",
+                      label = NULL,
+                      choices = "Don't remind again",
+                      selected = character(),
+                      inline = TRUE,
+                      status = "primary",
+                      width = "80%"
+                    )
+                  ),
+                  shiny::column(
+                    width = 3,
+                    shiny::downloadButton(
+                      outputId = "save_progress_button_reminder",
+                      label = "Save Progress",
+                      width = "80%"
+                    )
+                  ),
+                  shiny::column(
+                    width = 3,
+                    shiny::actionButton(
+                      inputId = "dont_save",
+                      label = "No, thanks.",
+                      width = "80%"
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+
+      }
+
+    }
+
+  })
+
+  shiny::observeEvent(input$dont_save, {
+
+    # apply update
+    saving_counter({ 0 })
+    saving_reminder({ input$saving_reminder })
+    reminder_disabled({ "Don't remind" %in% input$reminder_disabled })
+
+    shiny::removeModal()
+
+    })
+
+
 
 
   # Tab Progress ----------------------------------------------------------------
@@ -435,6 +528,38 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
   output$save_progress_button <- shiny::downloadHandler(
     filename = function() {
 
+      name_abbr <-
+        strsplit(userName(CBfile()), split = " ")[[1]]%>%
+        purrr::map_chr(.f = ~ toupper(strsplit(.x, split = "")[[1]][1])) %>%
+        stringr::str_c(collapse = "")
+
+      paste0("CB_progress_", name_abbr, "_", format(Sys.Date(), "%d%m"), ".rds")
+
+    },
+    content = function(file) {
+
+      cb_file <- CBfile()
+
+      cb_file@progress <- dplyr::select(cb_df(), x, y, z, CBscore)
+
+      cb_file@last_update <- Sys.time()
+
+      saveRDS(cb_file, file)
+
+    }
+  )
+
+  output$save_progress_button_reminder <- shiny::downloadHandler(
+    filename = function() {
+
+      # apply update
+      saving_counter({ 0 })
+      saving_reminder({ input$saving_reminder })
+      reminder_disabled({ "Don't remind" %in% input$reminder_disabled })
+
+      shiny::removeModal()
+
+      # then save
       name_abbr <-
         strsplit(userName(CBfile()), split = " ")[[1]]%>%
         purrr::map_chr(.f = ~ toupper(strsplit(.x, split = "")[[1]][1])) %>%

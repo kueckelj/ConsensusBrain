@@ -17,9 +17,13 @@ ConsensusBrainUI <- function(){
       shinydashboard::sidebarMenu(
         id = "sidebar_menu",
         shinydashboard::menuItem(
-          text = "Welcome",
-          tabName = "tab_welcome",
-          icon = shiny::icon("home")
+          text = "Home",
+          tabName = "tab_home",
+          icon = shiny::icon("home"),
+          shinydashboard::menuSubItem(
+            tabName = "tab_introduction",
+            text = "Introduction"
+          )
         ),
         shinydashboard::menuItem(
           text = "Workflow",
@@ -80,7 +84,13 @@ ConsensusBrainUI <- function(){
           style = "width: 100%;"
         ),
         shiny::helpText(
-          shiny::HTML("ConsensusBrain<sup style='font-size: 7.5px; color: gray;'>&copy;</sup> was developed by Jan Kückelhaus and Philipp Karschnia.")
+          shiny::HTML(
+            "ConsensusBrain<sup style='font-size: 7.5px; color: gray;'>&copy;</sup>
+            is an initiative of the RANOResect research group and was developed by
+            Jan Kückelhaus and Philipp Karschnia at the Department of Neurosurgery,
+            University Hospital Erlangen."
+          )
+
         )
 
       )
@@ -114,8 +124,25 @@ ConsensusBrainUI <- function(){
       shinydashboard::tabItems(
 
 
-        # Welcome -----------------------------------------------------------------
+        # Home -----------------------------------------------------------------
 
+        shinydashboard::tabItem(
+          tabName = "tab_welcome",
+          shiny::tags$img(
+            src = ifelse(local_launch(), "www/rano_resect_Logo_nbg.png", "rano_resect_logo_nbg.png"),
+            style = "width: 100%;"
+          )
+        ),
+
+        shinydashboard::tabItem(
+          tabName = "tab_introduction",
+          shiny::tags$iframe(
+            src = "www/Introduction.html",
+            width = '100%',
+            height = 1000,
+            style = "border:none;"
+          )
+        ),
 
 
         # Score Assignment --------------------------------------------------------

@@ -269,12 +269,13 @@ circular_progress_plot <- function(voxel_df, ...) {
 
   voxel_df <- make_CBscore_label(voxel_df, score_set_up)
 
-  df_summary <- voxel_df %>%
+  df_summary <-
+    voxel_df %>%
     dplyr::count(CBscore_label) %>%
     dplyr::mutate(
       fraction = n / sum(n),
       cumulative = cumsum(fraction),
-      ymin = lag(cumulative, default = 0),
+      ymin = dplyr::lag(cumulative, default = 0),
       ymax = cumulative
     )
 
@@ -285,9 +286,9 @@ circular_progress_plot <- function(voxel_df, ...) {
 
     df_summary <-
       dplyr::bind_rows(
-      df_summary,
-      tibble::tibble(CBscore_label = missing_levels, fraction = 0, ymin = 0, ymax = 0, n = 0)
-    )
+        df_summary,
+        tibble::tibble(CBscore_label = missing_levels, fraction = 0, ymin = 0, ymax = 0, n = 0)
+      )
 
   }
 
@@ -298,7 +299,6 @@ circular_progress_plot <- function(voxel_df, ...) {
   perc <- paste0(round(perc * 100, 0), "%")  # Ensures percentage formatting
 
   # Create the optimized donut plot with ordered legend and center text
-  p1 <-
     ggplot2::ggplot(
     data = df_summary,
     mapping = ggplot2::aes(ymin = ymin, ymax = ymax, xmin = 0.8, xmax = 1.6, fill = CBscore_label)
@@ -320,12 +320,6 @@ circular_progress_plot <- function(voxel_df, ...) {
     ) +
     ggplot2::labs(fill = "Score") +
     ggplot2::xlim(0, 2)
-
-  require(ggplot2)
-  pie <-
-    ggplot(mtcars, aes(x = factor(1), fill = factor(cyl))) +
-    geom_bar(width = 1)
-  pie + coord_polar(theta = "y")
 
 }
 
