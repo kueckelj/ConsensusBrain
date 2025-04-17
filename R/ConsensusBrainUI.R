@@ -17,27 +17,45 @@ ConsensusBrainUI <- function(){
       shinydashboard::sidebarMenu(
         id = "sidebar_menu",
         shinydashboard::menuItem(
-          text = "Home",
-          tabName = "tab_home",
-          icon = shiny::icon("home"),
+          tabName = "tab_introduction",
+          text = "Introduction",
+          icon = shiny::icon("info-circle")
+        ),
+        shinydashboard::menuItem(
+          text = "Guide",
+          tabName = "tab_guide",
+          icon = shiny::icon("graduation-cap"),
           shinydashboard::menuSubItem(
-            tabName = "tab_introduction",
-            text = "Introduction"
+            text = "Workflow",
+            tabName = "tab_tut_workflow"
+          ),
+          shinydashboard::menuSubItem(
+            text = "Selection",
+            tabName = "tab_tut_selection"
+          ),
+          shinydashboard::menuSubItem(
+            text = "Refinement",
+            tabName = "tab_tut_refinement"
           )
         ),
         shinydashboard::menuItem(
           text = "Workflow",
           tabName = "tab_workflow",
-          icon = shiny::icon("brain")
-        ),
-        shinydashboard::menuItem(
-          text = "Remaining",
-          tabName = "tab_remaining",
-          icon = shiny::icon("puzzle-piece")
+          icon = shiny::icon("tasks"),
+          shinydashboard::menuSubItem(
+            text = "Brain Regions",
+            tabName = "tab_wf_brain_regions",
+            icon = shiny::icon("brain")
+          ),
+          shinydashboard::menuSubItem(
+            text = "Remaining",
+            tabName = "tab_wf_remaining",
+            icon = shiny::icon("puzzle-piece")
+          )
         ),
         shinydashboard::menuItem(
           text = "Progress",
-          icon = shiny::icon("flag", lib = "glyphicon"),
+          icon = shiny::icon("flag-checkered"),
           tabName = "tab_progress",
           selected = FALSE
         )
@@ -53,32 +71,34 @@ ConsensusBrainUI <- function(){
           inputId = "logout",
           label = "Logout",
           icon = shiny::icon("sign-out-alt"),
-          style = "
-        width: 90%;
-        height: 36px;
-        line-height: 36px;
-        padding: 0;
-        margin: 0;
-        display: inline-block;
-        text-align: center;
-        color: black;
-        font-weight: bold;
-        background-color: white;
-        border: 2px solid black;
-        border-left: 0;"
+          style = c(
+          "width: 90%;
+           height: 36px;
+           line-height: 36px;
+           padding: 0;
+           margin: 0;
+           display: inline-block;
+           text-align: center;
+           color: black;
+           font-weight: bold;
+           background-color: white;
+           border: 2px solid black;
+           border-left: 0;"
+          )
         )
       ),
 
       # Help text at bottom
       shiny::tags$div(
-        style = "
-      position: absolute;
-      bottom: 10px;
-      width: 100%;
-      text-align: center;
-      font-size: 11px;
-      color: gray;
-      padding: 5px;",
+        style = c(
+        "position: absolute;
+         bottom: 10px;
+         width: 100%;
+         text-align: center;
+         font-size: 11px;
+         color: gray;
+         padding: 5px;"
+        ),
         shiny::tags$img(
           src = ifelse(local_launch(), "www/rano_resect_Logo_nbg.png", "rano_resect_logo_nbg.png"),
           style = "width: 100%;"
@@ -90,9 +110,7 @@ ConsensusBrainUI <- function(){
             Jan Kückelhaus and Philipp Karschnia at the Department of Neurosurgery,
             University Hospital Erlangen."
           )
-
         )
-
       )
     ),
 
@@ -116,6 +134,18 @@ ConsensusBrainUI <- function(){
             font-size: 30px;
             line-height: 60px;
           }
+          .video-container {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5%;
+            padding-bottom: 0.5%;
+            padding-top: 0.125%;
+            width: 100%;
+            margin-bottom: 1.5%;
+          }
         ")
         )
       ),
@@ -123,16 +153,7 @@ ConsensusBrainUI <- function(){
       # tabs
       shinydashboard::tabItems(
 
-
         # Home -----------------------------------------------------------------
-
-        shinydashboard::tabItem(
-          tabName = "tab_welcome",
-          shiny::tags$img(
-            src = ifelse(local_launch(), "www/rano_resect_Logo_nbg.png", "rano_resect_logo_nbg.png"),
-            style = "width: 100%;"
-          )
-        ),
 
         shinydashboard::tabItem(
           tabName = "tab_introduction",
@@ -145,11 +166,51 @@ ConsensusBrainUI <- function(){
         ),
 
 
+        # Guide -------------------------------------------------------------------
+
+        shinydashboard::tabItem(
+          tabName = "tab_tut_workflow",
+          shiny::fluidRow(
+            videoBox(name = "mri_interface"),
+            videoBox(name = "selection_and_score_assignment")
+          ),
+          shiny::fluidRow(
+            videoBox(name = "the_progress_tab"),
+            videoBox(name = "score_clearing")
+          ),
+          shiny::fluidRow(
+            videoBox(name = "score_overwriting_rules")
+          )
+        ),
+
+        shinydashboard::tabItem(
+          tabName = "tab_tut_selection",
+          shiny::fluidRow(
+            videoBox(name = "brain_regions_and_atlases"),
+            videoBox(name = "paintbrush")
+          ),
+          shiny::fluidRow(
+            videoBox(name = "paintbrush_sphere"),
+            videoBox(name = "paintbrush_ray")
+          )
+        ),
+
+        shinydashboard::tabItem(
+          tabName = "tab_tut_refinement",
+          shiny::fluidRow(
+            videoBox(name = "paintbrush_erase"),
+            videoBox(name = "undo_and_debris_removal")
+          ),
+          shiny::fluidRow(
+            videoBox(name = "safety_margin")
+          )
+        ),
+
         # Score Assignment --------------------------------------------------------
 
         # Workflow
         shinydashboard::tabItem(
-          tabName = "tab_workflow", # tab_frontal_lobe
+          tabName = "tab_wf_brain_regions",
 
           moduleWorkflowMacroAreaUI(id = "workflow")
 
@@ -157,7 +218,7 @@ ConsensusBrainUI <- function(){
 
         # Remaining
         shinydashboard::tabItem(
-          tabName = "tab_remaining",
+          tabName = "tab_wf_remaining",
 
           moduleWorkflowRemainingUI(id = "workflow_remaining")
 

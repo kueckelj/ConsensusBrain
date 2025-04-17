@@ -33,7 +33,7 @@ moduleMriControlServer <- function(id,
       # 1. Global ---------------------------------------------------------------
 
       # paintbrush/paintbrush_erase share their value
-      selection_tool <- shiny::reactiveVal(value = "region_click")
+      selection_tool <- shiny::reactiveVal(value = "paintbrush")
       selection_scope <- shiny::reactiveVal(value = list(region_click = "ann_dk_adj", paintbrush = "ann_macro"))
       selection_state <- shiny::reactiveVal(value = character())
 
@@ -137,7 +137,7 @@ moduleMriControlServer <- function(id,
 
       output$margin_opts <- shiny::renderUI({
 
-        if(length(shiny::isolate({ selection_state() })) != 0){
+        if(length(selection_state()) != 0){
 
           shiny::tagList(
             shiny::column(
@@ -303,7 +303,7 @@ moduleMriControlServer <- function(id,
           choices <-
             c(
               # Region-Click
-              '<i class="fas fa-hand-pointer" style="font-size: 1.5em;" data-toggle="tooltip" title="Region-Click"></i>' = "region_click",
+              #'<i class="fas fa-hand-pointer" style="font-size: 1.5em;" data-toggle="tooltip" title="Region-Click"></i>' = "region_click",
               # Outline - does not work properly - improve later
               #'<i class="fas fa-circle-notch" style="font-size: 1.5em;" data-toggle="tooltip" title="Outline"></i>' = "outline",
               # Paintbrush
@@ -322,14 +322,29 @@ moduleMriControlServer <- function(id,
               shiny::column(
                 width = 1,
                 align = "left",
-                shiny::div(style = "height: 35px;"),
-                shiny::actionButton(
-                  inputId = ns("viewer3D"),
-                  label = "3D View",
-                  icon = shiny::icon("brain"),
-                  width = "100%",
-                  disabled = TRUE,
-                  style = style_ab
+                shiny::h5(shiny::strong("View:")) %>% add_helper("selection_view"),
+                shiny::splitLayout(
+                  cellWidths = c("60%", "40%"),
+                  shiny::tagList(
+                    shiny::actionButton(
+                      inputId = ns("viewer3D"),
+                      label = "3D",
+                      icon = shiny::icon("brain"),
+                      width = "100%",
+                      disabled = TRUE,
+                      style = style_ab
+                    )
+                  ),
+                  shiny::tagList(
+                    shiny::actionButton(
+                      inputId = ns("selection_focus"),
+                      label = NULL,
+                      icon = shiny::icon("crosshairs"),
+                      width = "100%",
+                      disabled = TRUE,
+                      style = style_ab
+                    )
+                  )
                 )
               ),
               shiny::column(
@@ -371,7 +386,7 @@ moduleMriControlServer <- function(id,
                 shinyWidgets::radioGroupButtons(
                   inputId = ns("selection_tool"),
                   label = NULL,
-                  selected = "region_click",
+                  selected = "paintbrush",
                   choices = choices,
                   direction = "horizontal",
                   justified = TRUE,
@@ -825,6 +840,7 @@ moduleMriControlServer <- function(id,
       # observe cursor on MRI
 
       cursor_on_plane <- shiny::reactiveVal(value = character(0))
+      drawing_on_plane <- shiny::reactiveVal(value = character(0))
 
       shiny::observe({
 
@@ -837,9 +853,24 @@ moduleMriControlServer <- function(id,
 
         cop <- c("sag", "axi", "cor")[lgl]
 
-        if(length(cop) == 0){ cop <- "none" }
+        cop <- ifelse(length(cop) == 0, "none", cop)
 
         cursor_on_plane({ cop })
+
+      })
+
+      shiny::observe({
+
+        lgl <-
+          c(
+            mri_sag_out()$drawing_active,
+            mri_axi_out()$drawing_active,
+            mri_cor_out()$drawing_active
+          )
+
+        dop <- c("sag", "axi", "cor")[lgl]
+
+        drawing_on_plane({ dop })
 
       })
 
@@ -1256,6 +1287,12 @@ moduleMriControlServer <- function(id,
             disabled = FALSE
           )
 
+          shiny::updateActionButton(
+            session = session,
+            inputId = "selection_focus",
+            disabled = FALSE
+          )
+
           if(!identical(x = selection_state(), y = dplyr::last(stacks$selection))){
 
             stacks <-
@@ -1289,6 +1326,12 @@ moduleMriControlServer <- function(id,
 
           shiny::updateActionButton(
             session = session,
+            inputId = "selection_focus",
+            disabled = TRUE
+          )
+
+          shiny::updateActionButton(
+            session = session,
             inputId = "selection_undo",
             disabled = TRUE
           )
@@ -1296,7 +1339,7 @@ moduleMriControlServer <- function(id,
           shiny::updateActionButton(
             session = session,
             inputId = "selection_debris_rm",
-            disabled = FALSE
+            disabled = TRUE
           )
 
           shiny::updateActionButton(
@@ -1308,6 +1351,35 @@ moduleMriControlServer <- function(id,
         }
 
       }, ignoreInit = TRUE)
+
+      shiny::observeEvent(input$selection_focus, {
+
+        xmax <-
+          dplyr::filter(.data = voxel_df(), selected) %>%
+          dplyr::group_by(x) %>%
+          dplyr::summarize(count = dplyr::n(), .groups = "drop") %>%
+          dplyr::filter(count == max(count)) %>%
+          dplyr::pull(x)
+
+        ymax <-
+          dplyr::filter(.data = voxel_df(), selected) %>%
+          dplyr::group_by(y) %>%
+          dplyr::summarize(count = dplyr::n(), .groups = "drop") %>%
+          dplyr::filter(count == max(count)) %>%
+          dplyr::pull(y)
+
+        zmax <-
+          dplyr::filter(.data = voxel_df(), selected) %>%
+          dplyr::group_by(z) %>%
+          dplyr::summarize(count = dplyr::n(), .groups = "drop") %>%
+          dplyr::filter(count == max(count)) %>%
+          dplyr::pull(z)
+
+        slice_state$sag <- xmax[1]
+        slice_state$axi <- ymax[1]
+        slice_state$cor <- zmax[1]
+
+      })
 
       shiny::observeEvent(input$selection_undo, {
 
@@ -1368,7 +1440,7 @@ moduleMriControlServer <- function(id,
           showCancelButton = TRUE,
           confirmButtonText = "Trash",
           cancelButtonText = "Cancel",
-          closeOnEsc = FALSE,
+          closeOnEsc = TRUE,
           closeOnClickOutside = TRUE,
           callbackR = function(confirmed) {
             if (isTRUE(confirmed)) {
@@ -1678,6 +1750,7 @@ moduleMriControlServer <- function(id,
           output <-
             list(
               cursor_on_plane = cursor_on_plane(),
+              drawing_on_plane = drawing_on_plane(),
               outlines = outlines_control(),
               outlines_reset = input$outline_reset_all,
               paintbrush_direction = paintbrush_direction(),

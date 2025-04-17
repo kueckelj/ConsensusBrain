@@ -102,14 +102,14 @@ moduleScoreAssignmentServer <- function(id,
             shiny::isTruthy(input$CBscore_main) &
             shiny::isTruthy(input$CBscore_margin)
 
-          message <- "Choose the scores you want to assign."
+          message <- "Choose a score to assign."
 
         } else {
 
           ready_for_score_assignment <-
             shiny::isTruthy(input$CBscore_main)
 
-          message <- "Choose the score you want to assign."
+          message <- "Choose a score to assign."
 
         }
 

@@ -159,7 +159,7 @@ moduleMriPlaneUI <- function(id,
             outputId = ns("mriInteractionPlot"),
             height = "100%",
             click = shiny::clickOpts(id = ns("mriPlot_click"), clip = TRUE),
-            brush = shiny::brushOpts(id = ns("mriPlot_brush"), delayType = "debounce", resetOnNew = TRUE),
+            #brush = shiny::brushOpts(id = ns("mriPlot_brush"), delayType = "debounce", resetOnNew = TRUE),
             dblclick = shiny::dblclickOpts(id = ns("mriPlot_dblclick"), clip = TRUE),
             hover = shiny::hoverOpts(id = ns("mriPlot_hover"), delay = 100, delayType = "throttle", clip = TRUE)
           )
@@ -206,7 +206,9 @@ moduleMriPlaneServer <- function(id,
 
         print("-----------------------")
         print("Test")#
-        print(plane_selection_state)
+        print(mri_control_input$drawing_on_plane)
+        print(drawing_on_diff_plane())
+
 
       }, ignoreInit = TRUE)
 
@@ -214,7 +216,8 @@ moduleMriPlaneServer <- function(id,
 
       cursor_on_mri <- shiny::reactiveVal(value = FALSE)
 
-      # needs debuggin
+
+      # --- debuggin
       shiny::observeEvent(NULL, {
 
         shiny::req(stringr::str_detect(selection_tool(), pattern = "paintbrush"))
@@ -227,6 +230,22 @@ moduleMriPlaneServer <- function(id,
         ))
 
       }, ignoreNULL = TRUE)
+
+      time_text <- shiny::reactiveVal(value = "Waiting")
+      time_diff <- shiny::reactiveVal(value = list())
+
+      shiny::observeEvent(data$paintbrush, {
+
+        m <- round(mean(purrr::map_dbl(time_diff(), ~ .x)), 2)
+        v <- round(var(purrr::map_dbl(time_diff(), ~ .x)), 2)
+
+        time_text({  as.character(glue::glue("Mean: {m} | Var: {v}")) })
+
+      })
+
+      output$text <- renderPrint({ time_text() })
+
+      # --- debugging
 
       # Dynamic UI --------------------------------------------------------------
 
@@ -285,7 +304,7 @@ moduleMriPlaneServer <- function(id,
 
           } else if(mri_control_input$selection_tool == "paintbrush"){
 
-            if(length(paintbrushed_ids()) != 0){
+            if(length(data$paintbrush) != 0 & !drawing_active()){
 
               shiny::column(
                 offset = 1,
@@ -314,7 +333,8 @@ moduleMriPlaneServer <- function(id,
                     width = "100%",
                     disabled = btns_disabled_paintbrush()
                   )
-                )
+                ),
+                shiny::uiOutput(ns("paintbrush_helptext"))
               )
 
             } else {
@@ -325,7 +345,7 @@ moduleMriPlaneServer <- function(id,
 
           } else if(mri_control_input$selection_tool == "paintbrush_erase"){
 
-            if(length(paintbrushed_ids()) != 0){
+            if(length(data$paintbrush_erase) != 0 & !drawing_active()){
 
               shiny::column(
                 offset = 1,
@@ -334,7 +354,7 @@ moduleMriPlaneServer <- function(id,
                 shiny::splitLayout(
                   cellWidths = "33%",
                   shiny::actionButton(
-                    inputId = ns("paintbrush_erase_confirm3D"),
+                    inputId = ns("paintbrush_erase_confirm"),
                     icon = shiny::icon("eraser"),
                     label = "Erase",
                     width = "100%",
@@ -354,7 +374,8 @@ moduleMriPlaneServer <- function(id,
                     width = "100%",
                     disabled = btns_disabled_paintbrush_erase()
                   )
-                )
+                ),
+                shiny::uiOutput(ns("paintbrush_helptext"))
               )
 
             } else {
@@ -396,7 +417,11 @@ moduleMriPlaneServer <- function(id,
 
       output$paintbrush_helptext <- shiny::renderUI({
 
-        if(pb_mask_on_diff_plane()){
+        if(pb_mask_on_this_plane() & !drawing_active()){
+
+          shiny::helpText("Use either button or double-click to continue.")
+
+        } else if(pb_mask_on_diff_plane()){
 
           name <- tolower(mri_planes_pretty[names(mri_control_input$paintbrush_masks)])
 
@@ -433,6 +458,7 @@ moduleMriPlaneServer <- function(id,
           voxels_highlighted = character(1),
 
           # selection
+          drawing_on_plane = character(1),
           outlines = list(),
           outlines_reset = numeric(1),
           paintbrush_depth = numeric(1),
@@ -731,16 +757,23 @@ moduleMriPlaneServer <- function(id,
       paintbrush_selected <- shiny::reactive({
 
         interaction_template()$selected |
-        interaction_template()$id %in% paintbrush_selected_ids()
+        interaction_template()$id %in% data$paintbrush
 
         })
 
-      paintbrush_selected_ids <- shiny::reactive({ data$paintbrush })
+      pb_mask_on_this_plane <- shiny::reactive({ length(data$paintbrush) != 0 })
 
       pb_mask_on_diff_plane <- shiny::reactive({
 
         length(mri_control_input$paintbrush_masks) == 1 &&
           names(mri_control_input$paintbrush_masks) != plane
+
+      })
+
+      drawing_on_diff_plane <- shiny::reactive({
+
+        length(mri_control_input$drawing_on_plane) == 1 &&
+          mri_control_input$drawing_on_plane != plane
 
       })
 
@@ -900,8 +933,6 @@ moduleMriPlaneServer <- function(id,
 
         } else if(drawing_active() & selection_tool() == "paintbrush"){
 
-          t1 <- Sys.time()
-
           new_ids <-
             identify_obs_within_radius2D(
               cursor_pos = cursor_pos(),
@@ -922,8 +953,6 @@ moduleMriPlaneServer <- function(id,
             }
 
           }
-
-          time_diff({ append(shiny::isolate(time_diff()), round(as.numeric(Sys.time() - t1)*1000, 3))})
 
         } else if(drawing_active() & selection_tool() == "paintbrush_erase"){
 
@@ -986,6 +1015,22 @@ moduleMriPlaneServer <- function(id,
       # --- forward/backward
       shiny::observeEvent(input$mri_forward,{
 
+        if(pb_mask_on_this_plane()){
+
+          shinyWidgets::sendSweetAlert(
+            session = session,
+            title = "Unconfirmed Paintbrush Drawing!",
+            text = glue::glue(
+              "There is an unconfirmed paintbrush drawing on this MRI.
+              Please confirm or reset it before using the slider."
+            ),
+            type = "info"
+          )
+
+          shiny::req(FALSE)
+
+        }
+
         if(slice_pos[[plane]] != n_slices()){
 
           slice_pos[[plane]] <- slice_pos[[plane]]+1
@@ -996,14 +1041,25 @@ moduleMriPlaneServer <- function(id,
 
       shiny::observeEvent(input$mri_backward,{
 
+        if(pb_mask_on_this_plane()){
+
+          shinyWidgets::sendSweetAlert(
+            session = session,
+            title = "Unconfirmed Paintbrush Drawing!",
+            text = glue::glue(
+              "There is an unconfirmed paintbrush drawing on this MRI.
+              Please confirm or reset it before using the slider."
+            ),
+            type = "info"
+          )
+
+          shiny::req(FALSE)
+
+        }
+
         if(slice_pos[[plane]] != 1){
 
           slice_pos[[plane]] <- slice_pos[[plane]]-1
-
-          shiny::updateSliderInput(
-            session = session,
-
-          )
 
         }
 
@@ -1167,6 +1223,28 @@ moduleMriPlaneServer <- function(id,
 
       shiny::observeEvent(input$mri_slider_slice,{
 
+        if(pb_mask_on_this_plane()){
+
+          shinyWidgets::sendSweetAlert(
+            session = session,
+            title = "Unconfirmed Paintbrush Drawing!",
+            text = glue::glue(
+              "There is an unconfirmed paintbrush drawing on this MRI.
+              Please confirm or reset it before using the slider."
+            ),
+            type = "info"
+          )
+
+          shiny::updateSliderInput(
+            session = session,
+            inputId = "mri_slider_slice",
+            value = slice_pos[[plane]]
+          )
+
+          shiny::req(FALSE)
+
+        }
+
         slice_pos[[plane]] <- input$mri_slider_slice
 
       })
@@ -1233,20 +1311,6 @@ moduleMriPlaneServer <- function(id,
         }
 
       }, bg = "transparent")
-
-      time_text <- shiny::reactiveVal(value = "Waiting")
-      time_diff <- shiny::reactiveVal(value = list())
-
-      shiny::observeEvent(paintbrushed_ids(), {
-
-        m <- round(mean(purrr::map_dbl(time_diff(), ~ .x)), 2)
-        v <- round(var(purrr::map_dbl(time_diff(), ~ .x)), 2)
-
-        time_text({  as.character(glue::glue("Mean: {m} | Var: {v}")) })
-
-      })
-
-      output$text <- renderPrint({ time_text() })
 
       output$mriOutlinePlot <- shiny::renderPlot({
 
@@ -1997,7 +2061,7 @@ moduleMriPlaneServer <- function(id,
           voxels_show <-
             dplyr::filter(
               .data = interaction_template(),
-              selected | id %in% paintbrush_selected_ids()
+              selected | id %in% data$paintbrush
               ) %>%
             dplyr::mutate(
               color = dplyr::case_when(
@@ -2319,7 +2383,7 @@ moduleMriPlaneServer <- function(id,
         # initiate drawing logic for outline
         if(!drawing_active()){
 
-          drawing_active(TRUE)
+          drawing_active({ TRUE })
 
           # from drawing to stop drawing: save results as selected voxels
         } else if(drawing_active()){
@@ -2340,7 +2404,7 @@ moduleMriPlaneServer <- function(id,
 
           }
 
-          drawing_active(FALSE)
+          drawing_active({ FALSE })
 
         }
 
@@ -2457,17 +2521,18 @@ moduleMriPlaneServer <- function(id,
         # initiate drawing logic for selection + paintbrush
         if(!drawing_active()){
 
-          name <- tolower(mri_planes_pretty[names(mri_control_input$paintbrush_masks)])
+          if(drawing_on_diff_plane()){
 
-          if(pb_mask_on_diff_plane()){
+            name <- tolower(mri_planes_pretty[mri_control_input$drawing_on_plane])
 
             shinyWidgets::sendSweetAlert(
               session = session,
-              title = "Drawing on different plane!",
+              title = "Paintbrushing on different plane!",
               text = glue::glue(
-                "There is a paintbrush drawing on the {name} MRI.
-                Please confirm the selection by clicking on Confirm or reset it before drawing on a different plane."
-                ),
+                "You are currently paintbrushing on the {name} MRI. First, finish the
+                drawing process by double-clicking on the {name} MRI. Then, decide what
+                do with the drawing - confirm or reset. Then you can draw here."
+              ),
               type = "info"
             )
 
@@ -2475,7 +2540,23 @@ moduleMriPlaneServer <- function(id,
 
           }
 
-          data$cursor_pos <- list()
+          if(pb_mask_on_diff_plane()){
+
+            name <- tolower(mri_planes_pretty[names(mri_control_input$paintbrush_masks)])
+
+            shinyWidgets::sendSweetAlert(
+              session = session,
+              title = "Drawing on different plane!",
+              text = glue::glue(
+                "There is a paintbrush drawing on the {name} MRI.
+                Please confirm or reset it before paintbrushing on a different plane."
+                ),
+              type = "info"
+            )
+
+            shiny::req(FALSE)
+
+          }
 
           slice_pos[[col_axis]] <- round(cursor_pos()[1])
           slice_pos[[row_axis]] <- round(cursor_pos()[2])
@@ -2562,6 +2643,7 @@ moduleMriPlaneServer <- function(id,
 
       shiny::observeEvent(input$paintbrush_reset, {
 
+        data$cursor_pos <- list()
         data$paintbrush <- character()
         paintbrushed_ids(data$paintbrush)
         btns_disabled_paintbrush(TRUE)
@@ -2575,6 +2657,57 @@ moduleMriPlaneServer <- function(id,
 
         # initiate drawing logic for selection + paintbrush
         if(!drawing_active()){
+
+          if(length(mri_control_input$voxels_selected) == 0){
+
+            shinyWidgets::sendSweetAlert(
+              session = session,
+              title = "No selection to erase",
+              text = glue::glue(
+                "You are trying to use the paintbrush erase tool - but there
+                is no brain tissue selected that can be erased."
+              ),
+              type = "info"
+            )
+
+            shiny::req(FALSE)
+
+          }
+
+          if(!any(selection_template()$selected)){
+
+            shinyWidgets::sendSweetAlert(
+              session = session,
+              title = "No selection to erase on this MRI slice!",
+              text = glue::glue(
+                "You are trying to use the paintbrush erase tool - but on this MRI slice there
+                is no brain tissue selected that can be erased."
+              ),
+              type = "info"
+            )
+
+            shiny::req(FALSE)
+
+          }
+
+          if(drawing_on_diff_plane()){
+
+            name <- tolower(mri_planes_pretty[mri_control_input$drawing_on_plane])
+
+            shinyWidgets::sendSweetAlert(
+              session = session,
+              title = "Paintbrushing (Erase) on different plane!",
+              text = glue::glue(
+                "You are currently paintbrushing on the {name} MRI. First, finish the
+                drawing process by double-clicking on the {name} MRI. Then, decide what
+                do with the drawing - confirm or reset. Then you can draw here."
+              ),
+              type = "info"
+            )
+
+            shiny::req(FALSE)
+
+          }
 
           if(pb_mask_on_diff_plane()){
 
@@ -2611,7 +2744,7 @@ moduleMriPlaneServer <- function(id,
 
       }, ignoreInit = TRUE)
 
-      shiny::observeEvent(input$paintbrush_erase_confirm3D, {
+      shiny::observeEvent(input$paintbrush_erase_confirm, {
 
         if(mri_control_input$paintbrush_mode == "Sphere"){
 
@@ -2669,6 +2802,7 @@ moduleMriPlaneServer <- function(id,
 
       shiny::observeEvent(input$paintbrush_erase_reset, {
 
+        data$cursor_pos <- list()
         data$paintbrush_erase <- character(0)
         paintbrushed_ids(data$paintbrush_erase)
         btns_disabled_paintbrush_erase(TRUE)
@@ -2683,8 +2817,9 @@ moduleMriPlaneServer <- function(id,
 
         list(
           cursor_on_mri = cursor_on_mri(),
+          drawing_active = drawing_active(),
           drawing_outline_confirmed = drawing_outline_confirmed(),
-          paintbrushed_ids = paintbrushed_ids(),
+          paintbrushed_ids = data$paintbrush,
           plane_selection_state = plane_selection_state(),
           slice_pos = slice_pos
         )

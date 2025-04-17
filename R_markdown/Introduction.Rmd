@@ -15,37 +15,50 @@ Welcome to **ConsensusBrain**.
 
 This application is part of an initiative to build a shared, expert-guided consensus on glioma resectability across brain regions. The aim is to combine the experience of leading neurosurgeons into a unified resectability atlas. The following sections provide an overview of the project and outline how you can contribute. 
 
+---
+
 ## Motivation & Objective
-Glioma surgery demands a careful balance between achieving maximal tumor resection and preserving essential neurological function. At present, decisions regarding resectability are made on a case-by-case basis and rely heavily on individual surgical experience. ConsensusBrain aims to standardize and systematize this expertise. To achieve this, we ask for your input: your knowledge and experience will be encoded directly into a standardized template MRI. Each expert will annotate this template by assigning a resectability score to brain regions—voxel by voxel. These individual annotations will then be aggregated across all contributors to form a consensus resectability atlas—the ConsensusBrain. In this shared framework, each voxel is labeled with a consensus-based resectability index. This atlas can subsequently be used to project patient-specific tumor masks into the consensus space, allowing for the computation of a resectability score for each tumor based on expert-derived annotations.
+Glioma surgery demands a careful balance between achieving maximal tumor resection and preserving essential neurological function. At present, decisions regarding resectability are made on a case-by-case basis and rely heavily on individual surgical experience. ConsensusBrain aims to standardize and systematize this expertise. To achieve this, we ask for your input: your knowledge and experience will be encoded directly into a standardized template MRI. Each expert will annotate this template by assigning a resectability score to brain regions—voxel by voxel. These individual annotations will then be aggregated across all contributors to form a consensus resectability atlas—a consensus brain. In this shared framework, each voxel is labeled with a consensus-based resectability index. This atlas can subsequently be used to project patient-specific tumor masks into the consensus space, allowing for the computation of a resectability score for each tumor based on expert-derived annotations.
+
+---
 
 ## ConsensusBrain
-**ConsensusBrain** is an application that allows you to interact with a standardized [template brain](https://www.bic.mni.mcgill.ca/ServicesAtlases/ICBM152NLin2009) in MNI space. The MNI template is a widely adopted anatomical reference brain derived from the averaged MRI scans of healthy individuals. It serves as a spatial standard for neuroimaging research and clinical applications. This template has been annotated by using multiple brain atlases, enabling you to select and score regions directly by their anatomical names. In addition, interactive tools are available for refining these selections across by engaging with all three MRI orientations — sagittal, axial, and coronal. These tools allow precise voxel-level adjustments to better reflect your expert judgment before assigning a resectability score.
+**ConsensusBrain** is an application that allows you to interact with a standardized [template brain](https://www.bic.mni.mcgill.ca/ServicesAtlases/ICBM152NLin2009) in MNI space. The MNI template is a widely adopted anatomical reference brain derived from the averaged MRI scans of healthy individuals. It serves as a spatial standard for neuroimaging research and clinical applications. We annotated this template by using multiple brain atlases, enabling you to select and score regions directly by their anatomical names. In addition, interactive tools are available for refining these selections by engaging with all three MRI orientations — sagittal, axial, and coronal. These tools allow precise voxel-level adjustments to better reflect your expert judgment before assigning a resectability score.
 
-Although using the interactive tools may require a few minutes of familiarization, we encourage you to engage with them. They provide the opportunity to apply **your** understanding of resectability — rather than relying solely on predefined atlas regions.
+**Although using the interactive tools may require a few minutes of familiarization, we encourage you to engage with them. They provide the opportunity to apply your understanding of resectability — rather than relying solely on predefined atlas regions.** 
 
 The scoring system we designed is ordinal, ranging from **1** (safely resectable) to **4** (not resectable):
 
-- **1 — Safely resectable**  
+- <span style="background-color: #8BC34A; color: black; padding: 2px 6px; border-radius: 4px;"><strong>1 — Safely resectable</strong></span>  
   The region can be removed without significant risk to neurological function. Standard resection is expected to be safe.
 
-- **2 — Resectable with low to medium risk**  
+- <span style="background-color: #FFEB3B; color: black; padding: 2px 6px; border-radius: 4px;"><strong>2 — Resectable with low to medium risk</strong></span>  
   The region is generally resectable but carries some functional risk. Intraoperative neuromonitoring or mapping should be used. Awake surgery may be considered based on functional anatomy.
 
-- **3 — Resectable with medium to high risk**  
+- <span style="background-color: #FF9800; color: black; padding: 2px 6px; border-radius: 4px;"><strong>3 — Resectable with medium to high risk</strong></span>  
   Resection may be possible, but the risk to critical functions is greater. Advanced neuromonitoring and awake mapping are typically required.
 
-- **4 — Not resectable**  
+- <span style="background-color: #F44336; color: black; padding: 2px 6px; border-radius: 4px;"><strong>4 — Not resectable</strong></span>  
   The region cannot be safely removed due to its functional importance or anatomical constraints. Resection should be avoided.
 
+---
+
 ## User Workflow
-In the sidebar menu on the left, you will find the **Workflow** tab. This is where you access the interface used to annotate and score the template brain. The annotation workflow follows a simple, iterative process that consists of three main steps:
+
+In the sidebar menu on the left, you will find the *Workflow* tab. This is where you access the interface used to annotate and score the template brain. A collection 
+of short videos about this workflow is provided under the tab *Guide >> Workflow* in the sidebar menu.
+
+### Brain Regions
+
+You start in the tab *Brain Regions*. The annotation workflow follows a simple, iterative process that consists of three main steps:
 
 ##### 1. Select a Brain Region of Interest
-You can define regions of interest using a combination of tools:
+You can define regions of interest using a combination of:
 
 - **Atlas-based selection**, based on the Desikan-Killiany, Destrieux, or fiber tract segmentations
-- **Interactive region-clicking**, allowing quick selection of predefined anatomical areas
-- **Manual painting** on 2D MRI slices with automatic propagation into the 3D brain volume
+- **Manual paintbrushing** on 2D MRI slices with automatic propagation into the 3D brain volume
+
+You can find instructive videos on how to use the interactive paintbrush tool under *Guide >> Selection*.
 
 ##### 2. Refinement *(Optional)*
 After selecting a region, you may further refine it by:
@@ -53,20 +66,27 @@ After selecting a region, you may further refine it by:
 - **Erasing voxels** using the paintbrush-erase tool
 - **Adding a safety margin**, extending the selection by up to 15 mm
 
+You can find instructive videos on how to tweak your selection under *Guide >> Refinement*.
+
 ##### 3. Assign Resectability Scores
 The selection state can be inspected on the three MRI instances as well as rendered in 3D at any time. Once the region of interest is finalized, apply a resectability score to the selected voxels using the defined four-level scale.
 
 ---
 
-Guided by the macroanatomical structure of the brain — available via the selection bar at the top of the interface — you can proceed step by step until every voxel of the template MRI has been assigned a resectability score. You can monitor your progress in the Progress tab, where you can also save your current annotations for later completion or final submission. Once you have completed at least 75% of the brain, you can use the Remaining tab to identify regions that still need to be scored. This allows you to efficiently review and assign scores to the remaining tissue—without the need to manually search for areas that were overlooked, whether intentionally or unintentionally.
+Guided by the macroanatomical structure of the brain — available via the selection bar at the top of the interface — you can proceed step by step until every voxel of the template MRI has been assigned a resectability score. Progress can be monitored in the *Progress* tab, where you can also save your current annotations for later completion or final submission.
+
+### Remaining
+
+Once you have completed at least 75% of the brain, you can use the tab *Remaining* to identify regions that still need to be scored. This allows you to efficiently review and assign scores to the remaining tissue—without the need to manually search for areas that were overlooked, whether intentionally or unintentionally. The same workflow applies: Select one of the identified remaining regions, interactively refine them if desired, then assign a score.
+
+---
 
 ## Saving Progress & Finalization 
-At any time, you can save your current progress by clicking **Save** in the *Progress* tab. This will download a file with the `.rds` extension, which you can store on your device.  
-The next time you log in, simply use the **Browse** option to upload your saved file and resume where you left off.
+At any time, you can save your current progress by clicking **Save** in the *Progress* tab. This will download a file with the `.rds` extension, which you can store on your device. The next time you log in, simply use the **Browse** option to upload your saved file and resume where you left off.
 
 **We strongly recommend saving your progress regularly. Closing the application—whether intentionally or due to unexpected issues—will result in the loss of any unsaved work.**
 
-Once you have scored 95% you can finalize your output in the Progress tab. This downloads your progress to a file you can upload [here]().
+Once you have scored 95% you can finalize your output in the *Progress* tab. This downloads your progress to a file you can upload [here]().
 
 Thank you for your time and contribution.
 

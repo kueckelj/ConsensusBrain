@@ -8,6 +8,33 @@ moduleWorkflowMacroAreaUI <- function(id, height = 275) {
     shiny::div(
       style = "width: 100%; height: 100%",
       shiny::tagList(
+        shiny::tags$head(
+          shiny::tags$style(
+            shiny::HTML("
+            .btn-custom-fontsize {
+              background-color: #337ab7;
+              color: #fff;
+              border-color: #2e6da4;
+              font-size: 18px !important;
+            }
+
+            .btn-custom-fontsize:hover {
+              background-color: #2e6da4;
+              border-color: #204d74;
+              color: #fff;
+            }
+
+            .btn-custom-fontsize.active,
+            .btn-custom-fontsize:active,
+            .btn-custom-fontsize:focus {
+              background-color: #204d74;
+              border-color: #122b40;
+              color: #fff;
+              box-shadow: none;
+            }
+          ")
+         )
+        ),
         shiny::fluidRow(
           shiny::column(
             width = 12,
@@ -17,8 +44,8 @@ moduleWorkflowMacroAreaUI <- function(id, height = 275) {
                 label = NULL,
                 choices = workflow_tabs,
                 selected = "frontal_lobe",
-                status = "primary",
-                size = "lg",
+                status = "custom-fontsize",
+                size = "normal",
                 width = "100%",
                 justified = TRUE
               )

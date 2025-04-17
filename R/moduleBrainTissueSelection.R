@@ -128,7 +128,7 @@ moduleBrainTissueSelectionServer <- function(id,
 
       label <- shiny::reactive({
 
-        ifelse(macro_area() == "fiber_tract", "Fiber Tract", "Brain Area")
+        ifelse(macro_area() == "fiber_tract", "Fiber Tract", "Atlas Label")
 
       })
 
@@ -162,7 +162,7 @@ moduleBrainTissueSelectionServer <- function(id,
             no = make_pretty_label(macro_area())
             )
 
-        shiny::strong(glue::glue("Selection Criteria: {macro_area_label}"))
+        shiny::strong(glue::glue("Brain Region: {macro_area_label}"))
 
       })
 
@@ -175,7 +175,7 @@ moduleBrainTissueSelectionServer <- function(id,
           align = "left",
           shinyWidgets::pickerInput(
             inputId = ns("parc_atlas"),
-            label = "Cortex Parcellation:",
+            label = "Parcellation Atlas:",
             choices = c("Desikan-Kiliany" = "ann_dk_adj", "Destrieux" = "ann_dt_adj"),
             selected = "ann_dk_adj"
           ) %>% add_helper("parcellation_atlas")
@@ -399,6 +399,10 @@ moduleBrainTissueSelectionServer <- function(id,
           shiny::req(FALSE)
 
         }
+
+        # ensure that the value changes with every select
+        # even if the voxel selection remains the same
+        attr(out, which = "counter") <- input$applyVS
 
         voxel_df({ out })
 

@@ -135,7 +135,7 @@ CB_help <-
     "paintbrush_mode" =
       list(
         content = c(
-          "Defines how the selection is extended from 2D into 3D when using the paintbrush tool.",
+          "Defines how the paintbrush drawing on a slice is extended from 2D into 3D after clicking on Confirm.",
           "",
           "**Sphere** mode selects voxels in a spherical neighborhood around each brush position, including adjacent slices.",
           "",
@@ -275,12 +275,24 @@ CB_help <-
         type = "inline"
       ),
 
+    "selection_view" =
+      list(
+        content = c(
+          "Only available if any brain tissue is selected!",
+          "",
+          "Use the 3D button to visualize your current selection rendered in 3D.
+          Use the focus button on the right to shift the localizers to focus on
+          your current selection."
+        ),
+        type = "inline"
+      ),
+
     "selection_tool" =
       list(
         content = c(
           "Choose a tool to interactively define, refine, or erase tissue selections in the MRI viewer.",
           "",
-          "**Region-Click**: Double-click a voxel to select its entire anatomical region across the brain, based on the selected selection scope (e.g., a gyrus or white matter region). This is a quick way to select meaningful structures in 3D.",
+          #"**Region-Click**: Double-click a voxel to select its entire anatomical region across the brain, based on the selected selection scope (e.g., a gyrus or white matter region). This is a quick way to select meaningful structures in 3D.",
           #"**Outline**: Draw a freehand outline directly on a 2D MRI slice to define a custom region. The shape can be confirmed and used to select all underlying voxels. Useful for irregular or non-anatomical structures.",
           #"",
           "",
@@ -293,6 +305,161 @@ CB_help <-
           "Use 'Undo' to step back through previous selections and 'Trash' to clear all selections. The chosen tool will define the interaction logic until changed."
         ),
         type = "inline"
+      ),
+
+    # Workflow tab
+    "video_mri_interface" = list(
+      title = "The MRI Interface",
+      short = "Overview of the MRI viewer and available controls.",
+      type = "inline",
+      content = c(
+        "The MRI interface displays the brain in three orthogonal orientations: sagittal, axial, and coronal (left to right).",
+        "Depending on the selected interaction tool, contextual information appears at the top and bottom left to guide your actions.",
+        "Below the MRI, an information box provides tool-specific instructions.",
+        "Use the slider and corresponding arrow buttons at the top to scroll through slices in the active plane. The localizer lines in each view indicate the current position of the other two planes.",
+        "Zoom in and out using the buttons in the upper left corner of the interface."
       )
+    ),
+
+    "video_selection_and_score_assignment" = list(
+      title = "Selection and Score Assignment",
+      short = "How to inspect a selection and assign a resectability risk score.",
+      type = "inline",
+      content = c(
+        "Selected brain tissue appears in light blue on the MRI across all views.",
+        "To inspect your selection in 3D, use the 3D Viewer button at the bottom left. This is useful for verifying whether the selection behaves as expected across adjacent slices, as 2D views can sometimes be misleading.",
+        "Click the crosshairs icon to center the view on the current selection across all planes, making navigation easier.",
+        "To assign a score, use the buttons located at the top right. These options are only enabled if a voxel selection exists. Select a score and confirm using the Assign button.",
+        "After submission, you’ll receive feedback confirming success or explaining any issues. The progress donut chart will automatically update to reflect your changes."
+      )
+    ),
+
+    "video_the_progress_tab" = list(
+      title = "The Progress Tab",
+      short = "Visualize and inspect your current scoring progress.",
+      type = "inline",
+      content = c(
+        "The Progress tab shows the distribution of assigned scores across the brain using color-coding. This helps you quickly assess which regions have been reviewed and which remain unscored.",
+        "Use the Highlight options to emphasize specific brain regions or score levels.",
+        "You can configure the hover behavior in the bottom right corner, choosing what metadata should be shown when pointing to a brain area."
+      )
+    ),
+
+    "video_score_clearing" = list(
+      title = "Clearing Scores",
+      short = "Remove scores from a selected brain region.",
+      type = "inline",
+      content = c(
+        "If a selection contains voxels with existing scores, a Clear button appears next to the Assign Score option.",
+        "Clicking Clear will reset the score for those voxels to 'Missing', allowing you to revise your assessment or leave the region unscored."
+      )
+    ),
+
+    "video_score_overwriting_rules" = list(
+      title = "Score Overwriting Rules",
+      short = "Understand how overlapping scores are handled.",
+      type = "inline",
+      content = c(
+        "When assigning a score to a region that already contains scored voxels, the app enforces protection against unintentionally lowering risk assessments.",
+        "By default, voxels with higher existing scores cannot be overwritten by a lower score.",
+        "If this happens, a feedback message will inform you that some voxels were excluded from the update.",
+        "If you are confident that the entire selection should receive the new score, even if it's lower, you can activate the Force option. This will apply the score regardless of previous assignments."
+      )
+    ),
+
+    # Selection tab
+    "video_brain_regions_and_atlases" = list(
+      title = "Selection via Brain Regions and Atlases",
+      short = "Use predefined labels and atlases to select regions.",
+      type = "inline",
+      content = c(
+        "The selection bar at the top allows you to choose a brain region to work with.",
+        "Depending on your selection, the region-specific options update dynamically, allowing refined targeting through the Atlas Label selector.",
+        "For example, in the case of cerebral lobes, you can choose between different atlases to control the granularity of the selection.",
+        "Click Select to confirm your choice. The selected region appears on the MRI in light blue."
+      )
+    ),
+
+    "video_paintbrush" = list(
+      title = "Using the Paintbrush",
+      short = "Interactively draw custom selections in the MRI.",
+      type = "inline",
+      content = c(
+        "The paintbrush tool enables you to draw selections directly onto the MRI. You can configure the brush size in the bottom bar.",
+        "There are two modes: Sphere and Ray. These define how the 2D drawing is translated into 3D voxel selection. Separate videos explain each mode.",
+        "To use the tool, follow these steps:",
+        "1. Double-click the MRI to activate the brush (you'll see the indicator switch from dotted to solid).",
+        "2. Move the cursor to draw over the area of interest.",
+        "3. Double-click again to stop drawing. You can resume with another double-click or undo unwanted segments.",
+        "4. Once satisfied, click Confirm to finalize your drawing. The result will be interpreted in 3D according to your selected mode."
+      )
+    ),
+
+    "video_paintbrush_sphere" = list(
+      title = "Paintbrush: Sphere Mode",
+      short = "Apply brush strokes using a spherical 3D expansion.",
+      type = "inline",
+      content = c(
+        "In Sphere mode, the drawn circle is interpreted as a sphere in 3D space. As you move the cursor across slices, this sphere selects nearby voxels.",
+        "This results in a 3D volume that reflects both your 2D input and the brush radius — useful for general anatomical areas where boundaries are less strict."
+      )
+    ),
+
+    "video_paintbrush_ray" = list(
+      title = "Paintbrush: Ray Mode",
+      short = "Apply brush strokes in a directional, depth-controlled manner.",
+      type = "inline",
+      content = c(
+        "Ray mode extends your drawing along a ray into the brain volume. You can configure both the depth and the direction of propagation.",
+        "While hovering, the other two MRI views show localizer lines that help visualize how far and in which direction your selection will extend.",
+        "You can also define a brush Scope, which restricts selection based on anatomical context.",
+        "If no scope is selected ('None'), the brush includes voxels based purely on spatial proximity.",
+        "If a parcellation is chosen (e.g., Desikan-Killiany, Destrieux), the brush will only select voxels that share the same anatomical label and hemisphere as the starting point.",
+        "This ensures your selection respects anatomical boundaries and avoids spillover into unrelated regions."
+      )
+    ),
+
+    # Refinement tab
+    "video_paintbrush_erase" = list(
+      title = "Paintbrush Erase Mode",
+      short = "Remove voxels from an existing selection.",
+      type = "inline",
+      content = c(
+        "The Paintbrush-Eraser tool works similarly to the regular paintbrush, but instead of adding voxels, it removes them from your current selection.",
+        "Use the same brush size and mode configuration as with standard drawing.",
+        "After confirming, inspect the result in the MRI and 3D viewer. You can undo erasure actions using the Backward button if needed."
+      )
+    ),
+
+    "video_undo_and_debris_removal" = list(
+      title = "Undoing Changes & Debris Removal",
+      short = "Undo unwanted changes and automatically clean up small, isolated voxel clusters.",
+      type = "inline",
+      content = c(
+        "Changes in your selection can always be undone stepwise by clicking on Undo.",
+        "During erasing or selection refinement, small disconnected voxel clusters can remain.",
+        "Click Clean Debris to automatically remove these. It targets tiny, likely irrelevant clusters based on spatial isolation.",
+        "If the cleanup removes desired areas, you can easily undo the action using the Undo button."
+      )
+    ),
+
+    "video_safety_margin" = list(
+      title = "Safety Margin",
+      short = "Expand your selection with a configurable buffer.",
+      type = "inline",
+      content = c(
+        "To account for uncertainty or ensure full inclusion of surrounding tissue, you can apply a safety margin to your selection.",
+        "Click the Margin option, then use the slider to define the radius (up to 15 mm).",
+        "Once applied, margin voxels are marked separately. You can assign a distinct score to the margin in the scoring interface."
+      )
+    )
+
   )
+
+
+
+help_videos <- list(
+
+
+)
 

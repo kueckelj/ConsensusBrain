@@ -31,11 +31,11 @@ add_helper <- function(shiny_tag, name){
 
   help_info <- CB_help[[name]]
 
-  if(is.null(help_info$title)){ title <- make_pretty_label(name) }
+  if(is.null(help_info$title)){ help_info$title <- make_pretty_label(name) }
 
   shinyhelper::helper(
     shiny_tag = shiny_tag,
-    title = title,
+    title = help_info$title,
     type = help_info$type,
     content = help_info$content
     )
@@ -733,6 +733,33 @@ ggpLayer_slice <- function(slice_df,
   }
 
   return(out)
+
+}
+
+resource_file <- function(file){
+
+ ifelse(local_launch(), file.path("www", file), file)
+
+}
+
+videoBox <- function(name, width = 6){
+
+  help_name <- paste0("video_", name)
+
+  shiny::column(
+    width = width,
+    shiny::div(
+      class = "video-container",
+      shiny::strong(shiny::h4(CB_help[[help_name]]$title)) %>% add_helper(help_name),
+      shiny::tags$video(
+        src = paste0(resource_file(name), ".mp4"),
+        width = "100%",
+        type = "video/mp4",
+        controls = NA
+      ),
+      shiny::helpText(CB_help[[help_name]]$short)
+    )
+  )
 
 }
 
