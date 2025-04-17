@@ -303,7 +303,7 @@ moduleMriControlServer <- function(id,
           choices <-
             c(
               # Region-Click
-              #'<i class="fas fa-hand-pointer" style="font-size: 1.5em;" data-toggle="tooltip" title="Region-Click"></i>' = "region_click",
+              '<i class="fas fa-hand-pointer" style="font-size: 1.5em;" data-toggle="tooltip" title="Region-Click"></i>' = "region_click",
               # Outline - does not work properly - improve later
               #'<i class="fas fa-circle-notch" style="font-size: 1.5em;" data-toggle="tooltip" title="Outline"></i>' = "outline",
               # Paintbrush

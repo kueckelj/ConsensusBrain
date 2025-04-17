@@ -11,6 +11,32 @@ moduleMriPlaneUI <- function(id,
 
   shiny::tagList(
     shiny::tags$head(
+      tags$script(
+        shiny::HTML(
+          glue::glue(
+            "document.addEventListener('DOMContentLoaded', function() {
+             const plot = document.getElementById('{{ns('mriInteractionPlot')}}');
+
+             if (plot) {
+               plot.addEventListener('mousedown', function() {
+                 Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'down', {priority: 'event'});
+               });
+
+               plot.addEventListener('mouseup', function() {
+                 Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
+               });
+
+               plot.addEventListener('mouseleave', function() {
+                 Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
+               });
+             }
+
+            });",
+            .open = "{{",
+            .close = "}}"
+          )
+        )
+      ),
       shiny::tags$style(
         shiny::HTML(
           "
@@ -209,8 +235,8 @@ moduleMriPlaneServer <- function(id,
         print(mri_control_input$drawing_on_plane)
         print(drawing_on_diff_plane())
 
-
       }, ignoreInit = TRUE)
+
 
       # 1. Global ---------------------------------------------------------------
 
@@ -448,6 +474,12 @@ moduleMriPlaneServer <- function(id,
 
       # Reactive Values ---------------------------------------------------------
 
+      btns_disabled_outline <- shiny::reactiveVal(value = TRUE)
+      btns_disabled_paintbrush <- shiny::reactiveVal(value = TRUE)
+      btns_disabled_paintbrush_erase <- shiny::reactiveVal(value = TRUE)
+
+      drawing_active <- shiny::reactiveVal(value = FALSE)
+
       mri_control_input <-
         shiny::reactiveValues(
           # all modes
@@ -478,50 +510,7 @@ moduleMriPlaneServer <- function(id,
 
       stacks <- shiny::reactiveValues(zoom = list())
 
-      drawing_active <- shiny::reactiveVal(value = FALSE)
-
-      hover_show <- shiny::reactive({
-
-        if(mode() == "inspection"){
-
-          TRUE
-
-        } else {
-
-          !stringr::str_detect(interaction_tool(), pattern = "outline|paintbrush")
-
-        }
-
-      })
-
-      mri_range <- shiny::reactive({
-
-        shiny::req(stacks)
-
-        if(length(stacks$zoom) == 0){
-
-          shiny::req(nifti_input())
-
-          col_range <- c(1,dim(nifti_input())[which(mri_planes == unname(col_axis))])
-          row_range <- c(1,dim(nifti_input())[which(mri_planes == unname(row_axis))])
-
-          out <- list(col = col_range, row = row_range)
-
-        } else {
-
-          out <- dplyr::last(x = stacks$zoom)
-
-        }
-
-        return(out)
-
-      })
-
       mode <- shiny::reactiveVal(mode_init)
-
-      btns_disabled_outline <- shiny::reactiveVal(value = TRUE)
-      btns_disabled_paintbrush <- shiny::reactiveVal(value = TRUE)
-      btns_disabled_paintbrush_erase <- shiny::reactiveVal(value = TRUE)
 
       slice_pos <- shiny::reactiveValues(sag = 128, axi = 128, cor = 128)
 
@@ -567,11 +556,31 @@ moduleMriPlaneServer <- function(id,
 
       cursor_on_mri <- shiny::reactiveVal(value = FALSE)
 
+      cursor_down <- shiny::reactive({
+
+        is.character(input$mouse_state_plot) && input$mouse_state_plot == "down"
+
+        })
+
       cursor_pos <- shiny::reactive({ c(input$mriPlot_hover$x, input$mriPlot_hover$y) })
 
       col_min <- shiny::reactive({ min(mri_range()[["col"]]) })
       col_max <- shiny::reactive({ max(mri_range()[["col"]]) })
       col_seq <- shiny::reactive({ col_min():col_max() })
+
+      hover_show <- shiny::reactive({
+
+        if(mode() == "inspection"){
+
+          TRUE
+
+        } else {
+
+          !stringr::str_detect(interaction_tool(), pattern = "outline|paintbrush")
+
+        }
+
+      })
 
       hover_text <- shiny::reactive({
 
@@ -616,38 +625,6 @@ moduleMriPlaneServer <- function(id,
         return(text)
 
       })
-
-      # none = NULL for identify_obs_within_radius2D/3D()
-      selection_scope <- shiny::reactive({
-
-        if(stringr::str_detect(selection_tool(), "paintbrush")){
-
-          if(mri_control_input$paintbrush_mode == "Sphere" |
-             mri_control_input$selection_scope == "none"){
-
-            NULL
-
-          } else {
-
-            mri_control_input$selection_scope
-
-          }
-
-        } else {
-
-          if(mri_control_input$selection_scope == "none"){
-
-            NULL
-
-          } else {
-
-            mri_control_input$selection_scope
-
-          }
-
-        }
-
-        })
 
       inspection_template <- shiny::reactive({
 
@@ -712,31 +689,150 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      localizer_col_v <- shiny::reactive({ ifelse(cursor_on_mri(), ggplot2::alpha("red", 0.5), "red") })
+      dragging_localizers <- shiny::reactiveVal(value = character())
 
-      localizer_col_h <- shiny::reactive({ ifelse(cursor_on_mri(), ggplot2::alpha("red", 0.5), "red") })
+      shiny::observeEvent(cursor_down(), {
 
-      localizer_lty <- shiny::reactive({ ifelse(cursor_on_mri(), "solid", "solid") })
+        if(cursor_down()){
+
+          if(length(localizers_active()) != 0){
+
+            dragging_localizers({ localizers_active() })
+
+          }
+
+        } else if(!cursor_down()){
+
+          # either of two localizers was dragged
+          if(length(dragging_localizers()) != 0){
+
+            if("v" %in% dragging_localizers()){
+
+              slice_pos[[col_axis]] <- round(cursor_pos()[1])
+
+            }
+
+            if("h" %in% dragging_localizers()){
+
+              slice_pos[[row_axis]] <- round(cursor_pos()[2])
+
+            }
+
+            dragging_localizers({ character() })
+
+          }
+
+        }
+
+      })
+
+      localizer_active_h <- shiny::reactive({
+
+        cursor_on_mri() &&
+        !drawing_active() &&
+        abs(round(cursor_pos()[2], 0) - slice_pos[[ra_mri[["row"]]]]) <= mri_side_length()*0.01
+
+      })
+
+      localizer_active_v <- shiny::reactive({
+
+        cursor_on_mri() &&
+        !drawing_active() &&
+        abs(round(cursor_pos()[1], 0) - slice_pos[[ra_mri[["col"]]]]) <= mri_side_length()*0.01
+
+      })
+
+      localizers_active <- shiny::reactive({
+
+        c("v", "h")[c(localizer_active_v(), localizer_active_h())]
+
+      })
 
       localizer_lwd <- shiny::reactive({ ifelse(cursor_on_mri(), 1, 1.5) })
 
-      # positioning of the vertical localizer
-      localizer_x0_v <- shiny::reactive({ slice_pos[[ra_mri["col"]]] })
+      localizer_lwd_v <- shiny::reactive({ ifelse(localizer_active_v(), 2, localizer_lwd()) })
 
-      localizer_x1_v <- shiny::reactive({ slice_pos[[ra_mri["col"]]] })
+      localizer_lwd_h <- shiny::reactive({ ifelse(localizer_active_h(), 2, localizer_lwd()) })
+
+      localizer_col_v <- shiny::reactive({ ifelse(cursor_on_mri() & !localizer_active_v(), ggplot2::alpha("red", 0.5), "red") })
+
+      localizer_col_h <- shiny::reactive({ ifelse(cursor_on_mri() & !localizer_active_h(), ggplot2::alpha("red", 0.5), "red") })
+
+      localizer_lty <- shiny::reactive({ ifelse(cursor_on_mri(), "solid", "solid") })
+
+      # positioning of the vertical localizer
+      localizer_x0_v <- shiny::reactive({
+
+        ifelse(
+          test = "v" %in% dragging_localizers(),
+          yes = abs(round(cursor_pos()[1])),
+          no = slice_pos[[ra_mri["col"]]]
+        )
+
+        })
+
+      localizer_x1_v <- shiny::reactive({
+
+        ifelse(
+          test = "v" %in% dragging_localizers(),
+          yes = abs(round(cursor_pos()[1])),
+          no = slice_pos[[ra_mri["col"]]]
+        )
+
+      })
+
 
       localizer_y0_v <- shiny::reactive({ ifelse(show_localizer_ray_h(), NA, row_min()) })
 
       localizer_y1_v <- shiny::reactive({ ifelse(show_localizer_ray_h(), NA, row_max()) })
 
       # positioning of the horizontal localizer
-      localizer_y0_h <- shiny::reactive({ slice_pos[[ra_mri["row"]]] })
+      localizer_y0_h <- shiny::reactive({
 
-      localizer_y1_h <- shiny::reactive({ slice_pos[[ra_mri["row"]]] })
+        ifelse(
+          test = "h" %in% dragging_localizers(),
+          yes = abs(round(cursor_pos()[2])),
+          no = slice_pos[[ra_mri["row"]]]
+        )
+
+      })
+
+      localizer_y1_h <- shiny::reactive({
+
+        ifelse(
+          test = "h" %in% dragging_localizers(),
+          yes = abs(round(cursor_pos()[2])),
+          no = slice_pos[[ra_mri["row"]]]
+        )
+
+      })
 
       localizer_x0_h <- shiny::reactive({ ifelse(show_localizer_ray_v(), NA, col_min()) })
 
       localizer_x1_h <- shiny::reactive({ ifelse(show_localizer_ray_v(), NA, col_max()) })
+
+      mri_range <- shiny::reactive({
+
+        shiny::req(stacks)
+
+        if(length(stacks$zoom) == 0){
+
+          shiny::req(nifti_input())
+
+          col_range <- c(1,dim(nifti_input())[which(mri_planes == unname(col_axis))])
+          row_range <- c(1,dim(nifti_input())[which(mri_planes == unname(row_axis))])
+
+          out <- list(col = col_range, row = row_range)
+
+        } else {
+
+          out <- dplyr::last(x = stacks$zoom)
+
+        }
+
+        return(out)
+
+      })
 
       mri_slice <- shiny::reactive({
 
@@ -813,7 +909,6 @@ moduleMriPlaneServer <- function(id,
       row_min <- shiny::reactive({ min(mri_range()[["row"]]) })
       row_max <- shiny::reactive({ max(mri_range()[["row"]]) })
       row_seq <- shiny::reactive({ row_min():row_max() })
-
 
       show_localizer_ray_v <- shiny::reactive({
 
@@ -1382,14 +1477,14 @@ moduleMriPlaneServer <- function(id,
           segments(
             x0 = localizer_x0_v(), x1 = localizer_x1_v(),
             y0 = localizer_y0_v(), y1 = localizer_y1_v(),
-            col = localizer_col_v(), lwd = localizer_lwd(), lty = localizer_lty()
+            col = localizer_col_v(), lwd = localizer_lwd_v(), lty = localizer_lty()
           )
 
           # horizontal
           segments(
             x0 = localizer_x0_h(), x1 = localizer_x1_h(),
             y0 = localizer_y0_h(), y1 = localizer_y1_h(),
-            col = localizer_col_h(), lwd = localizer_lwd(), lty = localizer_lty()
+            col = localizer_col_h(), lwd = localizer_lwd_h(), lty = localizer_lty()
           )
 
           if(show_localizer_ray_v()){
@@ -1464,7 +1559,7 @@ moduleMriPlaneServer <- function(id,
             segments(
               x0 = ray_x, x1 = ray_x,
               y0 = row_min(), y1 = row_max(),
-              col = "red", lwd = 1.5, lty = "dotted"
+              col = "red", lwd = localizer_lwd(), lty = "dotted"
             )
 
             text(
@@ -1530,7 +1625,7 @@ moduleMriPlaneServer <- function(id,
             segments(
               x0 = col_min(), x1 = col_max(),
               y0 = ray_y, y1 = ray_y,
-              col = "red", lwd = 1.5, lty = "dotted"
+              col = "red", lwd = localizer_lwd(), lty = "dotted"
             )
 
             text(
@@ -1551,14 +1646,14 @@ moduleMriPlaneServer <- function(id,
           segments(
             x0 = localizer_x0_v(), x1 = localizer_x1_v(),
             y0 = localizer_y0_v(), y1 = localizer_y1_v(),
-            col = localizer_col_v(), lwd = localizer_lwd(), lty = localizer_lty()
+            col = localizer_col_v(), lwd = localizer_lwd_v(), lty = localizer_lty()
           )
 
           # horizontal
           segments(
             x0 = localizer_x0_h(), x1 = localizer_x1_h(),
             y0 = localizer_y0_h(), y1 = localizer_y1_h(),
-            col = localizer_col_h(), lwd = localizer_lwd(), lty = localizer_lty()
+            col = localizer_col_h(), lwd = localizer_lwd_h(), lty = localizer_lty()
           )
 
           if(show_localizer_ray_v()){
@@ -1633,7 +1728,7 @@ moduleMriPlaneServer <- function(id,
             segments(
               x0 = ray_x, x1 = ray_x,
               y0 = row_min(), y1 = row_max(),
-              col = "red", lwd = 1.5, lty = "dotted"
+              col = "red", lwd = localizer_lwd(), lty = "dotted"
             )
 
             text(
@@ -1699,7 +1794,7 @@ moduleMriPlaneServer <- function(id,
             segments(
               x0 = col_min(), x1 = col_max(),
               y0 = ray_y, y1 = ray_y,
-              col = "red", lwd = 1.5, lty = "dotted"
+              col = "red", lwd = localizer_lwd(), lty = "dotted"
             )
 
             text(
@@ -1720,14 +1815,14 @@ moduleMriPlaneServer <- function(id,
           segments(
             x0 = localizer_x0_v(), x1 = localizer_x1_v(),
             y0 = localizer_y0_v(), y1 = localizer_y1_v(),
-            col = localizer_col_v(), lwd = localizer_lwd(), lty = localizer_lty()
+            col = localizer_col_v(), lwd = localizer_lwd_v(), lty = localizer_lty()
           )
 
           # horizontal
           segments(
             x0 = localizer_x0_h(), x1 = localizer_x1_h(),
             y0 = localizer_y0_h(), y1 = localizer_y1_h(),
-            col = localizer_col_h(), lwd = localizer_lwd(), lty = localizer_lty()
+            col = localizer_col_h(), lwd = localizer_lwd_h(), lty = localizer_lty()
           )
 
           if(show_localizer_ray_v()){
@@ -1802,7 +1897,7 @@ moduleMriPlaneServer <- function(id,
             segments(
               x0 = ray_x, x1 = ray_x,
               y0 = row_min(), y1 = row_max(),
-              col = "red", lwd = 1.5, lty = "dotted"
+              col = "red", lwd = localizer_lwd(), lty = "dotted"
             )
 
             text(
@@ -1868,7 +1963,7 @@ moduleMriPlaneServer <- function(id,
             segments(
               x0 = col_min(), x1 = col_max(),
               y0 = ray_y, y1 = ray_y,
-              col = "red", lwd = 1.5, lty = "dotted"
+              col = "red", lwd = localizer_lwd(), lty = "dotted"
             )
 
             text(
@@ -2173,6 +2268,38 @@ moduleMriPlaneServer <- function(id,
       })
 
       selection_erase <- shiny::reactive({ mri_control_input$selection_erase })
+
+      # none = NULL for identify_obs_within_radius2D/3D()
+      selection_scope <- shiny::reactive({
+
+        if(stringr::str_detect(selection_tool(), "paintbrush")){
+
+          if(mri_control_input$paintbrush_mode == "Sphere" |
+             mri_control_input$selection_scope == "none"){
+
+            NULL
+
+          } else {
+
+            mri_control_input$selection_scope
+
+          }
+
+        } else {
+
+          if(mri_control_input$selection_scope == "none"){
+
+            NULL
+
+          } else {
+
+            mri_control_input$selection_scope
+
+          }
+
+        }
+
+      })
 
       selection_slices <- shiny::reactive({
 
