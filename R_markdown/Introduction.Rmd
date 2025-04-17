@@ -86,7 +86,7 @@ At any time, you can save your current progress by clicking **Save** in the *Pro
 
 **We strongly recommend saving your progress regularly. Closing the application—whether intentionally or due to unexpected issues—will result in the loss of any unsaved work.**
 
-Once you have scored 95% you can finalize your output in the *Progress* tab. This downloads your progress to a file you can upload [here]().
+Once you have scored 95% you can finalize your output in the *Progress* tab. 
 
 Thank you for your time and contribution.
 

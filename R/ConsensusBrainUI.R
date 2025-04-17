@@ -108,7 +108,7 @@ ConsensusBrainUI <- function(){
             "ConsensusBrain<sup style='font-size: 7.5px; color: gray;'>&copy;</sup>
             is an initiative of the RANOResect research group and was developed by
             Jan Kückelhaus and Philipp Karschnia at the Department of Neurosurgery,
-            University Hospital Erlangen."
+            University Hospital Erlangen (Chair: Prof. Dr. O. Schnell)."
           )
         )
       )
@@ -176,10 +176,10 @@ ConsensusBrainUI <- function(){
           ),
           shiny::fluidRow(
             videoBox(name = "the_progress_tab"),
-            videoBox(name = "score_clearing")
+            videoBox(name = "score_overwriting_rules")
           ),
           shiny::fluidRow(
-            videoBox(name = "score_overwriting_rules")
+            videoBox(name = "score_clearing")
           )
         ),
 
