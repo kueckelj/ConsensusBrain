@@ -303,7 +303,7 @@ moduleMriControlServer <- function(id,
           choices <-
             c(
               # Region-Click
-              '<i class="fas fa-hand-pointer" style="font-size: 1.5em;" data-toggle="tooltip" title="Region-Click"></i>' = "region_click",
+              #'<i class="fas fa-hand-pointer" style="font-size: 1.5em;" data-toggle="tooltip" title="Region-Click"></i>' = "region_click",
               # Outline - does not work properly - improve later
               #'<i class="fas fa-circle-notch" style="font-size: 1.5em;" data-toggle="tooltip" title="Outline"></i>' = "outline",
               # Paintbrush
@@ -1101,6 +1101,32 @@ moduleMriControlServer <- function(id,
                     )
                   )
               ),
+            )
+
+            shiny::req(FALSE)
+
+          }
+
+        } else if(stringr::str_detect(selection_tool(), pattern = "paintbrush")){
+
+          if(length(paintbrush_masks()) != 0){
+
+            name <- tolower(mri_planes_pretty[names(paintbrush_masks())])
+
+            shinyWidgets::sendSweetAlert(
+              session = session,
+              title = "Unconfirmed Paintbrush Drawing!",
+              text = glue::glue(
+                "There is an unconfirmed drawing on the {name} MRI. Please decide what
+                do with the drawing - confirm or reset. Then you can change the interaction tool."
+              ),
+              type = "info"
+            )
+
+            shinyWidgets::updateRadioGroupButtons(
+              session = session,
+              inputId = "selection_tool",
+              selected = selection_tool()
             )
 
             shiny::req(FALSE)

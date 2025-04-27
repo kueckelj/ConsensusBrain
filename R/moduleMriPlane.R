@@ -11,44 +11,90 @@ moduleMriPlaneUI <- function(id,
 
   shiny::tagList(
     shiny::tags$head(
-      shiny::tags$script(
-        shiny::HTML(
-          glue::glue("
-          Shiny.addCustomMessageHandler('{{ns('changeCursor')}}', function(message) {
-          const plot = document.getElementById('{{ns('mriInteractionPlot')}}');
-          if (plot) {
-            plot.style.cursor = message;
-          }
-          });
-          document.addEventListener('DOMContentLoaded', function() {
-            const plot = document.getElementById('{{ns('mriInteractionPlot')}}');
+      tags$script(shiny::HTML(glue::glue("
+  document.addEventListener('DOMContentLoaded', function() {
+    const plot = document.getElementById('{{ns('mriInteractionPlot')}}');
+    const cursor = document.getElementById('{{ns('brushCursor')}}');
 
-          if (plot) {
-            plot.addEventListener('wheel', function(e) {
-              e.preventDefault();
-              let direction = e.deltaY > 0 ? -1 : 1;
-              Shiny.setInputValue('{{ns('plot_scroll_delta')}}', direction, {priority: 'event'});
-            });
+    if (plot && cursor) {
+      // Static initial style for brush circle
+      cursor.style.border = '2px solid green';
+      cursor.style.borderRadius = '50%';
+      cursor.style.pointerEvents = 'none';
+      cursor.style.position = 'absolute';
+      cursor.style.zIndex = '9999';
+      cursor.style.transform = 'translate(-50%, -50%)';
+      cursor.style.display = 'none';
 
-            plot.addEventListener('mousedown', function() {
-              Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'down', {priority: 'event'});
-            });
+      // Mouse tracking
+      plot.addEventListener('mousemove', function(e) {
+        const rect = plot.getBoundingClientRect();
+        cursor.style.left = (e.clientX - rect.left) + 'px';
+        cursor.style.top = (e.clientY - rect.top) + 'px';
+      });
 
-            plot.addEventListener('mouseup', function() {
-              Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
-          });
+      // Show/hide cursor
+      plot.addEventListener('mouseenter', function() {
+        cursor.style.display = 'block';
+      });
 
-            plot.addEventListener('mouseleave', function() {
-              Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
-            });
-          }
-          });
-          ", .open = "{{", .close = "}}")
-          )
-      ),
+      plot.addEventListener('mouseleave', function() {
+        cursor.style.display = 'none';
+        Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
+      });
+
+      // Other events
+      plot.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        let direction = e.deltaY > 0 ? -1 : 1;
+        Shiny.setInputValue('{{ns('plot_scroll_delta')}}', direction, {priority: 'event'});
+      });
+
+      plot.addEventListener('mousedown', function() {
+        Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'down', {priority: 'event'});
+      });
+
+      plot.addEventListener('mouseup', function() {
+        Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
+      });
+
+      // Shiny messages
+      Shiny.addCustomMessageHandler('{{ns('updateBrushSize')}}', function(sizePx) {
+        cursor.style.width = sizePx + 'px';
+        cursor.style.height = sizePx + 'px';
+      });
+
+      Shiny.addCustomMessageHandler('{{ns('updateBrushColor')}}', function(color) {
+        cursor.style.borderColor = color;
+      });
+
+      Shiny.addCustomMessageHandler('{{ns('updateBrushLinetype')}}', function(linetype) {
+        cursor.style.borderStyle = linetype;
+      });
+
+      Shiny.addCustomMessageHandler('{{ns('changeCursor')}}', function(cursorType) {
+        if (plot) {
+          plot.style.cursor = cursorType;
+        }
+      });
+    }
+  });
+", .open = "{{", .close = "}}"))),
+
+
       shiny::tags$style(
         shiny::HTML(
           "
+               #{{ns('brushCursor')}} {
+                position: absolute;
+                border: 2px solid red;
+                border-radius: 50%;
+                pointer-events: none;
+                z-index: 9999;
+                display: none;
+                transform: translate(-50%, -50%);
+              }
+
              .mri-btn {
               align-items: center;
               cursor: pointer;
@@ -197,7 +243,8 @@ moduleMriPlaneUI <- function(id,
             #brush = shiny::brushOpts(id = ns("mriPlot_brush"), delayType = "debounce", resetOnNew = TRUE),
             dblclick = shiny::dblclickOpts(id = ns("mriPlot_dblclick"), clip = TRUE),
             hover = shiny::hoverOpts(id = ns("mriPlot_hover"), delay = 100, delayType = "throttle", clip = TRUE)
-          )
+          ),
+          shiny::div(id = ns("brushCursor"))
         )
       ),
       # Bottom Options
@@ -246,7 +293,8 @@ moduleMriPlaneServer <- function(id,
 
       }, ignoreInit = TRUE)
 
-      shiny::observeEvent(input$plot_scroll_delta,{
+      # --- scrolling (in dev)
+      shiny::observeEvent(NULL,{ # input$plot_scroll_delta
 
         new_slice_pos <- slice_pos[[plane]] + input$plot_scroll_delta
 
@@ -263,36 +311,6 @@ moduleMriPlaneServer <- function(id,
 
       cursor_on_mri <- shiny::reactiveVal(value = FALSE)
 
-
-      # --- debuggin
-      shiny::observeEvent(NULL, {
-
-        shiny::req(stringr::str_detect(selection_tool(), pattern = "paintbrush"))
-
-        session$sendCustomMessage("plot-hover-toggle", list(
-          show = cursor_on_mri(),
-          # 500 = MRI width
-          radius_px = (paintbrush_radius()/2) * (500 / diff(col_min(), col_max())),
-          color = selection_color()
-        ))
-
-      }, ignoreNULL = TRUE)
-
-      time_text <- shiny::reactiveVal(value = "Waiting")
-      time_diff <- shiny::reactiveVal(value = list())
-
-      shiny::observeEvent(data$paintbrush, {
-
-        m <- round(mean(purrr::map_dbl(time_diff(), ~ .x)), 2)
-        v <- round(var(purrr::map_dbl(time_diff(), ~ .x)), 2)
-
-        time_text({  as.character(glue::glue("Mean: {m} | Var: {v}")) })
-
-      })
-
-      output$text <- renderPrint({ time_text() })
-
-      # --- debugging
 
       # Dynamic UI --------------------------------------------------------------
 
@@ -716,7 +734,7 @@ moduleMriPlaneServer <- function(id,
 
         if(cursor_down()){
 
-          if(length(localizers_active()) != 0){
+          if(localizers_hover()){
 
             dragging_localizers({ localizers_active() })
 
@@ -749,15 +767,13 @@ moduleMriPlaneServer <- function(id,
 
       shiny::observeEvent(localizers_active(), {
 
-        if(length(localizers_active()) != 0){
+        if(localizers_hover()){
 
           session$sendCustomMessage(ns("changeCursor"), "grab")
-          print("hovering")
 
         } else {
 
           session$sendCustomMessage(ns("changeCursor"), "crosshair")
-          print("default")
 
         }
 
@@ -785,7 +801,7 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      localizer_hover <- shiny::reactive({ length(localizers_active()) != 0 })
+      localizers_hover <- shiny::reactive({ length(localizers_active()) != 0 })
 
       localizer_lwd <- shiny::reactive({ ifelse(cursor_on_mri(), 1, 1.5) })
 
@@ -1425,21 +1441,6 @@ moduleMriPlaneServer <- function(id,
               false = interaction_template()[interaction_template()$selected,]$color
             ),
             border = NA
-          )
-
-        }
-
-        if(cursor_on_mri() & !localizer_hover() & length(dragging_localizers()) == 0){
-
-          symbols(
-            x = cursor_pos()[1],
-            y = cursor_pos()[2],
-            circles = paintbrush_radius(),
-            inches = FALSE,
-            add = TRUE,
-            fg = interaction_color(),
-            lwd = 2,
-            lty = ifelse(drawing_active(), "solid", "dotted")
           )
 
         }
@@ -2211,8 +2212,7 @@ moduleMriPlaneServer <- function(id,
             dplyr::mutate(
               .data = dplyr::filter(interaction_template(), selected),
               color = dplyr::case_when(
-                id %in% data$paintbrush_erase & id %in% non_brain_template$id ~ ggplot2::alpha("red", 0.2),
-                id %in% data$paintbrush_erase & !id %in% non_brain_template$id ~ ggplot2::alpha("red", alpha_val),
+                id %in% data$paintbrush_erase ~ ggplot2::alpha(colorsCB$erased, alpha_val),
                 TRUE ~ color
               )
             )
@@ -2261,7 +2261,7 @@ moduleMriPlaneServer <- function(id,
 
       shiny::observeEvent(input$mriPlot_dblclick, {
 
-        shiny::req(mode() == "inspection")
+        shiny::req(mode() == "inspection" & !localizers_hover())
 
         slice_pos[[plane]] <- slice_idx()
         slice_pos[[col_axis]] <- round(cursor_pos()[1])
@@ -2302,7 +2302,7 @@ moduleMriPlaneServer <- function(id,
 
       selection_color <- shiny::reactive({
 
-        ifelse(!selection_erase(), yes = "forestgreen", no = "red")
+        ifelse(!selection_erase(), yes = colorsCB$not_selected, no = colorsCB$erased)
 
       })
 
@@ -2478,7 +2478,7 @@ moduleMriPlaneServer <- function(id,
       # --- dblclick + region_click -> updates voxel_df() immediately
       shiny::observeEvent(input$mriPlot_dblclick, {
 
-        shiny::req(mode() == "selection" & selection_tool() == "region_click")
+        shiny::req(mode() == "selection" & selection_tool() == "region_click" & !localizers_hover())
 
         # validity check
         if(!cursor_on_brain_tissue()){
@@ -2544,7 +2544,7 @@ moduleMriPlaneServer <- function(id,
       # --- selection by outline
       shiny::observeEvent(input$mriPlot_dblclick, {
 
-        shiny::req(mode() == "selection" & selection_tool() == "outline")
+        shiny::req(mode() == "selection" & selection_tool() == "outline" & !localizers_hover())
 
         # initiate drawing logic for outline
         if(!drawing_active()){
@@ -2682,7 +2682,7 @@ moduleMriPlaneServer <- function(id,
       # --- selection by paintbrush
       shiny::observeEvent(input$mriPlot_dblclick, {
 
-        shiny::req(mode() == "selection" & selection_tool() == "paintbrush")
+        shiny::req(mode() == "selection" & selection_tool() == "paintbrush" & !localizers_hover())
 
         # initiate drawing logic for selection + paintbrush
         if(!drawing_active()){
@@ -2819,7 +2819,7 @@ moduleMriPlaneServer <- function(id,
       # --- deselection by paintbrush
       shiny::observeEvent(input$mriPlot_dblclick, {
 
-        shiny::req(mode() == "selection" & selection_tool() == "paintbrush_erase")
+        shiny::req(mode() == "selection" & selection_tool() == "paintbrush_erase" & !localizers_hover())
 
         # initiate drawing logic for selection + paintbrush
         if(!drawing_active()){
@@ -2893,6 +2893,9 @@ moduleMriPlaneServer <- function(id,
 
           }
 
+          slice_pos[[col_axis]] <- round(cursor_pos()[1])
+          slice_pos[[row_axis]] <- round(cursor_pos()[2])
+
           drawing_active(TRUE)
 
         } else if(drawing_active()){
@@ -2902,6 +2905,9 @@ moduleMriPlaneServer <- function(id,
             btns_disabled_paintbrush_erase(FALSE)
 
           }
+
+          slice_pos[[col_axis]] <- round(cursor_pos()[1])
+          slice_pos[[row_axis]] <- round(cursor_pos()[2])
 
           paintbrushed_ids(data$paintbrush_erase)
           drawing_active(FALSE)
@@ -2975,6 +2981,42 @@ moduleMriPlaneServer <- function(id,
 
       }, ignoreInit = TRUE)
 
+
+
+      # ---- dev
+      # --- circle cursor
+      shiny::observe({
+
+        plot_width_px <- session$clientData[[paste0("output_", ns("mriInteractionPlot"), "_width")]]
+        req(plot_width_px)
+
+        size_px <- plot_width_px * (paintbrush_radius()*2 / mri_side_length())
+        session$sendCustomMessage(ns("updateBrushSize"), size_px)
+
+      })
+
+      # 1. Color changes independently
+      shiny::observeEvent(selection_tool(), {
+
+        if(stringr::str_detect(selection_tool(), pattern = "paintbrush")){
+
+          session$sendCustomMessage(ns("updateBrushColor"), selection_color())
+
+        } else {
+
+          session$sendCustomMessage(ns("updateBrushColor"), "transparent")
+
+        }
+
+      })
+
+      # 2. Linetype changes independently
+      shiny::observeEvent(drawing_active(), {
+
+        session$sendCustomMessage(ns("updateBrushLinetype"), ifelse(drawing_active(), "solid", "dotted"))
+
+      })
+
       # LAST: Module Output -----------------------------------------------------
 
       paintbrushed_ids <- shiny::reactiveVal(value = character(0))
@@ -2993,6 +3035,8 @@ moduleMriPlaneServer <- function(id,
         })
 
       return(module_output)
+
+
 
     }
   )
