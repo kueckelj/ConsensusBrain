@@ -32,6 +32,7 @@ Imports:
     tidyr,
     shiny,
     shinyalert,
+    shinyBS,
     shinybusy,
     shinycssloaders,
     shinydashboard,

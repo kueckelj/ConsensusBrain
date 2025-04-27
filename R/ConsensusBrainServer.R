@@ -100,6 +100,20 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
               width = "100%"
             )
           ),
+          shinyBS::bsPopover(
+            id = "userInp_first_name",
+            title = NULL,
+            content = "Enter your first ame as it should appear in a publication.",
+            placement = "bottom",
+            trigger = "hover"
+          ),
+          shinyBS::bsPopover(
+            id = "userInp_last_name",
+            title = NULL,
+            content = "Enter your last ame as it should appear in a publication.",
+            placement = "bottom",
+            trigger = "hover"
+          ),
           shiny::splitLayout(
             cellWidths = "50%",
             shiny::textInput(
@@ -120,6 +134,13 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
             value = ifelse(local_launch(session), "Department of Neurosurgery, University Clinic Erlangen", ""),
             placeholder = "As denoted in publications."
           ),
+          shinyBS::bsPopover(
+            id = "userInp_affiliation",
+            title = NULL,
+            content = "Enter your affiliation as it should appear in a publication.",
+            placement = "bottom",
+            trigger = "hover"
+          ),
           shiny::fluidRow(
             shiny::column(
               width = 4,
@@ -129,6 +150,13 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
                 choices = c("", countrycode::codelist$country.name.en),
                 selected = ifelse(local_launch(session), "Germany", ""),
                 width = "100%"
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_country",
+                title = NULL,
+                content = "The country where your affiliation is based (not your country of birth).",
+                placement = "bottom",
+                trigger = "hover"
               )
             ),
             shiny::column(
@@ -140,6 +168,13 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
                 min = 0,
                 max = 100,
                 step = 1
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_years_of_experience",
+                title = NULL,
+                content = "Years of experience as a neurosurgeon, counted from the first day of residency to the present.",
+                placement = "bottom",
+                trigger = "hover"
               )
             ),
             shiny::column(
@@ -151,6 +186,13 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
                 min = 0,
                 max = 1000,
                 step = 50
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_annual_case_load",
+                title = "Annual Case Load",
+                content = "Your personal annual case load for intra-parenchymal glioma surgeries.",
+                placement = "bottom",
+                trigger = "hover"
               )
             )
           ),

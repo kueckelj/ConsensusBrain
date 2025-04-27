@@ -1256,8 +1256,8 @@ map_values_to_colors <- function(values, clrsp = "Viridis", n = 100){
 
 }
 
-plot_mri_frame <- function(col,
-                           row,
+plot_mri_frame <- function(col = c(1,256),
+                           row = c(1,256),
                            type = "n",
                            color = NULL,
                            xlim = NULL,

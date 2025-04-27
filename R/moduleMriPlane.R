@@ -11,31 +11,40 @@ moduleMriPlaneUI <- function(id,
 
   shiny::tagList(
     shiny::tags$head(
-      tags$script(
+      shiny::tags$script(
         shiny::HTML(
-          glue::glue(
-            "document.addEventListener('DOMContentLoaded', function() {
-             const plot = document.getElementById('{{ns('mriInteractionPlot')}}');
+          glue::glue("
+          Shiny.addCustomMessageHandler('{{ns('changeCursor')}}', function(message) {
+          const plot = document.getElementById('{{ns('mriInteractionPlot')}}');
+          if (plot) {
+            plot.style.cursor = message;
+          }
+          });
+          document.addEventListener('DOMContentLoaded', function() {
+            const plot = document.getElementById('{{ns('mriInteractionPlot')}}');
 
-             if (plot) {
-               plot.addEventListener('mousedown', function() {
-                 Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'down', {priority: 'event'});
-               });
+          if (plot) {
+            plot.addEventListener('wheel', function(e) {
+              e.preventDefault();
+              let direction = e.deltaY > 0 ? -1 : 1;
+              Shiny.setInputValue('{{ns('plot_scroll_delta')}}', direction, {priority: 'event'});
+            });
 
-               plot.addEventListener('mouseup', function() {
-                 Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
-               });
+            plot.addEventListener('mousedown', function() {
+              Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'down', {priority: 'event'});
+            });
 
-               plot.addEventListener('mouseleave', function() {
-                 Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
-               });
-             }
+            plot.addEventListener('mouseup', function() {
+              Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
+          });
 
-            });",
-            .open = "{{",
-            .close = "}}"
+            plot.addEventListener('mouseleave', function() {
+              Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
+            });
+          }
+          });
+          ", .open = "{{", .close = "}}")
           )
-        )
       ),
       shiny::tags$style(
         shiny::HTML(
@@ -236,6 +245,18 @@ moduleMriPlaneServer <- function(id,
         print(drawing_on_diff_plane())
 
       }, ignoreInit = TRUE)
+
+      shiny::observeEvent(input$plot_scroll_delta,{
+
+        new_slice_pos <- slice_pos[[plane]] + input$plot_scroll_delta
+
+        if(within_range(new_slice_pos, r = c(1, 256))){
+
+          slice_pos[[plane]] <- new_slice_pos
+
+        }
+
+      }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
 
       # 1. Global ---------------------------------------------------------------
@@ -726,6 +747,22 @@ moduleMriPlaneServer <- function(id,
 
       })
 
+      shiny::observeEvent(localizers_active(), {
+
+        if(length(localizers_active()) != 0){
+
+          session$sendCustomMessage(ns("changeCursor"), "grab")
+          print("hovering")
+
+        } else {
+
+          session$sendCustomMessage(ns("changeCursor"), "crosshair")
+          print("default")
+
+        }
+
+      })
+
       localizer_active_h <- shiny::reactive({
 
         cursor_on_mri() &&
@@ -747,6 +784,8 @@ moduleMriPlaneServer <- function(id,
         c("v", "h")[c(localizer_active_v(), localizer_active_h())]
 
       })
+
+      localizer_hover <- shiny::reactive({ length(localizers_active()) != 0 })
 
       localizer_lwd <- shiny::reactive({ ifelse(cursor_on_mri(), 1, 1.5) })
 
@@ -1390,7 +1429,7 @@ moduleMriPlaneServer <- function(id,
 
         }
 
-        if(cursor_on_mri()){
+        if(cursor_on_mri() & !localizer_hover() & length(dragging_localizers()) == 0){
 
           symbols(
             x = cursor_pos()[1],
