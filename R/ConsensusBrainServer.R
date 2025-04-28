@@ -147,7 +147,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
               shiny::selectInput(
                 inputId = "userInp_country",
                 label = shiny::tagList(shiny::icon("globe"), "Country:"),
-                choices = c("", countrycode::codelist$country.name.en),
+                choices = stringr::str_subset(c("", countrycode::codelist$country.name.en), pattern = "German Democratic Republic", negate = TRUE),
                 selected = ifelse(local_launch(session), "Germany", ""),
                 width = "100%"
               ),
