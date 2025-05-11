@@ -655,6 +655,14 @@ comp_progress <- function(voxel_df){
 
 }
 
+get_brain_dim <- function(nifti, plane, slice){
+
+  slice_df <-
+    get_slice_df(nifti, plane = plane, slice = slice) %>%
+    dplyr::filter(value != 0)
+
+}
+
 get_slice <- function(nifti, plane, slice){
 
   if(plane == "sag"){
@@ -1871,6 +1879,7 @@ plot_brain_3d <- function(voxel_df,
                           plot_bgcolor = "white",
                           paper_bgcolor = "white",
                           source = "plotly_source",
+                          scene = NULL,
                           ...){ # Default frontal perspective
 
   type <- type[1]
@@ -2024,18 +2033,25 @@ plot_brain_3d <- function(voxel_df,
     }
   }
 
+  if(is.null(scene)){
+
+    scene <-
+      list(
+        xaxis = list(title = "Sagittal (x)", range = c(min(voxel_df$x), max(voxel_df$x))),
+        yaxis = list(title = "Coronal (z)", range = c(min(voxel_df$z), max(voxel_df$z))), # switch y & z
+        zaxis = list(title = "Axial (y)", range = c(min(voxel_df$y), max(voxel_df$y))),
+        camera = list(
+          eye = eye,
+          ...# Use the `eye` argument for dynamic camera positioning
+        )
+      )
+
+  }
+
   ## Add camera with user-defined `eye`
   p <- plotly::layout(
     p,
-    scene = list(
-      xaxis = list(title = "Sagittal (x)", range = c(min(voxel_df$x), max(voxel_df$x))),
-      yaxis = list(title = "Coronal (z)", range = c(min(voxel_df$z), max(voxel_df$z))), # switch y & z
-      zaxis = list(title = "Axial (y)", range = c(min(voxel_df$y), max(voxel_df$y))),
-      camera = list(
-        eye = eye,
-        ...# Use the `eye` argument for dynamic camera positioning
-      )
-    ),
+    scene = scene,
     paper_bgcolor = paper_bgcolor,
     plot_bgcolor = plot_bgcolor
   )
