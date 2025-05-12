@@ -3,6 +3,7 @@
 export(ConsensusBrain)
 export(ProgressCB)
 export(UserCB)
+export(launchCB)
 export(score_set_up)
 exportClasses(ProgressCB)
 exportClasses(UserCB)

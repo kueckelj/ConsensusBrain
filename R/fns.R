@@ -461,6 +461,7 @@ ConsensusBrain <- function(nifti_object = NULL){
 
 }
 
+#' @export
 launchCB <- function(){
 
   shiny::runApp(
