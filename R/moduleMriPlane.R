@@ -870,8 +870,11 @@ moduleMriPlaneServer <- function(id,
 
           shiny::req(nifti_input())
 
-          col_range <- c(1,dim(nifti_input())[which(mri_planes == unname(col_axis))])
-          row_range <- c(1,dim(nifti_input())[which(mri_planes == unname(row_axis))])
+          #col_range <- c(1,dim(nifti_input())[which(mri_planes == unname(col_axis))])
+          #row_range <- c(1,dim(nifti_input())[which(mri_planes == unname(row_axis))])
+
+          col_range <- brain_dims[[col_axis]]
+          row_range <- brain_dims[[row_axis]]
 
           out <- list(col = col_range, row = row_range)
 

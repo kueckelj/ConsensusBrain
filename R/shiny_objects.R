@@ -250,6 +250,67 @@ names(workflow_tabs) <-
   c('Frontal Lobe', 'Insular Lobe', 'Temporal Lobe', 'Parietal Lobe', 'Occipital Lobe',
      'Cingulate Lobe','Corpus Callosum', 'Subcortical','Infratentorial', 'Fiber Tracts')
 
+# diffuse to save time
+if(FALSE){
+
+  ctp_df <- load_consensus_template()
+  brain_dims <-
+    purrr::map(
+      .x = ccs_labels,
+      .f = function(axis){
+
+        r <- range(ctp_df[[axis]])
+        r[1] <- r[1]-10
+        r[2] <- r[2]+10
+
+        return(r)
+
+      }
+    ) %>%
+    purrr::set_names(nm = mri_planes)
+
+  max_dist <- max(map_dbl(brain_dims, .f = ~ as.numeric(dist(.x))))
+
+  brain_dims <-
+    map(
+      .x = brain_dims,
+      .f = function(r){
+
+        if(as.numeric(dist(r)) != max_dist){
+
+          dif <- max_dist - as.numeric(dist(r))
+
+          val <- dif/2
+
+          if(val%%2!=0){
+
+            r[1] <- r[1]-floor(val)
+            r[2] <- r[2]+ceiling(val)
+
+          } else {
+
+            r[1] <- r[1]-val
+            r[2] <- r[2]+val
+
+          }
+
+        }
+
+        return(r)
+
+      }
+    )
+
+  print(brain_dims)
+
+}
+
+brain_dims <-
+  list(
+    sag = c(29, 227),
+    cor = c(29, 227),
+    axi = c(43, 241)
+  )
 
 
 
