@@ -1,6 +1,7 @@
 
 ConsensusBrainServer <- function(input, output, session, nifti_object){
 
+  require(shinyBS)
 
   # Global ------------------------------------------------------------------
   shinyhelper::observe_helpers()

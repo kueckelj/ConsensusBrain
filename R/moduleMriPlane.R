@@ -87,7 +87,7 @@ moduleMriPlaneUI <- function(id,
 
         scrollTimer = setTimeout(function() {
           scrollTimer = null;
-        }, 100);  // adjust delay to taste
+        }, 75);  // adjust delay to taste
       });
 
       }
