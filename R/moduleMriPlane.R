@@ -43,13 +43,6 @@ moduleMriPlaneUI <- function(id,
         Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'up', {priority: 'event'});
       });
 
-      // Other events
-      plot.addEventListener('wheel', function(e) {
-        e.preventDefault();
-        let direction = e.deltaY > 0 ? -1 : 1;
-        Shiny.setInputValue('{{ns('plot_scroll_delta')}}', direction, {priority: 'event'});
-      });
-
       plot.addEventListener('mousedown', function() {
         Shiny.setInputValue('{{ns('mouse_state_plot')}}', 'down', {priority: 'event'});
       });
@@ -250,6 +243,7 @@ moduleMriPlaneUI <- function(id,
       # Bottom Options
       shiny::div(
         style = "margin-top: 1.5%; margin-bottom: 1%",
+        shiny::actionButton(ns("test"), "Test"),
         shiny::uiOutput(ns("options_bottom"))
       )
 
@@ -288,8 +282,7 @@ moduleMriPlaneServer <- function(id,
 
         print("-----------------------")
         print("Test")#
-        print(mri_control_input$drawing_on_plane)
-        print(drawing_on_diff_plane())
+        slice_idx({ slice_idx()+1 })
 
       }, ignoreInit = TRUE)
 
@@ -519,6 +512,11 @@ moduleMriPlaneServer <- function(id,
 
       drawing_active <- shiny::reactiveVal(value = FALSE)
 
+      max_slices <- shiny::reactiveVal(value = 256)
+      min_slices <- shiny::reactiveVal(value = 1)
+
+      mode <- shiny::reactiveVal(mode_init)
+
       mri_control_input <-
         shiny::reactiveValues(
           # all modes
@@ -548,8 +546,6 @@ moduleMriPlaneServer <- function(id,
         )
 
       stacks <- shiny::reactiveValues(zoom = list())
-
-      mode <- shiny::reactiveVal(mode_init)
 
       slice_pos <- shiny::reactiveValues(sag = 128, axi = 128, cor = 128)
 
@@ -901,8 +897,6 @@ moduleMriPlaneServer <- function(id,
       # (col and row are always equally long - pick col)
       mri_side_length <- shiny::reactive({ as.numeric(dist(mri_range()[["col"]])) })
 
-      n_slices <- shiny::reactive({ dim(nifti_input())[which(c("sag", "cor", "axi") == plane)] })
-
       paintbrush_radius <- shiny::reactive({ mri_control_input$paintbrush_radius })
 
       paintbrush_selected <- shiny::reactive({
@@ -1031,7 +1025,9 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      slice_idx <- shiny::reactive({ slice_pos[[plane]] })
+      slice_idx <- shiny::reactiveVal(value = 128)
+      slice_idx_debounce <- shiny::debounce(r = slice_idx, millis = 200)
+
 
       # ----- Observers
 
@@ -1048,6 +1044,27 @@ moduleMriPlaneServer <- function(id,
             mri_control_input[[nm]] <- slot_data
 
           }
+
+        }
+
+      })
+
+      # slice positioning
+      shiny::observeEvent(slice_idx_debounce(), {
+
+        if(slice_pos[[plane]] != slice_idx_debounce()){
+
+          slice_pos[[plane]] <- slice_idx_debounce()
+
+        }
+
+      })
+
+      shiny::observeEvent(slice_pos[[plane]], {
+
+        if(slice_pos[[plane]] != slice_idx()){
+
+          slice_idx({ slice_pos[[plane]] })
 
         }
 
@@ -1181,9 +1198,9 @@ moduleMriPlaneServer <- function(id,
 
         }
 
-        if(slice_pos[[plane]] != n_slices()){
+        if(slice_idx() != max_slices()){
 
-          slice_pos[[plane]] <- slice_pos[[plane]]+1
+          slice_idx({ slice_idx() + 1})
 
         }
 
@@ -1207,9 +1224,9 @@ moduleMriPlaneServer <- function(id,
 
         }
 
-        if(slice_pos[[plane]] != 1){
+        if(slice_idx() != min_slices()){
 
-          slice_pos[[plane]] <- slice_pos[[plane]]-1
+          slice_idx({ slice_idx() - 1})
 
         }
 
