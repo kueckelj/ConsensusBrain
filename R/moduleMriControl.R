@@ -103,9 +103,9 @@ moduleMriControlServer <- function(id,
 
           names(choices$Subcortical) <- make_pretty_label(choices$Subcortical)
 
-        } else if(input$highlight_var == "wm_tract"){
+        } else if(input$highlight_var == "fiber_tract"){
 
-          choices <- sort(unique(voxel_df()[["wm_tract"]]))
+          choices <- sort(unique(voxel_df()[["fiber_tract"]]))
           choices <- choices[choices != "none"]
 
           names(choices) <- make_pretty_label(choices)
@@ -241,7 +241,7 @@ moduleMriControlServer <- function(id,
                   "Macroanatomical" = "ann_macro",
                   "Desikan-Kiliany" = "ann_dk_adj",
                   "Destrieux" = "ann_dt_adj",
-                  "White Matter Tracts" = "wm_tract",
+                  "Fibert Tracts" = "fiber_tract",
                   "Score" = "CBscore"
                 ),
                 width = "100%",

@@ -1358,6 +1358,73 @@ prepare_margin_selection <- function(voxel_df, dist_max, voxels_margin){
 
 }
 
+pre_render_slices <- function(nifti, plane = "axi") {
+
+  # required axes
+  ra <- req_axes_2d(plane, mri = TRUE)
+
+  rcol <- brain_dims[[ra["col"]]]
+  rrow <- brain_dims[[ra["row"]]]
+
+  dc <- as.numeric(dist(rcol))
+  dr <- as.numeric(dist(rrow))
+
+  if(dr > dc){
+
+    rcol <- rrow
+    sl <- as.numeric(dist(rcol))
+
+  } else if(dc > dr){
+
+    rrow <- rcol
+    sl <- as.numeric(dist(rrow))
+
+  }
+  print(sl)
+
+  # range plane
+  rp <- brain_dims[[plane]]
+  col_seq <- rcol[1]:rcol[2]
+  row_seq <- rrow[1]:rrow[2]
+  slice_seq <- rp[1]:rp[2]
+
+  lst <- vector(mode = "list", length = 256)
+
+  lst[slice_seq] <-
+    lapply(slice_seq, function(i) {
+      #pb$tick()
+
+      slice <- get_slice(nifti, plane = plane, slice = i)
+
+      slice <- slice[row_seq, col_seq]
+
+      slice <- slice - min(slice, na.rm = TRUE)
+      slice <- slice / max(slice, na.rm = TRUE)
+
+      tf <- tempfile(fileext = ".png")
+      png(tf, width = 750, height = 750, bg = "white")
+      par(mar = c(0, 0, 0, 0))
+      plot_mri_frame(col = col_seq, row = row_seq)
+      rasterImage(
+        image = slice,
+        xleft = min(col_seq),
+        ybottom = max(row_seq),
+        xright = max(col_seq),
+        ytop = min(row_seq),
+        interpolate = FALSE
+      )
+      dev.off()
+
+      on.exit(unlink(tf))  # ensures cleanup even if something fails
+      base64enc::dataURI(file = tf, mime = "image/png")
+
+    })
+
+  lst
+
+}
+
+
 propagate_selection_unscoped <- function(voxel_df,
                                          selection_mask,
                                          selection_plane,

@@ -9,6 +9,9 @@ moduleMriPlaneUI <- function(id,
 
   ns <- shiny::NS(id)
 
+  rmin <- min(brain_dims[[plane]])
+  rmax <- max(brain_dims[[plane]])
+
   shiny::tagList(
     shiny::tags$head(
       tags$script(shiny::HTML(glue::glue("
@@ -70,8 +73,39 @@ moduleMriPlaneUI <- function(id,
           plot.style.cursor = cursorType;
         }
       });
-    }
-  });
+
+      // Scrolling
+      let scrollTimer = null;
+
+      plot.addEventListener('wheel', function(e) {
+        e.preventDefault();
+
+        if (scrollTimer) return; // ignore if waiting
+
+        const direction = e.deltaY > 0 ? -1 : 1;
+        Shiny.setInputValue('{{ns('scroll_delta')}}', direction, {priority: 'event'});
+
+        scrollTimer = setTimeout(function() {
+          scrollTimer = null;
+        }, 100);  // adjust delay to taste
+      });
+
+      }
+      });
+
+      Shiny.addCustomMessageHandler('{{ns('show_slice')}}', function(slice_idx) {
+        for (let i = {{rmin}}; i <= {{rmax}}; i++) {
+          const el = document.getElementById('slice_' + i + '_{{id}}' + '-'); // with + '-'! due to how ns() works
+          if (el) {
+            el.style.display = (i === slice_idx) ? 'block' : 'none';
+          }
+        }
+      });
+
+      setTimeout(function() {
+        Shiny.setInputValue('{{ns('show_slice_direct')}}', 128, {priority: 'event'});
+      }, 100);
+
 ", .open = "{{", .close = "}}"))),
 
 
@@ -221,7 +255,8 @@ moduleMriPlaneUI <- function(id,
         shiny::div(
           class = "multiple-plots",
           style = "background-color: white;",
-          shiny::plotOutput(ns("mriSlicePlot"), height = "100%", width = "100%"),
+          #shiny::plotOutput(ns("mriSlicePlot"), height = "100%", width = "100%"),
+          shiny::uiOutput(ns("mriSlicePlot")),
           shiny::plotOutput(ns("mriInspectionPlot"), height = "100%", width = "100%"),
           shiny::plotOutput(ns("mriSelectionStatePlot"), height = "100%", width = "100%"),
           shiny::plotOutput(ns("mriVisualAidPlot"), height = "100%", width = "100%"),
@@ -243,7 +278,7 @@ moduleMriPlaneUI <- function(id,
       # Bottom Options
       shiny::div(
         style = "margin-top: 1.5%; margin-bottom: 1%",
-        shiny::actionButton(ns("test"), "Test"),
+        #shiny::actionButton(ns("test"), "Test"),
         shiny::uiOutput(ns("options_bottom"))
       )
 
@@ -287,17 +322,28 @@ moduleMriPlaneServer <- function(id,
       }, ignoreInit = TRUE)
 
       # --- scrolling (in dev)
-      shiny::observeEvent(NULL,{ # input$plot_scroll_delta
+      shiny::observeEvent(input$scroll_delta, {
 
-        new_slice_pos <- slice_pos[[plane]] + input$plot_scroll_delta
+        if(pb_mask_on_this_plane()){
 
-        if(within_range(new_slice_pos, r = c(1, 256))){
+          shinyWidgets::sendSweetAlert(
+            session = session,
+            title = "Unconfirmed Paintbrush Drawing!",
+            text = glue::glue(
+              "There is an unconfirmed paintbrush drawing on this MRI.
+              Please confirm or reset it before scrolling."
+            ),
+            type = "info"
+          )
 
-          slice_pos[[plane]] <- new_slice_pos
+          shiny::req(FALSE)
 
         }
 
-      }, ignoreInit = TRUE, ignoreNULL = TRUE)
+        new_val <- min(max(slice_idx() + input$scroll_delta, min_slices()), max_slices())
+        slice_idx(new_val)
+
+      })
 
 
       # 1. Global ---------------------------------------------------------------
@@ -665,11 +711,10 @@ moduleMriPlaneServer <- function(id,
 
         shiny::req(nrow(voxel_df()) != 0)
 
-        out <-
-          dplyr::rename(
-            .data = voxel_df()[voxel_df()[[plane_ccs]] == slice_idx(), ],
-            !!!ra_ccs
-          )
+        dplyr::rename(
+          .data = voxel_df()[voxel_df()[[plane_ccs]] == slice_idx(), ],
+          !!!ra_ccs
+        )
 
       })
 
@@ -870,9 +915,6 @@ moduleMriPlaneServer <- function(id,
 
           shiny::req(nifti_input())
 
-          #col_range <- c(1,dim(nifti_input())[which(mri_planes == unname(col_axis))])
-          #row_range <- c(1,dim(nifti_input())[which(mri_planes == unname(row_axis))])
-
           col_range <- brain_dims[[col_axis]]
           row_range <- brain_dims[[row_axis]]
 
@@ -1000,7 +1042,7 @@ moduleMriPlaneServer <- function(id,
       slice_cor <- shiny::reactive({ mri_control_input$slice_state$cor })
       slice_sag <- shiny::reactive({ mri_control_input$slice_state$sag })
 
-      slice_df <- shiny::reactive({ voxel_df()[voxel_df()[[plane_ccs]] == slice_idx(),] })
+      slice_df <- shiny::reactive({ voxel_df()[voxel_df()[[plane_ccs]] == slice_pos[[plane]],] })
 
       slice_df_hover <- shiny::reactive({
 
@@ -2256,24 +2298,29 @@ moduleMriPlaneServer <- function(id,
 
       }, bg = "transparent")
 
-      output$mriSlicePlot <- shiny::renderPlot({
+      output$mriSlicePlot <- renderUI({
 
-        shiny::req(mri_slice())
+        rp <- range(brain_dims[plane])
 
-        plot_mri_frame(col = col_seq(), row = row_seq())
-
-        graphics::rasterImage(
-          image = mri_slice()[row_seq(), col_seq()],
-          xleft = col_min(),
-          xright = col_max(),
-          ybottom = row_max(),
-          ytop = row_min(),
-          interpolate = FALSE
+        tags$div(
+          id = ns("mriSlicePlot"),
+          style = "width: 100%; height: 100%; overflow: hidden; border: 1px solid #ccc;",
+          lapply(rp[1]:rp[2], function(i) {
+            tags$img(
+              id = paste0("slice_", i, "_", ns("")),
+              src = pre_rendered_slices[[plane]][[i]],
+              style = ifelse(i==128, 'display: block; width: 100%;', 'display: none; width: 100%;')
+            )
+          })
         )
 
       })
 
+      shiny::observe({
 
+        session$sendCustomMessage(ns("show_slice"), slice_idx())
+
+      })
 
       # 1. Mode: Inspection -----------------------------------------------------
 
@@ -2768,7 +2815,6 @@ moduleMriPlaneServer <- function(id,
 
       }, ignoreInit = TRUE)
 
-
       # apply buttons
       shiny::observeEvent(input$paintbrush_confirm, {
 
@@ -3055,8 +3101,6 @@ moduleMriPlaneServer <- function(id,
         })
 
       return(module_output)
-
-
 
     }
   )
