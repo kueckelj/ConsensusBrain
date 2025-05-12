@@ -1358,7 +1358,7 @@ prepare_margin_selection <- function(voxel_df, dist_max, voxels_margin){
 
 }
 
-pre_render_slices <- function(nifti, plane = "axi") {
+pre_render_slices <- function(nifti, npixels = 1500, plane = "axi") {
 
   # required axes
   ra <- req_axes_2d(plane, mri = TRUE)
@@ -1368,19 +1368,6 @@ pre_render_slices <- function(nifti, plane = "axi") {
 
   dc <- as.numeric(dist(rcol))
   dr <- as.numeric(dist(rrow))
-
-  if(dr > dc){
-
-    rcol <- rrow
-    sl <- as.numeric(dist(rcol))
-
-  } else if(dc > dr){
-
-    rrow <- rcol
-    sl <- as.numeric(dist(rrow))
-
-  }
-  print(sl)
 
   # range plane
   rp <- brain_dims[[plane]]
@@ -1402,7 +1389,7 @@ pre_render_slices <- function(nifti, plane = "axi") {
       slice <- slice / max(slice, na.rm = TRUE)
 
       tf <- tempfile(fileext = ".png")
-      png(tf, width = 750, height = 750, bg = "white")
+      png(tf, width = npixels, height = npixels, bg = "white")
       par(mar = c(0, 0, 0, 0))
       plot_mri_frame(col = col_seq, row = row_seq)
       rasterImage(
