@@ -316,7 +316,7 @@ CB_help <-
         "The MRI interface displays the brain in three orthogonal orientations: sagittal, axial, and coronal (left to right).",
         "Depending on the selected interaction tool, contextual information appears at the top and bottom left to guide your actions.",
         "Below the MRI, an information box provides tool-specific instructions.",
-        "Use the slider and corresponding arrow buttons at the top to scroll through slices in the active plane. The localizer lines in each view indicate the current position of the other two planes.",
+        "Scroll or use the slider and the corresponding arrow buttons at the top to navigate through slices in the active plane. The localizer lines in each view indicate the current position of the other two planes.",
         "When hovering over a localizer the cursor shows a 'grab'-symbol. This indicates that you can click + hold and drag the localizer to the desired level.",
         "Zoom in and out using the buttons in the upper left corner of the interface."
       )
