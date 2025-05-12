@@ -93,6 +93,19 @@ moduleMriPlaneUI <- function(id,
       }
       });
 
+      // Zooming
+      Shiny.addCustomMessageHandler('{{ns('set_zoom')}}', function(data) {
+        const zoom = data.zoom;
+        const allImgs = document.querySelectorAll('#{{ns('mriSlicePlot')}} .zoomable-image');
+
+        allImgs.forEach(function(img) {
+          img.style.transform = 'scale(' + zoom + ')';
+          img.style.transformOrigin = 'center center';
+        });
+
+      });
+
+      // Ensure that initial slice is shown directly
       Shiny.addCustomMessageHandler('{{ns('show_slice')}}', function(slice_idx) {
         for (let i = {{rmin}}; i <= {{rmax}}; i++) {
           const el = document.getElementById('slice_' + i + '_{{id}}' + '-'); // with + '-'! due to how ns() works
@@ -162,6 +175,7 @@ moduleMriPlaneUI <- function(id,
 
            .multiple-plots {
             position: relative;
+            overflow: hidden;
             width: 100%;
             aspect-ratio: 1 / 1;
             margin: 0 !important;
@@ -930,6 +944,12 @@ moduleMriPlaneServer <- function(id,
 
       })
 
+      mri_range_orig <-
+        list(
+          col = brain_dims[[col_axis]],
+          row = brain_dims[[row_axis]]
+          )
+
       mri_slice <- shiny::reactive({
 
         shiny::req(nifti_input())
@@ -1295,45 +1315,14 @@ moduleMriPlaneServer <- function(id,
       })
 
       # --- zoom in
+      zoom_const <- 0.05
+      zoom_factor <- shiny::reactiveVal(value = 1)
+
       shiny::observeEvent(input$zoom_in,{
 
-        fct <- 0.05
         # new mri range
-        nmr <-
-          purrr::map(
-            .x = mri_range(),
-            .f = function(r){
-
-              d <- as.numeric(dist(r))
-              zoom <- d*fct
-
-              r[1] <- round(r[1]+zoom)
-              r[2] <- round(r[2]-zoom)
-
-              return(r)
-
-            }
-          )
-
-        # ensure both axes are equally long
-        length_col <- as.numeric(dist(nmr$col))
-        length_row <- as.numeric(dist(nmr$row))
-
-        if(length_col != length_row){
-
-          length_max <- ifelse(length_col>length_row, yes = length_col, no = length_row)
-
-          half <- ceiling(length_max/2)
-
-          nmr <- purrr::map(nmr, .f = function(r){
-
-            mid <- round(mean(r))
-
-            c(mid-half, mid+half)
-
-          })
-
-        }
+        new_zoom_fct <- zoom_factor() + zoom_const
+        nmr <- update_mri_range_zoom(mri_range = mri_range_orig, zoom_fct = new_zoom_fct)
 
         # update localizer
         shinyWidgets::updateNoUiSliderInput(
@@ -1350,8 +1339,10 @@ moduleMriPlaneServer <- function(id,
           value = round(mean(nmr$col))
         )
 
-        # stack zoom ranges
+        # stack zoom ranges - update plots
         stacks <- add_to_stack(stacks, which = "zoom", what = nmr)
+        zoom_factor({ new_zoom_fct })
+
 
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
@@ -1395,10 +1386,20 @@ moduleMriPlaneServer <- function(id,
         if(length(stacks$zoom) != 0){
 
           stacks <- reduce_stack(stacks, which = "zoom")
+          zoom_factor({ zoom_factor() - zoom_const })
 
         }
 
       }, ignoreInit = TRUE)
+
+      shiny::observeEvent(zoom_factor(), {
+
+        session$sendCustomMessage(
+          ns("set_zoom"),
+          list(zoom = zoom_factor())
+        )
+
+      })
 
       # --- updates of slice_pos from the controller side
       shiny::observeEvent(slice_sag(), {
@@ -2309,7 +2310,13 @@ moduleMriPlaneServer <- function(id,
             tags$img(
               id = paste0("slice_", i, "_", ns("")),
               src = pre_rendered_slices[[plane]][[i]],
-              style = ifelse(i==128, 'display: block; width: 100%;', 'display: none; width: 100%;')
+              class = "zoomable-image",
+              style =
+                ifelse(
+                  test = i==128,
+                  yes = "display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;",
+                  no = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+                )
             )
           })
         )

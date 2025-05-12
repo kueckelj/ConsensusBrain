@@ -2323,6 +2323,31 @@ CBscore_to_label <- function(cb_df){
 
 }
 
+
+update_mri_range_zoom <- function(mri_range, zoom_fct) {
+  # Extract original ranges
+  col <- mri_range$col
+  row <- mri_range$row
+
+  # Compute center
+  cx <- mean(col)
+  cy <- mean(row)
+
+  # Compute new half-width/height after zooming in
+  col_half_range <- diff(col) / 2 / zoom_fct
+  row_half_range <- diff(row) / 2 / zoom_fct
+
+  # Create new zoomed-in ranges
+  col_zoomed <- c(cx - col_half_range, cx + col_half_range)
+  row_zoomed <- c(cy - row_half_range, cy + row_half_range)
+
+  # Return updated list
+  list(
+    col = col_zoomed,
+    row = row_zoomed
+  )
+}
+
 within_range <- function(x, r){
 
   x > min(r) & x < max(r)
