@@ -965,6 +965,27 @@ identify_obs_in_polygon <- function(interaction_template,
 
 }
 
+
+
+#' @title Identify Observations Within a 2D Radius
+#'
+#' @description
+#' Returns the IDs of all observations in a 2D interaction template that lie within
+#' a specified radius of a cursor position. Optionally restricts the selection to a
+#' specific label and hemisphere based on the observation at the center of the cursor.
+#'
+#' @param cursor_pos A numeric vector of length 2 indicating the cursor position (`c(col, row)`).
+#' @param radius A numeric value specifying the radius within which to select observations.
+#' @param interaction_template A data frame containing at least the columns `id`, `col`, `row`,
+#' `hemisphere`, and optionally a label column (specified by `selection_scope`).
+#' @param preselected_ids A character vector of IDs that should be excluded from selection. Defaults to `character()`.
+#' @param selection_scope Optional character string naming the column in `interaction_template` used
+#' to constrain the selection to observations with the same label and hemisphere as the observation under the cursor.
+#'
+#' @return A character vector of `id`s from `interaction_template` that fall within the specified radius
+#' and match the optional label and hemisphere constraints.
+#' @export
+
 identify_obs_within_radius2D <- function(cursor_pos,
                                          radius,
                                          interaction_template,

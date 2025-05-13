@@ -2301,6 +2301,16 @@ moduleMriPlaneServer <- function(id,
 
       output$mriSlicePlot <- renderUI({
 
+        if(plane == "axi"){
+
+          shiny::showNotification(
+            ui = "MRI data is loading. This can take a few seconds - even if the red busy indicator is not displayed.",
+            type = "message",
+            duration = 10
+          )
+
+        }
+
         rp <- range(brain_dims[plane])
 
         tags$div(
