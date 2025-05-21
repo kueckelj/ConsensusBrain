@@ -254,14 +254,14 @@ names(workflow_tabs) <-
 if(FALSE){
 
   ctp_df <- load_consensus_template()
-  brain_dims <-
+  brain_dims_slider <-
     purrr::map(
       .x = ccs_labels,
       .f = function(axis){
 
         r <- range(ctp_df[[axis]])
-        r[1] <- r[1]-10
-        r[2] <- r[2]+10
+        r[1] <- r[1]
+        r[2] <- r[2]
 
         return(r)
 
@@ -269,11 +269,11 @@ if(FALSE){
     ) %>%
     purrr::set_names(nm = mri_planes)
 
-  max_dist <- max(map_dbl(brain_dims, .f = ~ as.numeric(dist(.x))))
+  max_dist <- max(map_dbl(brain_dims_slider, .f = ~ as.numeric(dist(.x))))
 
   brain_dims <-
     map(
-      .x = brain_dims,
+      .x = brain_dims_slider,
       .f = function(r){
 
         if(as.numeric(dist(r)) != max_dist){
@@ -307,10 +307,18 @@ if(FALSE){
 
 brain_dims <-
   list(
-    sag = c(29, 227),
-    cor = c(29, 227),
-    axi = c(43, 241)
+    sag = c(39, 217),
+    cor = c(39, 217),
+    axi = c(53, 231)
   )
+
+brain_dims_slider <-
+  list(
+    sag = c(57, 198),
+    cor = c(39, 217),
+    axi = c(69, 214)
+  )
+
 
 
 

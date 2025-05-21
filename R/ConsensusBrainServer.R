@@ -32,6 +32,20 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
   })
 
+  # idle warning
+  shiny::observeEvent(input$idle_warning, {
+
+    shiny::showModal(
+      shiny::modalDialog(
+        title = "Inactivity Warning",
+        "You have been inactive for 10 minutes. The session will disconnect in 5 minutes unless activity resumes.",
+        easyClose = TRUE
+      )
+    )
+
+  })
+
+
   # Login -------------------------------------------------------------------
 
   # open login modal
@@ -197,6 +211,40 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
               )
             )
           ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 6,
+              shiny::sliderInput(
+                inputId = "userInp_perc_surgery_awake",
+                label = "Awake Surgery [%]",
+                value = 0,
+                min = 0, max = 100, step = 1
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_perc_surgery_awake",
+                title = "Awake Surgery [%]",
+                content = "The percentage of glioma surgeries you conduct with the patient beeing awake.",
+                placement = "bottom",
+                trigger = "hover"
+              )
+            ),
+            shiny::column(
+              width = 6,
+              shiny::sliderInput(
+                inputId = "userInp_perc_surgery_ionm",
+                label = "Surgery with IONM [%]",
+                value = 0,
+                min = 0, max = 100, step = 1
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_perc_surgery_ionm",
+                title = "Surgery with IONM [%]",
+                content = "The percentage of glioma surgeries you conduct with intraoperative neuromonitoring.",
+                placement = "bottom",
+                trigger = "hover"
+              )
+            )
+          ),
           shiny::br(),
           shiny::fluidRow(
             shiny::column(
@@ -243,6 +291,8 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
       email = input$userInp_email,
       first_name = stringr::str_to_title(input$userInp_first_name),
       last_name = stringr::str_to_title(input$userInp_last_name),
+      perc_surgery_awake = input$userInp_perc_surgery_awake,
+      perc_surgery_ionm = input$userInp_perc_surgery_ionm,
       years_of_experience = input$userInp_years_of_experience
     )
 

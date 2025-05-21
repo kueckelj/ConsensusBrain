@@ -371,7 +371,7 @@ moduleMriControlServer <- function(id,
                   ),
                   shiny::actionButton(
                     inputId = ns("selection_reset"),
-                    label = " All", # empty space!
+                    label = " All",
                     icon = shiny::icon("trash"),
                     width = "100%",
                     disabled = TRUE,
@@ -982,6 +982,8 @@ moduleMriControlServer <- function(id,
 
       })
 
+      selection_reset_counter <- shiny::reactiveVal(value = 0)
+
       # Reactive Values ---------------------------------------------------------
 
       # Reactive (Expressions) --------------------------------------------------
@@ -1471,6 +1473,7 @@ moduleMriControlServer <- function(id,
           callbackR = function(confirmed) {
             if (isTRUE(confirmed)) {
               stacks$selection <- list()
+              selection_reset_counter({ selection_reset_counter()+1 })
               selection_state({ character(0) })
               voxels_margin({ character(0) })
               voxels_margin_cand({ character(0) })
@@ -1786,6 +1789,7 @@ moduleMriControlServer <- function(id,
               paintbrush_radius = paintbrush_radius(),
               slice_state = slice_state,
               selection_erase = selection_erase(),
+              selection_reset = selection_reset_counter(),
               selection_scope = sel_scope,
               selection_tool = selection_tool(),
               voxels_margin = voxels_margin(), # only margin

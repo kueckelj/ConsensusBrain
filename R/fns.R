@@ -97,6 +97,104 @@ adjust_sub_colors <- function(df,
 
 }
 
+animate3D_prepare <- function(fig,
+                              n_frames = 360,
+                              angle_range = c(0, 360),
+                              paper_bgcolor = "black",
+                              vwidth = 600,
+                              vheight = 600){
+
+  require(plotly)
+  require(htmlwidgets)
+  require(webshot2)
+  require(av)
+
+  # 1. Set up temporary directory for frames
+  frame_dir <- tempdir()
+  # Double-check that it's the correct path and not something critical
+  if(dir.exists(frame_dir)){
+    unlink(frame_dir, recursive = TRUE, force = TRUE)
+    dir.create(frame_dir)  # optional: recreate empty dir if needed
+  }
+
+  angles <- seq(angle_range[1], angle_range[2], length.out = n_frames)
+
+  pb <- confuns::create_progress_bar(total = length(angles))
+
+  # 2. Create and save each frame
+  for(i in seq_along(angles)){
+
+    pb$tick()
+
+    rad <- angles[i] * pi / 180
+    eye <- list(x = 1.5 * cos(rad), y = 1.5 * sin(rad), z = 0.6)
+    camera <- list(eye = eye)
+
+    fig <-
+      fig %>%
+      layout(scene = list(camera = camera),
+             margin = list(l = 0, r = 0, b = 0, t = 0),
+             paper_bgcolor = paper_bgcolor)
+
+    # Save widget to temp HTML
+    html_path <- file.path(frame_dir, sprintf("frame_%03d.html", i))
+    htmlwidgets::saveWidget(fig, file = html_path, selfcontained = TRUE)
+
+    # Convert to PNG using webshot2
+    png_path <- file.path(frame_dir, sprintf("frame_%03d.png", i))
+    webshot2::webshot(html_path, file = png_path, vwidth = vwidth, vheight = vheight, quiet = TRUE)
+
+  }
+
+  return(frame_dir)
+
+}
+
+animate3D_render <- function(frame_dir,
+                             frame_rate,
+                             filename,
+                             folder = "animations"){
+
+  output <- file.path(folder, paste0(filename, ".mp4"))
+
+  # 3. Encode PNGs to video
+  png_files <- list.files(frame_dir, pattern = "frame_\\d+\\.png$", full.names = TRUE)
+  av::av_encode_video(png_files, framerate = frame_rate, output = output)
+
+}
+
+animate3D_clear <- function(frame_dir, force = FALSE){
+
+  if(dir.exists(frame_dir)){
+
+    files <- list.files(frame_dir)
+    print(files)
+
+    if(isTRUE(force)){
+
+      clear <- TRUE
+
+    } else {
+
+      clear <- askYesNo("Do you want to clear this directory")
+
+    }
+
+    if(isTRUE(clear)){
+
+      unlink(frame_dir, recursive = TRUE, force = TRUE)
+      message("Cleared.")
+
+    }
+
+  } else {
+
+    message("Already cleared.")
+
+  }
+
+}
+
 
 apply_erase_mask <- function(voxel_df,
                              erase_mask,
@@ -1949,6 +2047,7 @@ plot_brain_3d <- function(voxel_df,
                           pt_clrsp = "Viridis",
                           pt_size = 1.5,
                           eye = list(x = 0, y = 0, z = 2),
+                          show_axes = TRUE,
                           show_legend = TRUE,
                           colorful = FALSE,
                           mode = "markers",
@@ -2111,16 +2210,33 @@ plot_brain_3d <- function(voxel_df,
 
   if(is.null(scene)){
 
-    scene <-
-      list(
-        xaxis = list(title = "Sagittal (x)", range = c(min(voxel_df$x), max(voxel_df$x))),
-        yaxis = list(title = "Coronal (z)", range = c(min(voxel_df$z), max(voxel_df$z))), # switch y & z
-        zaxis = list(title = "Axial (y)", range = c(min(voxel_df$y), max(voxel_df$y))),
-        camera = list(
-          eye = eye,
-          ...# Use the `eye` argument for dynamic camera positioning
+    if(show_axes){
+
+      scene <-
+        list(
+          xaxis = list(title = "Sagittal (x)", range = c(min(voxel_df$x), max(voxel_df$x))),
+          yaxis = list(title = "Coronal (z)", range = c(min(voxel_df$z), max(voxel_df$z))), # switch y & z
+          zaxis = list(title = "Axial (y)", range = c(min(voxel_df$y), max(voxel_df$y))),
+          camera = list(
+            eye = eye,
+            ...
+          )
         )
-      )
+
+    } else {
+
+      scene <-
+        list(
+          xaxis = list(title = '', showticklabels = FALSE, showgrid = FALSE, zeroline = FALSE, showline = FALSE),
+          yaxis = list(title = '', showticklabels = FALSE, showgrid = FALSE, zeroline = FALSE, showline = FALSE),
+          zaxis = list(title = '', showticklabels = FALSE, showgrid = FALSE, zeroline = FALSE, showline = FALSE),
+          camera = list(
+            eye = eye,
+            ...
+          )
+        )
+
+    }
 
   }
 
@@ -2135,6 +2251,156 @@ plot_brain_3d <- function(voxel_df,
   return(p)
 
 }
+
+#' Plot Brain in 3D
+#'
+#' This function creates a 3D scatter plot of brain vertices, allowing users to color points by numeric or categorical variables.
+#'
+#' @param vdf A data frame containing vertex coordinates and metadata (e.g., x, y, z, and color_by columns).
+#' @param color_by A string defining the column to use for coloring vertices.
+#' @param parcellation A string specifying the parcellation column (optional).
+#' @param parc_highlight A vector of parcellation labels to highlight (optional).
+#' @param side_highlight A string specifying the hemisphere to highlight ("left" or "right") (optional).
+#' @param parc_rm A vector of parcellation labels to remove from the plot (optional).
+#' @param side_rm A string specifying the hemisphere to remove ("left" or "right") (optional).
+#' @param vert_rm A vector of vertex IDs to remove from the plot (optional).
+#' @param pt_clrsp A string specifying the colorscale for numeric variables (default: "Viridis").
+#' @param pt_size A numeric value specifying the size of the points in the plot (default: 1.5).
+#'
+#' @return A plotly object containing the 3D scatter plot.
+#' @examples
+#' vdf <- data.frame(
+#'   x = rnorm(100),
+#'   y = rnorm(100),
+#'   z = rnorm(100),
+#'   color_by = sample(c("A", "B", "C"), 100, replace = TRUE)
+#' )
+#' plot_brain_surface_3d(vdf, color_by = "color_by")
+#' @export
+plot_brain_surface_3d <- function(vdf,
+                                  color_by,
+                                  parcellation = NULL,
+                                  parc_highlight = NULL,
+                                  side_highlight = NULL,
+                                  parc_rm = NULL,
+                                  side_rm = NULL,
+                                  vert_rm = NULL,
+                                  pt_clrsp = "Viridis",
+                                  pt_size = 1.5){
+
+  require(plotly)
+
+  ## Prepare and subset
+  if(is.character(side_rm)){
+    vdf <- dplyr::filter(vdf, hem != {{side_rm}})
+
+  }
+
+  if(is.character(vert_rm)){
+    vdf <- dplyr::filter(vdf, !vert_id %in% {{vert_rm}})
+
+  }
+
+  if(is.character(color_by)){
+    if(is.character(parc_highlight)){
+      stopifnot(is.character(parcellation))
+      vdf[[parcellation]][!vdf[[parcellation]] %in% parc_highlight] <- NA
+      vdf[[color_by]][!vdf[[parcellation]] %in% parc_highlight] <- NA
+
+    }
+
+    if(is.character(side_highlight)){
+      vdf[[parcellation]][!vdf$hem %in% side_highlight] <- NA
+      vdf[[color_by]][!vdf$hem %in% side_highlight] <- NA
+
+    }
+
+  }
+
+  ## Create dynamic formula for `color`
+  color_formula <- as.formula(paste("~", color_by))
+
+  ## Generate color palette for categorical variables
+  if(!is.numeric(vdf[[color_by]])){
+    unique_labels <- sort(unique(vdf[[color_by]]))
+    n_labels <- length(unique_labels)
+    colors <- scales::hue_pal()(n_labels)  # Generate default ggplot2-like colors
+    color_map <- setNames(colors, unique_labels)  # Map colors to categories
+    vdf$color <- color_map[vdf[[color_by]]]  # Assign discrete colors
+    vdf[[color_by]] <- factor(vdf[[color_by]], levels = unique_labels)  # Factor for legend ordering
+
+  }
+
+  ## Plot
+  if(is.numeric(vdf[[color_by]])){
+    # Numeric values
+    p <- plot_ly(
+      data = vdf,
+      x = ~x, y = ~y, z = ~z, color = color_formula,
+      type = "scatter3d",
+      mode = "markers",
+      marker = list(size = pt_size, colorscale = pt_clrsp, colorbar = list(title = color_by))
+    )
+
+  } else {
+    # Grouped (categorical) values
+    p <- plot_ly()
+
+    for(i in seq_along(unique_labels)){
+      label <- unique_labels[i]
+      vdf_subset <- vdf[vdf[[color_by]] == label, ]
+      p <- add_trace(
+        p = p,
+        data = vdf_subset,
+        x = ~x, y = ~y, z = ~z,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = pt_size, color = color_map[[label]]),
+        name = label,
+        showlegend = TRUE
+      )
+
+    }
+
+    # Add proxy traces for the legend (2D traces for larger markers)
+    for(i in seq_along(unique_labels)){
+      label <- unique_labels[i]
+      p <- add_trace(
+        p = p,
+        type = "scatter",
+        mode = "markers",
+        x = NA, y = NA,  # Legend-only proxy
+        marker = list(size = 20, color = color_map[[label]]),  # Larger marker size
+        name = label,
+        showlegend = TRUE
+      )
+
+    }
+
+    # Adjust legend to be at the bottom with multiple columns
+    p <- layout(
+      p = p,
+      legend = list(
+        orientation = "h",       # Horizontal legend
+        x = 0.5,                 # Center legend horizontally
+        y = -0.2,                # Position legend below the plot
+        xanchor = "center",
+        yanchor = "top",
+        tracegroupgap = 5,       # Gap between groups
+        title = list(text = color_by),
+        font = list(size = 10),  # Legend font size
+        itemwidth = 30,          # Width of legend items
+        itemclick = "toggle",    # Allow toggling items
+        columns = 3              # Number of legend columns
+      )
+    )
+
+  }
+
+  return(p)
+
+}
+
 
 reduce_stack <- function(stacks, which){
 
@@ -2253,7 +2519,7 @@ score_label_colors <- function(score_set_up){
 
 }
 
-trim_brain_3d <- function(plot_input, var, val_missing, fct = 0.5){
+trim_brain_3d <- function(plot_input, var, val_missing, fct = 0.5, hem = TRUE){
 
   # pre-deselect infratentorial
   contains_cerebellum <-
@@ -2276,13 +2542,17 @@ trim_brain_3d <- function(plot_input, var, val_missing, fct = 0.5){
 
   }
 
-  # select hemispheres
-  hemispheres <-
-    dplyr::filter(plot_input, !!rlang::sym(var) != {{val_missing}}) %>%
-    dplyr::pull(var = "hemisphere") %>%
-    unique()
+  if(hem){
 
-  plot_input <- dplyr::filter(plot_input, hemisphere %in% {{hemispheres}})
+    # select hemispheres
+    hemispheres <-
+      dplyr::filter(plot_input, !!rlang::sym(var) != {{val_missing}}) %>%
+      dplyr::pull(var = "hemisphere") %>%
+      unique()
+
+    plot_input <- dplyr::filter(plot_input, hemisphere %in% {{hemispheres}})
+
+  }
 
   # trim remaining
   plot_input_main <- dplyr::filter(plot_input, !!rlang::sym(var) != {{val_missing}} | !is_wm)

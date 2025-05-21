@@ -3,14 +3,15 @@
 moduleMriPlaneUI <- function(id,
                              plane,
                              title = "MRI",
-                             slider_min = 1,
-                             slider_max = 256,
                              ...) {
 
   ns <- shiny::NS(id)
 
   rmin <- min(brain_dims[[plane]])
   rmax <- max(brain_dims[[plane]])
+
+  slider_min <- min(brain_dims_slider[[plane]])
+  slider_max <- max(brain_dims_slider[[plane]])
 
   shiny::tagList(
     shiny::tags$head(
@@ -598,6 +599,7 @@ moduleMriPlaneServer <- function(id,
           slice_state = list(),
           selected_voxels = character(1),
           selection_erase = logical(1),
+          selection_reset = numeric(1),
           selection_scope = character(1),
           selection_tool = character(1),
           voxels_margin = character(1),
@@ -2152,8 +2154,8 @@ moduleMriPlaneServer <- function(id,
             paste0(
               "Tool: ",
               stringr::str_remove_all(interaction_tool(), pattern = "erase$") %>%
-               stringr::str_to_title() %>%
-               stringr::str_replace_all(string = ., pattern = "_", replacement = " ")
+              stringr::str_to_title() %>%
+              stringr::str_replace_all(string = ., pattern = "_", replacement = " ")
             )
 
           if(interaction_erase()){
@@ -2366,6 +2368,13 @@ moduleMriPlaneServer <- function(id,
           paintbrush = character(),
           paintbrush_erase = character()
         )
+
+      shiny::observeEvent(mri_control_input$selection_reset, {
+
+        data$paintbrush <- character()
+        data$paintbrush_erase <- character()
+
+      }, ignoreInit = TRUE)
 
       drawing_outline_confirmed <- shiny::reactiveVal(value = data.frame(col = numeric(), row = numeric()))
 
@@ -2811,22 +2820,22 @@ moduleMriPlaneServer <- function(id,
           slice_pos[[col_axis]] <- round(cursor_pos()[1])
           slice_pos[[row_axis]] <- round(cursor_pos()[2])
 
-          drawing_active(TRUE)
+          drawing_active({ TRUE })
 
         } else if(drawing_active()){
 
-          drawing_active(FALSE)
+          drawing_active({ FALSE })
 
           if(length(data$paintbrush) != 0){
 
-            btns_disabled_paintbrush(FALSE)
+            btns_disabled_paintbrush({ FALSE })
 
           }
 
           slice_pos[[col_axis]] <- round(cursor_pos()[1])
           slice_pos[[row_axis]] <- round(cursor_pos()[2])
 
-          paintbrushed_ids(data$paintbrush)
+          paintbrushed_ids({ data$paintbrush })
 
         }
 
@@ -2985,15 +2994,15 @@ moduleMriPlaneServer <- function(id,
 
           if(length(data$paintbrush_erase) != 0){
 
-            btns_disabled_paintbrush_erase(FALSE)
+            btns_disabled_paintbrush_erase({ FALSE })
 
           }
 
           slice_pos[[col_axis]] <- round(cursor_pos()[1])
           slice_pos[[row_axis]] <- round(cursor_pos()[2])
 
-          paintbrushed_ids(data$paintbrush_erase)
-          drawing_active(FALSE)
+          paintbrushed_ids({ data$paintbrush_erase })
+          drawing_active({ FALSE })
 
         }
 
@@ -3064,21 +3073,41 @@ moduleMriPlaneServer <- function(id,
 
       }, ignoreInit = TRUE)
 
+      # stop drawing when leaving the plot
+      shiny::observeEvent(cursor_on_mri(), {
 
+        if(drawing_active() & !cursor_on_mri()){
 
-      # ---- dev
-      # --- circle cursor
-      shiny::observe({
+          drawing_active({ FALSE })
 
-        plot_width_px <- session$clientData[[paste0("output_", ns("mriInteractionPlot"), "_width")]]
-        req(plot_width_px)
+          if(selection_tool() == "paintbrush"){
 
-        size_px <- plot_width_px * (paintbrush_radius()*2 / mri_side_length())
-        session$sendCustomMessage(ns("updateBrushSize"), size_px)
+            if(length(data$paintbrush) != 0){
+
+              btns_disabled_paintbrush({ FALSE })
+
+            }
+
+            paintbrushed_ids({ data$paintbrush })
+
+          } else if(selection_tool() == "paintbrush_erase"){
+
+            if(length(data$paintbrush_erase) != 0){
+
+              btns_disabled_paintbrush_erase({ FALSE })
+
+            }
+
+            paintbrushed_ids({ data$paintbrush_erase })
+            drawing_active({ FALSE })
+
+          }
+
+        }
 
       })
 
-      # 1. Color changes independently
+      # 1. Color changes
       shiny::observeEvent(selection_tool(), {
 
         if(stringr::str_detect(selection_tool(), pattern = "paintbrush")){
@@ -3093,10 +3122,21 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      # 2. Linetype changes independently
+      # 2. Linetype changes
       shiny::observeEvent(drawing_active(), {
 
         session$sendCustomMessage(ns("updateBrushLinetype"), ifelse(drawing_active(), "solid", "dotted"))
+
+      })
+
+      # 3. Brush size changes
+      shiny::observe({
+
+        plot_width_px <- session$clientData[[paste0("output_", ns("mriInteractionPlot"), "_width")]]
+        shiny::req(plot_width_px)
+
+        size_px <- plot_width_px * (paintbrush_radius()*2 / mri_side_length())
+        session$sendCustomMessage(ns("updateBrushSize"), size_px)
 
       })
 

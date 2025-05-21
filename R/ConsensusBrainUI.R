@@ -107,7 +107,7 @@ ConsensusBrainUI <- function(){
           shiny::HTML(
             "ConsensusBrain<sup style='font-size: 7.5px; color: gray;'>&copy;</sup>
             is an initiative of the RANOResect research group and was developed by
-            Jan Kückelhaus and Philipp Karschnia at the Department of Neurosurgery,
+            Jan Kueckelhaus and Philipp Karschnia at the Department of Neurosurgery,
             University Hospital Erlangen (Chair: Prof. Dr. O. Schnell)."
           )
         )
@@ -147,7 +147,31 @@ ConsensusBrainUI <- function(){
             margin-bottom: 1.5%;
           }
         ")
-        )
+        ),
+        shiny::tags$script(HTML("
+      var idleTime = 0;
+      var idleInterval;
+
+      function resetIdleTime() {
+        idleTime = 0;
+        console.log('Idle time reset');
+      }
+
+      $(document).ready(function () {
+        idleInterval = setInterval(function () {
+          idleTime++;
+          console.log('Idle time:', idleTime);
+          if (idleTime === 10) {
+            Shiny.setInputValue('idle_warning', true, {priority: 'event'});
+          }
+          if (idleTime === 15) {
+            Shiny.setInputValue('disconnect', true, {priority: 'event'});
+          }
+        }, 60000); // every minute (60k miliseconds)
+
+        $(document).on('mousemove keypress click scroll', resetIdleTime);
+      });
+    "))
       ),
 
       # tabs
