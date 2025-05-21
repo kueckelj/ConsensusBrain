@@ -2371,8 +2371,10 @@ moduleMriPlaneServer <- function(id,
 
       shiny::observeEvent(mri_control_input$selection_reset, {
 
+        data$cursor_pos <- list()
         data$paintbrush <- character()
         data$paintbrush_erase <- character()
+        paintbrushed_ids({ character() })
 
       }, ignoreInit = TRUE)
 
@@ -3150,7 +3152,7 @@ moduleMriPlaneServer <- function(id,
           cursor_on_mri = cursor_on_mri(),
           drawing_active = drawing_active(),
           drawing_outline_confirmed = drawing_outline_confirmed(),
-          paintbrushed_ids = data$paintbrush,
+          paintbrushed_ids = paintbrushed_ids(),
           plane_selection_state = plane_selection_state(),
           slice_pos = slice_pos
         )
