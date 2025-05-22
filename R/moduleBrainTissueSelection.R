@@ -185,8 +185,8 @@ moduleBrainTissueSelectionServer <- function(id,
 
       output$brain_area <- shiny::renderUI({
 
-        shiny::req(choices())
-        shiny::req(progress_values())
+        #shiny::req(choices())
+        #shiny::req(progress_values())
 
         shiny::column(
           width = 6,
@@ -194,8 +194,8 @@ moduleBrainTissueSelectionServer <- function(id,
           shinyWidgets::pickerInput(
             inputId = ns("brain_area"),
             label = paste0(label(), ":"),
-            choices = choices(),
-            choicesOpt = list(style = unlist(progress_values())),
+            choices = NULL, #choices(),
+            choicesOpt = list(), #list(style = unlist(progress_values())),
             selected = character(),
             multiple = TRUE,
             options = picker_options
@@ -326,6 +326,22 @@ moduleBrainTissueSelectionServer <- function(id,
       })
 
       # ----- observeEvents
+
+      # update brain area picker
+      shiny::observeEvent({ list(choices(), progress_values(), label()) }, {
+
+        shiny::req(choices(), progress_values())
+
+        shinyWidgets::updatePickerInput(
+          session = session,
+          inputId = "brain_area",
+          label = paste0(label(), ":"),
+          choices = choices(),
+          choicesOpt = list(style = unlist(progress_values())),
+          selected = character()
+        )
+
+      })
 
       # apply selection criteria
       shiny::observeEvent(input$applyVS, {

@@ -26,15 +26,15 @@ ConsensusBrainUI <- function(){
           tabName = "tab_guide",
           icon = shiny::icon("graduation-cap"),
           shinydashboard::menuSubItem(
-            text = "Workflow",
+            text = "Workflow (Videos)",
             tabName = "tab_tut_workflow"
           ),
           shinydashboard::menuSubItem(
-            text = "Selection",
+            text = "Selection (Videos)",
             tabName = "tab_tut_selection"
           ),
           shinydashboard::menuSubItem(
-            text = "Refinement",
+            text = "Refinement (Videos)",
             tabName = "tab_tut_refinement"
           )
         ),
