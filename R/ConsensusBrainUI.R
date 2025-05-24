@@ -148,30 +148,39 @@ ConsensusBrainUI <- function(){
           }
         ")
         ),
-        shiny::tags$script(HTML("
-      var idleTime = 0;
-      var idleInterval;
+        shiny::tags$script(
+          shiny::HTML(
+            "
+            var idleTime = 0;
+            var idleInterval;
 
-      function resetIdleTime() {
-        idleTime = 0;
-        console.log('Idle time reset');
-      }
+            function resetIdleTime() {
+              idleTime = 0;
+              console.log('Idle time reset');
+            }
 
-      $(document).ready(function () {
-        idleInterval = setInterval(function () {
-          idleTime++;
-          console.log('Idle time:', idleTime);
-          if (idleTime === 10) {
-            Shiny.setInputValue('idle_warning', true, {priority: 'event'});
-          }
-          if (idleTime === 15) {
-            Shiny.setInputValue('disconnect', true, {priority: 'event'});
-          }
-        }, 60000); // every minute (60k miliseconds)
+            $(document).ready(function () {
+              idleInterval = setInterval(function () {
+                idleTime++;
+                console.log('Idle time:', idleTime);
+                if (idleTime === 10) {
+                  Shiny.setInputValue('idle_warning', true, {priority: 'event'});
+                }
+                if (idleTime === 15) {
+                  Shiny.setInputValue('disconnect', true, {priority: 'event'});
+                }
+              }, 60000); // every minute (60k miliseconds)
 
-        $(document).on('mousemove keypress click scroll', resetIdleTime);
-      });
-    "))
+              $(document).on('mousemove keypress click scroll', resetIdleTime);
+            });
+
+            $(document).on('click', '#terms_link', function(e) {
+             e.preventDefault();
+             Shiny.setInputValue('terms_link_clicked', true, {priority: 'event'});
+            });
+            "
+          )
+        )
       ),
 
       # tabs
