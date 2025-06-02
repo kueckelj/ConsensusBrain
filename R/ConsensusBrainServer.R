@@ -1,6 +1,7 @@
 
 ConsensusBrainServer <- function(input, output, session, nifti_object){
 
+  require(shiny)
   require(shinyBS)
 
   # Global ------------------------------------------------------------------
@@ -113,10 +114,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
       shiny::modalDialog(
         title = "Terms of Use",
 
-        shiny::tagList(
-          shiny::p("By using this application, you acknowledge that all concepts, features, and design elements are the intellectual property of its creators."),
-          shiny::p("You agree not to claim ownership, file for patents, or otherwise appropriate the underlying idea of this application without prior written consent.")
-        ),
+        html_terms_of_use, # this is supposed to be a shiny::tagList()
 
         footer = shiny::tagList(
           shiny::fluidRow(

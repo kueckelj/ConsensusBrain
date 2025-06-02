@@ -754,6 +754,12 @@ comp_progress <- function(voxel_df){
 
 }
 
+generate_color_gradient <- function(colors, n) {
+  stopifnot(length(colors) >= 2)
+  grDevices::colorRampPalette(colors)(n)
+}
+
+
 get_brain_dim <- function(nifti, plane, slice){
 
   slice_df <-
@@ -2146,19 +2152,51 @@ plot_brain_3d <- function(voxel_df,
   }
 
   ## Plot
-  if(is.numeric(voxel_df[[color_by]])){
+  if (is.numeric(voxel_df[[color_by]])) {
 
-    # Numeric values
-    p <-
-      plotly::plot_ly(
-        data = voxel_df,
-        x = ~x, y = ~z, z = ~y, # exchange z and y axis, cause plotly rotates around z axis
-        color = color_formula,
+    max_points <- 100000
+    color_range <- range(voxel_df[[color_by]], na.rm = TRUE)
+
+    voxel_list <- split(voxel_df, ceiling(seq_len(nrow(voxel_df)) / max_points))
+    p <- plotly::plot_ly(source = source)
+
+    # Determine the colorscale
+    if (length(pt_clrsp) == 1 && is.character(pt_clrsp)) {
+      # Single palette name like "Viridis" or "Inferno"
+      colorscale <- pt_clrsp
+    } else if (length(pt_clrsp) >= 2 && is.character(pt_clrsp)) {
+      # User-provided full colorscale
+      n_colors <- length(pt_clrsp)
+      colorscale <- lapply(seq_len(n_colors), function(i) {
+        list((i - 1) / (n_colors - 1), pt_clrsp[i])
+      })
+    } else {
+      stop("pt_clrsp must be either a single named palette or a vector of colors.")
+    }
+
+    for (i in seq_along(voxel_list)) {
+      sub_df <- voxel_list[[i]]
+
+      p <- plotly::add_trace(
+        p = p,
+        data = sub_df,
+        x = ~x, y = ~z, z = ~y,
         type = type,
-        mode = "markers",
-        marker = list(size = pt_size, colorscale = pt_clrsp, colorbar = list(title = color_by))
+        mode = mode,
+        text = ~hoverinfo,
+        hoverinfo = "text",
+        marker = list(
+          size = pt_size,
+          color = sub_df[[color_by]],
+          colorscale = colorscale,
+          cmin = color_range[1],
+          cmax = color_range[2],
+          colorbar = if (i == 1) list(title = color_by) else NULL
+        ),
+        showlegend = FALSE,
+        name = NULL
       )
-
+    }
   } else {
 
     # Grouped (categorical) values
