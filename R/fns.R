@@ -536,7 +536,7 @@ comp_selection_bb <- function(voxel_df, distance = NULL){
 }
 
 #' @export
-ConsensusBrain <- function(nifti_object = NULL){
+ConsensusBrain <- function(nifti_object = NULL, project = ""){
 
   # draw from package data
   if(is.null(nifti_object)){ nifti_object <- ConsensusBrain::mni_template }
@@ -544,14 +544,15 @@ ConsensusBrain <- function(nifti_object = NULL){
   if(local_launch()){ shiny::addResourcePath("www", "inst/app/www") }
 
   shiny::shinyApp(
-    ui = ConsensusBrainUI,
+    ui = ConsensusBrainUI(project = project),
     server = function(input, output, session){
 
       ConsensusBrainServer(
         input = input,
         output = output,
         session = session,
-        nifti_object = nifti_object
+        nifti_object = nifti_object,
+        project = project
       )
 
     }
@@ -560,10 +561,10 @@ ConsensusBrain <- function(nifti_object = NULL){
 }
 
 #' @export
-launchCB <- function(){
+launchCB <- function(project = ""){
 
   shiny::runApp(
-    appDir = ConsensusBrain(),
+    appDir = ConsensusBrain(project = project),
     launch.browser = TRUE
   )
 
@@ -751,6 +752,18 @@ exchange_raster_colors <- function(mri_list,
 comp_progress <- function(voxel_df){
 
   floor((sum(voxel_df$CBscore != 0)/nrow(voxel_df))*100)
+
+}
+
+find_intro_html <- function(dir, project){
+
+  if(project != ""){
+
+    dir <- stringr::str_replace(dir, "Introduction", paste0("Introduction_", project))
+
+  }
+
+  return(dir)
 
 }
 
@@ -2551,205 +2564,433 @@ showModalWelcome <- function(){
 
 }
 
-showModalNewUser <- function(session){
+showModalNewUser <- function(session, project = ""){
 
-  shiny::showModal(
-    ui = shiny::modalDialog(
-      title = shiny::tags$h2(shiny::strong("New User"), style = "padding-top: 0;"),
-      shiny::column(
-        width = 12,
-        align = "left",
-        shiny::br(),
-        shiny::splitLayout(
-          cellWidths = "50%",
-          shiny::textInput(
-            inputId = "userInp_first_name",
-            label = shiny::tagList(shiny::icon("person"), "First Name:"),
-            value = ifelse(local_launch(session), "Jan", ""),
-            width = "100%"
-          ),
-          shiny::textInput(
-            inputId = "userInp_last_name",
-            label = "Last Name:",
-            value = ifelse(local_launch(session), "Kueckelhaus", ""),
-            width = "100%"
-          )
-        ),
-        shinyBS::bsPopover(
-          id = "userInp_first_name",
-          title = NULL,
-          content = "Enter your first ame as it should appear in a publication.",
-          placement = "bottom",
-          trigger = "hover"
-        ),
-        shinyBS::bsPopover(
-          id = "userInp_last_name",
-          title = NULL,
-          content = "Enter your last ame as it should appear in a publication.",
-          placement = "bottom",
-          trigger = "hover"
-        ),
-        shiny::splitLayout(
-          cellWidths = "50%",
-          shiny::textInput(
-            inputId = "userInp_email",
-            value = ifelse(local_launch(session), "jankueckelhaus@gmx.de", ""),
-            label = shiny::tagList(shiny::icon("envelope"), "E-Mail:")
-          ),
-          shiny::textInput(
-            inputId = "userInp_email_confirm",
-            value = ifelse(local_launch(session), "jankueckelhaus@gmx.de", ""),
-            label = shiny::tagList(shiny::icon("envelope"), "E-Mail (Confirm):")
-          )
-        ),
-        shiny::textInput(
-          inputId = "userInp_affiliation",
-          label = shiny::tagList(shiny::icon("institution"), "Affiliation:"),
-          width = "100%",
-          value = ifelse(local_launch(session), "Department of Neurosurgery, University Clinic Erlangen", ""),
-          placeholder = "As denoted in publications."
-        ),
-        shinyBS::bsPopover(
-          id = "userInp_affiliation",
-          title = NULL,
-          content = "Enter your affiliation as it should appear in a publication.",
-          placement = "bottom",
-          trigger = "hover"
-        ),
-        shiny::fluidRow(
-          shiny::column(
-            width = 4,
-            shiny::selectInput(
-              inputId = "userInp_country",
-              label = shiny::tagList(shiny::icon("globe"), "Country:"),
-              choices = stringr::str_subset(c("", countrycode::codelist$country.name.en), pattern = "German Democratic Republic", negate = TRUE),
-              selected = ifelse(local_launch(session), "Germany", ""),
+  if(project == ""){
+
+    shiny::showModal(
+      ui = shiny::modalDialog(
+        title = shiny::tags$h2(shiny::strong("New User"), style = "padding-top: 0;"),
+        shiny::column(
+          width = 12,
+          align = "left",
+          shiny::br(),
+          shiny::splitLayout(
+            cellWidths = "50%",
+            shiny::textInput(
+              inputId = "userInp_first_name",
+              label = shiny::tagList(shiny::icon("person"), "First Name:"),
+              value = ifelse(local_launch(session), "Jan", ""),
               width = "100%"
             ),
-            shinyBS::bsPopover(
-              id = "userInp_country",
-              title = NULL,
-              content = "The country where your affiliation is based (not your country of birth).",
-              placement = "bottom",
-              trigger = "hover"
+            shiny::textInput(
+              inputId = "userInp_last_name",
+              label = "Last Name:",
+              value = ifelse(local_launch(session), "Kueckelhaus", ""),
+              width = "100%"
             )
           ),
-          shiny::column(
-            width = 4,
-            shiny::numericInput(
-              inputId = "userInp_years_of_experience",
-              label = shiny::tagList(shiny::icon("briefcase"), "Years of Experience:"),
-              value = ifelse(local_launch(session), 20, NA_integer_),
-              min = 0,
-              max = 100,
-              step = 1
+          shinyBS::bsPopover(
+            id = "userInp_first_name",
+            title = NULL,
+            content = "Enter your first ame as it should appear in a publication.",
+            placement = "bottom",
+            trigger = "hover"
+          ),
+          shinyBS::bsPopover(
+            id = "userInp_last_name",
+            title = NULL,
+            content = "Enter your last ame as it should appear in a publication.",
+            placement = "bottom",
+            trigger = "hover"
+          ),
+          shiny::splitLayout(
+            cellWidths = "50%",
+            shiny::textInput(
+              inputId = "userInp_email",
+              value = ifelse(local_launch(session), "jankueckelhaus@gmx.de", ""),
+              label = shiny::tagList(shiny::icon("envelope"), "E-Mail:")
             ),
-            shinyBS::bsPopover(
-              id = "userInp_years_of_experience",
-              title = NULL,
-              content = "Years of experience as a neurosurgeon, counted from the first day of residency to the present.",
-              placement = "bottom",
-              trigger = "hover"
+            shiny::textInput(
+              inputId = "userInp_email_confirm",
+              value = ifelse(local_launch(session), "jankueckelhaus@gmx.de", ""),
+              label = shiny::tagList(shiny::icon("envelope"), "E-Mail (Confirm):")
             )
           ),
-          shiny::column(
-            width = 4,
-            shiny::numericInput(
-              inputId = "userInp_annual_case_load",
-              label = shiny::tagList(shiny::icon("notes-medical"), "Annual Case Load:"),
-              value = ifelse(local_launch(session), 250, NA_integer_),
-              min = 0,
-              max = 1000,
-              step = 50
-            ),
-            shinyBS::bsPopover(
-              id = "userInp_annual_case_load",
-              title = "Annual Case Load",
-              content = "Your personal annual case load for intra-parenchymal glioma surgeries.",
-              placement = "bottom",
-              trigger = "hover"
-            )
-          )
-        ),
-        shiny::fluidRow(
-          shiny::column(
-            width = 6,
-            shiny::sliderInput(
-              inputId = "userInp_perc_surgery_awake",
-              label = "Awake Surgery [%]",
-              value = 0,
-              min = 0, max = 100, step = 1
-            ),
-            shinyBS::bsPopover(
-              id = "userInp_perc_surgery_awake",
-              title = "Awake Surgery [%]",
-              content = "The percentage of glioma surgeries you conduct with the patient beeing awake.",
-              placement = "bottom",
-              trigger = "hover"
-            )
+          shiny::textInput(
+            inputId = "userInp_affiliation",
+            label = shiny::tagList(shiny::icon("institution"), "Affiliation:"),
+            width = "100%",
+            value = ifelse(local_launch(session), "Department of Neurosurgery, University Clinic Erlangen", ""),
+            placeholder = "As denoted in publications."
           ),
-          shiny::column(
-            width = 6,
-            shiny::sliderInput(
-              inputId = "userInp_perc_surgery_ionm",
-              label = "Surgery with IONM [%]",
-              value = 0,
-              min = 0, max = 100, step = 1
-            ),
-            shinyBS::bsPopover(
-              id = "userInp_perc_surgery_ionm",
-              title = "Surgery with IONM [%]",
-              content = "The percentage of glioma surgeries you conduct with intraoperative neuromonitoring.",
-              placement = "bottom",
-              trigger = "hover"
-            )
-          )
-        ),
-        shiny::fluidRow(
-          shiny::column(
-            width = 10,
-            align = "left",
-            shinyWidgets::awesomeCheckbox(
-              inputId = "userInp_terms_of_use",
-              label = HTML(
-                'I acknowledge and agree to the <a href="#" id="terms_link">Terms of Use</a>.'
+          shinyBS::bsPopover(
+            id = "userInp_affiliation",
+            title = NULL,
+            content = "Enter your affiliation as it should appear in a publication.",
+            placement = "bottom",
+            trigger = "hover"
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 4,
+              shiny::selectInput(
+                inputId = "userInp_country",
+                label = shiny::tagList(shiny::icon("globe"), "Country:"),
+                choices = stringr::str_subset(c("", countrycode::codelist$country.name.en), pattern = "German Democratic Republic", negate = TRUE),
+                selected = ifelse(local_launch(session), "Germany", ""),
+                width = "100%"
               ),
-              value = FALSE
+              shinyBS::bsPopover(
+                id = "userInp_country",
+                title = NULL,
+                content = "The country where your affiliation is based (not your country of birth).",
+                placement = "bottom",
+                trigger = "hover"
+              )
+            ),
+            shiny::column(
+              width = 4,
+              shiny::numericInput(
+                inputId = "userInp_years_of_experience",
+                label = shiny::tagList(shiny::icon("briefcase"), "Years of Experience:"),
+                value = ifelse(local_launch(session), 20, NA_integer_),
+                min = 0,
+                max = 100,
+                step = 1
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_years_of_experience",
+                title = NULL,
+                content = "Years of experience as a neurosurgeon, counted from the first day of residency to the present.",
+                placement = "bottom",
+                trigger = "hover"
+              )
+            ),
+            shiny::column(
+              width = 4,
+              shiny::numericInput(
+                inputId = "userInp_annual_case_load",
+                label = shiny::tagList(shiny::icon("notes-medical"), "Annual Case Load:"),
+                value = ifelse(local_launch(session), 250, NA_integer_),
+                min = 0,
+                max = 1000,
+                step = 50
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_annual_case_load",
+                title = "Annual Case Load",
+                content = "Your personal annual case load for intra-parenchymal glioma surgeries.",
+                placement = "bottom",
+                trigger = "hover"
+              )
             )
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 6,
+              shiny::sliderInput(
+                inputId = "userInp_perc_surgery_awake",
+                label = "Awake Surgery [%]",
+                value = 0,
+                min = 0, max = 100, step = 1
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_perc_surgery_awake",
+                title = "Awake Surgery [%]",
+                content = "The percentage of glioma surgeries you conduct with the patient beeing awake.",
+                placement = "bottom",
+                trigger = "hover"
+              )
+            ),
+            shiny::column(
+              width = 6,
+              shiny::sliderInput(
+                inputId = "userInp_perc_surgery_ionm",
+                label = "Surgery with IONM [%]",
+                value = 0,
+                min = 0, max = 100, step = 1
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_perc_surgery_ionm",
+                title = "Surgery with IONM [%]",
+                content = "The percentage of glioma surgeries you conduct with intraoperative neuromonitoring.",
+                placement = "bottom",
+                trigger = "hover"
+              )
+            )
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 10,
+              align = "left",
+              shinyWidgets::awesomeCheckbox(
+                inputId = "userInp_terms_of_use",
+                label = HTML(
+                  'I acknowledge and agree to the <a href="#" id="terms_link">Terms of Use</a>.'
+                ),
+                value = FALSE
+              )
+            )
+          ),
+          shiny::br(),
+          shiny::fluidRow(
+            shiny::column(
+              width = 2,
+              shiny::actionButton(
+                inputId = "back_to_welcome",
+                label = shiny::tagList(shiny::icon("arrow-left"), "Back"),
+                width = "100%"
+              )
+            ),
+            shiny::column(width = 2),
+            shiny::column(
+              width = 4,
+              shiny::actionButton(
+                inputId = "login",
+                label = shiny::tagList(shiny::icon("sign-in-alt"), "Login"),
+                width = "100%"
+              )
+            ),
+            shiny::column(width = 4)
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 12,
+              align = "center",
+              shiny::uiOutput(outputId = "helptext_login")
+            ),
           )
         ),
-        shiny::br(),
-        shiny::fluidRow(
-          shiny::column(
-            width = 2,
-            shiny::actionButton(
-              inputId = "back_to_welcome",
-              label = shiny::tagList(shiny::icon("arrow-left"), "Back"),
-              width = "100%"
-            )
-          ),
-          shiny::column(width = 2),
-          shiny::column(
-            width = 4,
-            shiny::actionButton(
-              inputId = "login",
-              label = shiny::tagList(shiny::icon("sign-in-alt"), "Login"),
-              width = "100%"
-            )
-          ),
-          shiny::column(width = 4)
-        ),
-        shiny::fluidRow(
-          shiny::column(
-            width = 12,
-            align = "center",
-            shiny::uiOutput(outputId = "helptext_login")
-          ),
-        )
-      ),
-      footer = shiny::tagList()
+        footer = shiny::tagList()
+      )
     )
-  )
+
+  } else if(project == "recap"){
+
+    shiny::showModal(
+      ui = shiny::modalDialog(
+        title = shiny::tags$h2(shiny::strong("New User"), style = "padding-top: 0;"),
+        shiny::column(
+          width = 12,
+          align = "left",
+          shiny::br(),
+          shiny::splitLayout(
+            cellWidths = "50%",
+            shiny::textInput(
+              inputId = "userInp_first_name",
+              label = shiny::tagList(shiny::icon("person"), "First Name:"),
+              value = ifelse(local_launch(session), "Jan", ""),
+              width = "100%"
+            ),
+            shiny::textInput(
+              inputId = "userInp_last_name",
+              label = "Last Name:",
+              value = ifelse(local_launch(session), "Kueckelhaus", ""),
+              width = "100%"
+            )
+          ),
+          shinyBS::bsPopover(
+            id = "userInp_first_name",
+            title = NULL,
+            content = "Enter your first ame as it should appear in a publication.",
+            placement = "bottom",
+            trigger = "hover"
+          ),
+          shinyBS::bsPopover(
+            id = "userInp_last_name",
+            title = NULL,
+            content = "Enter your last ame as it should appear in a publication.",
+            placement = "bottom",
+            trigger = "hover"
+          ),
+          shiny::splitLayout(
+            cellWidths = "50%",
+            shiny::textInput(
+              inputId = "userInp_email",
+              value = ifelse(local_launch(session), "jankueckelhaus@gmx.de", ""),
+              label = shiny::tagList(shiny::icon("envelope"), "E-Mail:")
+            ),
+            shiny::textInput(
+              inputId = "userInp_email_confirm",
+              value = ifelse(local_launch(session), "jankueckelhaus@gmx.de", ""),
+              label = shiny::tagList(shiny::icon("envelope"), "E-Mail (Confirm):")
+            )
+          ),
+          shiny::textInput(
+            inputId = "userInp_affiliation",
+            label = shiny::tagList(shiny::icon("institution"), "Affiliation:"),
+            width = "100%",
+            value = ifelse(local_launch(session), "Department of Neurosurgery, University Clinic Erlangen", ""),
+            placeholder = "As denoted in publications."
+          ),
+          shinyBS::bsPopover(
+            id = "userInp_affiliation",
+            title = NULL,
+            content = "Enter your affiliation as it should appear in a publication.",
+            placement = "bottom",
+            trigger = "hover"
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 4,
+              shiny::numericInput(
+                inputId = "userInp_years_of_experience",
+                label = shiny::tagList(shiny::icon("briefcase"), "Years of Experience:"),
+                value = ifelse(local_launch(session), 20, NA_integer_),
+                min = 0,
+                max = 100,
+                step = 1
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_years_of_experience",
+                title = NULL,
+                content = "Years of experience as a neurosurgeon, counted from the first day of residency to the present.",
+                placement = "bottom",
+                trigger = "hover"
+              )
+            ),
+            shiny::column(
+              width = 4,
+              shiny::numericInput(
+                inputId = "userInp_annual_case_load",
+                label = shiny::tagList(shiny::icon("notes-medical"), "Annual Case Load:"),
+                value = ifelse(local_launch(session), 250, NA_integer_),
+                min = 0,
+                max = Inf,
+                step = 1
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_annual_case_load",
+                title = "Annual Case Load",
+                content = "Your personal annual case load for intra-parenchymal glioma surgeries.",
+                placement = "bottom",
+                trigger = "hover"
+              )
+            ),
+            shiny::column(
+              width = 4,
+              shiny::numericInput(
+                inputId = "userInp_total_case_load",
+                label = shiny::tagList(shiny::icon("notes-medical"), "Total Case Load:"),
+                value = ifelse(local_launch(session), 250, NA_integer_),
+                min = 0,
+                max = Inf,
+                step = 1
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_total_case_load",
+                title = "Total Case Load",
+                content =  "The total number of gliomas you have operated so far",
+                placement = "bottom",
+                trigger = "hover"
+              )
+            )
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 4,
+              shiny::numericInput(
+                inputId = "userInp_n_institutions",
+                label = shiny::tagList(shiny::icon("building-columns"), "Institution Count:"),
+                value = ifelse(local_launch(session), 1, NA_integer_),
+                min = 0,
+                max = 100,
+                step = 1
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_n_institutions",
+                title = NULL,
+                content = "The total number of institutions you have worked at as a neurosurgeon.",
+                placement = "bottom",
+                trigger = "hover"
+              )
+            ),
+            shiny::column(
+              width = 4,
+              shiny::selectInput(
+                inputId = "userInp_academic_degree",
+                label = shiny::tagList(shiny::icon("graduation-cap"), "Academic Degree:"),
+                selected = ifelse(local_launch(session), "None", NA_character_),
+                choices = c("None", "Dr. med.", "PD Dr. med.", "Prof. Dr. med.")
+              )
+            ),
+            shiny::column(
+              width = 4,
+              shiny::selectInput(
+                inputId = "userInp_scientific_focus",
+                label = shiny::tagList(shiny::icon("microscope"), "Scientific Focus:"),
+                selected = ifelse(local_launch(session), "Neuroncology", NA_character_),
+                selectize = TRUE,
+                choices =
+                  c("Epilepsy",
+                    "Neurooncology",
+                    "Pediatric",
+                    "Skull Base", "Spine",
+                    "Trauma",
+                    "Vascular",
+                    "Other"
+                    ),
+                multiple = TRUE
+              ),
+              shinyBS::bsPopover(
+                id = "userInp_scientific_focus",
+                title = NULL,
+                content = "The focus of your scientific work. Multiple choices can be made!",
+                placement = "top",
+                trigger = "hover"
+              )
+            )
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 10,
+              align = "left",
+              shinyWidgets::awesomeCheckbox(
+                inputId = "userInp_terms_of_use",
+                label = HTML(
+                  'I acknowledge and agree to the <a href="#" id="terms_link">Terms of Use</a>.'
+                ),
+                value = FALSE
+              )
+            )
+          ),
+          shiny::br(),
+          shiny::fluidRow(
+            shiny::column(
+              width = 2,
+              shiny::actionButton(
+                inputId = "back_to_welcome",
+                label = shiny::tagList(shiny::icon("arrow-left"), "Back"),
+                width = "100%"
+              )
+            ),
+            shiny::column(width = 2),
+            shiny::column(
+              width = 4,
+              shiny::actionButton(
+                inputId = "login",
+                label = shiny::tagList(shiny::icon("sign-in-alt"), "Login"),
+                width = "100%"
+              )
+            ),
+            shiny::column(width = 4)
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 12,
+              align = "center",
+              shiny::uiOutput(outputId = "helptext_login")
+            ),
+          )
+        ),
+        footer = shiny::tagList()
+      )
+    )
+
+  }
+
+
 
 }
 

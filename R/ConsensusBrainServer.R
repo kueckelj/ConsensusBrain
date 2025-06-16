@@ -1,5 +1,5 @@
 
-ConsensusBrainServer <- function(input, output, session, nifti_object){
+ConsensusBrainServer <- function(input, output, session, nifti_object, project = ""){
 
   require(shiny)
   require(shinyBS)
@@ -66,27 +66,47 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
   # Input Validation
   iv <- shinyvalidate::InputValidator$new()
 
+  # all
   iv$add_rule("userInp_first_name", shinyvalidate::sv_required())
-  iv$add_rule("userInp_last_name", shinyvalidate::sv_required())
-  iv$add_rule("userInp_affiliation", shinyvalidate::sv_required())
-  iv$add_rule("userInp_country", shinyvalidate::sv_required())
-  iv$add_rule("userInp_email", shinyvalidate::sv_required())
-  iv$add_rule("userInp_email_confirm", shinyvalidate::sv_required())
-  iv$add_rule("userInp_years_of_experience", shinyvalidate::sv_required())
-  iv$add_rule("userInp_annual_case_load", shinyvalidate::sv_required())
-
   iv$add_rule("userInp_first_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
-  iv$add_rule("userInp_last_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
-
   iv$add_rule("userInp_first_name", ~ if(!valid_name_symbols(.)) "Only letters are allowed.")
+
+  iv$add_rule("userInp_last_name", shinyvalidate::sv_required())
+  iv$add_rule("userInp_last_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
   iv$add_rule("userInp_last_name", ~ if(!valid_name_symbols(.)) "Only letters are allowed.")
 
+  iv$add_rule("userInp_affiliation", shinyvalidate::sv_required())
+
+  iv$add_rule("userInp_email", shinyvalidate::sv_required())
   iv$add_rule("userInp_email", shinyvalidate::sv_email())
+
+  iv$add_rule("userInp_email_confirm", shinyvalidate::sv_required())
   iv$add_rule("userInp_email_confirm", function(value) {
     if(value != input$userInp_email){
       "The email addresses do not match."
     }
   })
+
+  iv$add_rule("userInp_years_of_experience", shinyvalidate::sv_required())
+
+  iv$add_rule("userInp_annual_case_load", shinyvalidate::sv_required())
+
+  # Original Project
+  if(project == ""){
+
+    iv$add_rule("userInp_country", shinyvalidate::sv_required())
+
+  }
+
+  # RECAP: Resectability Evaluation Comparison Across Practice levels
+  if(project == "recap"){
+
+    iv$add_rule("userInp_academic_degree", shinyvalidate::sv_required())
+    iv$add_rule("userInp_n_institutions", shinyvalidate::sv_required())
+    iv$add_rule("userInp_scientific_focus", shinyvalidate::sv_required())
+    iv$add_rule("userInp_total_case_load", shinyvalidate::sv_required())
+
+  }
 
   iv$enable()
 
@@ -94,7 +114,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
     shiny::removeModal()
 
-    showModalNewUser(session = session)
+    showModalNewUser(session = session, project = project)
 
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
@@ -102,7 +122,7 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
 
     shiny::removeModal()
 
-    showModalNewUser(session = session)
+    showModalNewUser(session = session, project = project)
 
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
@@ -142,15 +162,19 @@ ConsensusBrainServer <- function(input, output, session, nifti_object){
   user_meta <- shiny::reactive({
 
     list(
+      academic_degree = input$userInp_academic_degree,
       affiliation = input$userInp_affiliation,
       annual_case_load = input$userInp_annual_case_load,
       country = input$userInp_country,
       email = input$userInp_email,
       first_name = stringr::str_to_title(input$userInp_first_name),
       last_name = stringr::str_to_title(input$userInp_last_name),
+      n_institutions = input$userInp_n_institutions,
       perc_surgery_awake = input$userInp_perc_surgery_awake,
       perc_surgery_ionm = input$userInp_perc_surgery_ionm,
+      scientific_focus = input$userInp_scientific_focus,
       terms_of_use = input$userInp_terms_of_use,
+      total_case_laod = input$userInp_total_case_load,
       years_of_experience = input$userInp_years_of_experience
     )
 
