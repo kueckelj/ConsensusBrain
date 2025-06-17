@@ -1,6 +1,7 @@
 
 ConsensusBrainServer <- function(input, output, session, nifti_object, project = ""){
 
+  require(oro.nifti)
   require(shiny)
   require(shinyBS)
 

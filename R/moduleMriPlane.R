@@ -310,6 +310,8 @@ moduleMriPlaneServer <- function(id,
                                  mode_init = "inspection"
                                  ){
 
+  print(1)
+
   # define once
   plane_ccs <- switch_axis_label(plane)
 
@@ -1464,7 +1466,7 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-
+      print(2)
       # Outputs (Plots) ---------------------------------------------------------
 
       output$mriInteractionPlot <- shiny::renderPlot({
@@ -2341,6 +2343,8 @@ moduleMriPlaneServer <- function(id,
 
       })
 
+      print(3)
+
       # 1. Mode: Inspection -----------------------------------------------------
 
       # Observe Events (MRI Interaction) ----------------------------------------
@@ -3158,6 +3162,9 @@ moduleMriPlaneServer <- function(id,
         )
 
         })
+
+      print(4)
+
 
       return(module_output)
 
