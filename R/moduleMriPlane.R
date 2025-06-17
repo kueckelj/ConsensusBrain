@@ -2314,29 +2314,23 @@ moduleMriPlaneServer <- function(id,
 
         rp <- range(brain_dims[plane])
 
-        if(F){
-
-          X = rp[1]:rp[2]
-
-          tags$div(
-            id = ns("mriSlicePlot"),
-            style = "width: 100%; height: 100%; overflow: hidden; border: 1px solid #ccc;",
-            lapply(X = X, FUN = function(i) {
-              tags$img(
-                id = paste0("slice_", i, "_", ns("")),
-                src = pre_rendered_slices[[plane]][[i]],
-                class = "zoomable-image",
-                style =
-                  ifelse(
-                    test = i==128,
-                    yes = "display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;",
-                    no = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
-                  )
-              )
-            })
-          )
-
-        }
+        tags$div(
+          id = ns("mriSlicePlot"),
+          style = "width: 100%; height: 100%; overflow: hidden; border: 1px solid #ccc;",
+          lapply(X = rp[1]:rp[2], FUN = function(i) {
+            tags$img(
+              id = paste0("slice_", i, "_", ns("")),
+              src = pre_rendered_slices[[plane]][[i]],
+              class = "zoomable-image",
+              style =
+                ifelse(
+                  test = i==128,
+                  yes = "display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;",
+                  no = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+                )
+            )
+          })
+        )
 
       })
 
