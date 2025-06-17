@@ -2315,6 +2315,7 @@ moduleMriPlaneServer <- function(id,
 
         }
 
+        print("plotting MRI")
         rp <- range(brain_dims[plane])
 
         tags$div(
@@ -2334,6 +2335,8 @@ moduleMriPlaneServer <- function(id,
             )
           })
         )
+
+        print("done!")
 
       })
 
