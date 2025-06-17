@@ -2314,12 +2314,14 @@ moduleMriPlaneServer <- function(id,
 
         rp <- range(brain_dims[plane])
 
-        print(str(pre_rendered_slices[[plane]][rp[1]:rp[2]]))
+        #X = rp[1]:rp[2]
+        X = 128
+
 
         tags$div(
           id = ns("mriSlicePlot"),
           style = "width: 100%; height: 100%; overflow: hidden; border: 1px solid #ccc;",
-          lapply(rp[1]:rp[2], function(i) {
+          lapply(X = X, FUN = function(i) {
             tags$img(
               id = paste0("slice_", i, "_", ns("")),
               src = pre_rendered_slices[[plane]][[i]],
