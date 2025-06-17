@@ -2314,8 +2314,8 @@ moduleMriPlaneServer <- function(id,
 
         rp <- range(brain_dims[plane])
 
-        #X = rp[1]:rp[2]
-        X = 128
+        X = rp[1]:rp[2]
+        #X = 128
 
 
         tags$div(
