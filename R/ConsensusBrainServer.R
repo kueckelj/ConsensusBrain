@@ -1,8 +1,6 @@
 
 ConsensusBrainServer <- function(input, output, session, nifti_object, project = ""){
 
-  options(shiny.trace = TRUE)
-
   require(oro.nifti)
   require(shiny)
   require(shinyBS)

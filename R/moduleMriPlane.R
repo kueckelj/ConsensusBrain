@@ -143,6 +143,15 @@ moduleMriPlaneUI <- function(id,
               border: 1px solid #ccc;
               background-color: rgba(200, 200, 200, 0.2);
               transition: all 0.2s ease-in-out;
+             }
+
+             .btn-mri-btn {
+              border: 1px solid #ccc;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              margin-top: 0;
+              marign-bottom: 0;
               }
 
             .mri-btn-icon {
@@ -261,8 +270,47 @@ moduleMriPlaneUI <- function(id,
             label = NULL,
             icon = shiny::icon("step-forward", class = "mri-btn-icon"),
             class = "mri-btn"
+            ),
+          shinyWidgets::dropdownButton(
+            circle = TRUE,
+            icon = shiny::icon("gear"),
+            right = TRUE,
+            size = "sm",
+            status = "mri-btn",
+
+            shiny::br(),
+
+            shinyWidgets::materialSwitch(
+              inputId = ns("show_localizer"),
+              label = "Show Localizer",
+              value = TRUE,
+              status = "success"
+            ),
+
+            shinyWidgets::materialSwitch(
+              inputId = ns("show_score"),
+              label = "Show Score",
+              value = FALSE,
+              status = "success"
+            ),
+
+            shiny::conditionalPanel(
+              condition = sprintf("input['%s'] === true", ns("show_score")),
+              shiny::div(
+                shiny::sliderInput(
+                  inputId = ns("transp_score"),
+                  label = "Transparency Score",
+                  value = 0.75,
+                  min = 0,
+                  max = 1,
+                  step = 0.01,
+                  width = "100%"
+                )
+              )
             )
+
           )
+         )
         ),
       # MRI Plot
       shiny::div(
@@ -273,6 +321,7 @@ moduleMriPlaneUI <- function(id,
           #shiny::plotOutput(ns("mriSlicePlot"), height = "100%", width = "100%"),
           shiny::uiOutput(ns("mriSlicePlot")),
           shiny::plotOutput(ns("mriInspectionPlot"), height = "100%", width = "100%"),
+          shiny::plotOutput(ns("mriScorePlot"), height = "100%", width = "100%"),
           shiny::plotOutput(ns("mriSelectionStatePlot"), height = "100%", width = "100%"),
           shiny::plotOutput(ns("mriVisualAidPlot"), height = "100%", width = "100%"),
           shiny::plotOutput(ns("mriLocalizerPlot"), height = "100%", width = "100%"),
@@ -665,6 +714,15 @@ moduleMriPlaneServer <- function(id,
       col_max <- shiny::reactive({ max(mri_range()[["col"]]) })
       col_seq <- shiny::reactive({ col_min():col_max() })
 
+      dragging_localizers <- shiny::reactiveVal(value = character())
+
+      drawing_on_diff_plane <- shiny::reactive({
+
+        length(mri_control_input$drawing_on_plane) == 1 &&
+          mri_control_input$drawing_on_plane != plane
+
+      })
+
       hover_show <- shiny::reactive({
 
         if(mode() == "inspection"){
@@ -785,59 +843,9 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      dragging_localizers <- shiny::reactiveVal(value = character())
-
-      shiny::observeEvent(cursor_down(), {
-
-        if(cursor_down()){
-
-          if(localizers_hover()){
-
-            dragging_localizers({ localizers_active() })
-
-          }
-
-        } else if(!cursor_down()){
-
-          # either of two localizers was dragged
-          if(length(dragging_localizers()) != 0){
-
-            if("v" %in% dragging_localizers()){
-
-              slice_pos[[col_axis]] <- round(cursor_pos()[1])
-
-            }
-
-            if("h" %in% dragging_localizers()){
-
-              slice_pos[[row_axis]] <- round(cursor_pos()[2])
-
-            }
-
-            dragging_localizers({ character() })
-
-          }
-
-        }
-
-      })
-
-      shiny::observeEvent(localizers_active(), {
-
-        if(localizers_hover()){
-
-          session$sendCustomMessage(ns("changeCursor"), "grab")
-
-        } else {
-
-          session$sendCustomMessage(ns("changeCursor"), "crosshair")
-
-        }
-
-      })
-
       localizer_active_h <- shiny::reactive({
 
+        show_localizer() &&
         cursor_on_mri() &&
         !drawing_active() &&
         abs(round(cursor_pos()[2], 0) - slice_pos[[ra_mri[["row"]]]]) <= mri_side_length()*0.01
@@ -846,6 +854,7 @@ moduleMriPlaneServer <- function(id,
 
       localizer_active_v <- shiny::reactive({
 
+        show_localizer() &&
         cursor_on_mri() &&
         !drawing_active() &&
         abs(round(cursor_pos()[1], 0) - slice_pos[[ra_mri[["col"]]]]) <= mri_side_length()*0.01
@@ -892,7 +901,6 @@ moduleMriPlaneServer <- function(id,
         )
 
       })
-
 
       localizer_y0_v <- shiny::reactive({ ifelse(show_localizer_ray_h(), NA, row_min()) })
 
@@ -982,13 +990,6 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      drawing_on_diff_plane <- shiny::reactive({
-
-        length(mri_control_input$drawing_on_plane) == 1 &&
-          mri_control_input$drawing_on_plane != plane
-
-      })
-
       ray_depth <- shiny::reactive({
 
         pb_dir <- mri_control_input$paintbrush_direction
@@ -1026,6 +1027,8 @@ moduleMriPlaneServer <- function(id,
       row_max <- shiny::reactive({ max(mri_range()[["row"]]) })
       row_seq <- shiny::reactive({ row_min():row_max() })
 
+      show_localizer <- shiny::reactive({ input$show_localizer })
+
       show_localizer_ray_v <- shiny::reactive({
 
         if(is.null(mri_control_input$paintbrush_mode)){
@@ -1059,6 +1062,8 @@ moduleMriPlaneServer <- function(id,
         }
 
       })
+
+      show_score <- shiny::reactive({ input$show_score })
 
       slice_axi <- shiny::reactive({ mri_control_input$slice_state$axi })
       slice_cor <- shiny::reactive({ mri_control_input$slice_state$cor })
@@ -1403,6 +1408,56 @@ moduleMriPlaneServer <- function(id,
 
       })
 
+      # localizer movement
+      shiny::observeEvent(cursor_down(), {
+
+        if(cursor_down()){
+
+          if(localizers_hover()){
+
+            dragging_localizers({ localizers_active() })
+
+          }
+
+        } else if(!cursor_down()){
+
+          # either of two localizers was dragged
+          if(length(dragging_localizers()) != 0){
+
+            if("v" %in% dragging_localizers()){
+
+              slice_pos[[col_axis]] <- round(cursor_pos()[1])
+
+            }
+
+            if("h" %in% dragging_localizers()){
+
+              slice_pos[[row_axis]] <- round(cursor_pos()[2])
+
+            }
+
+            dragging_localizers({ character() })
+
+          }
+
+        }
+
+      })
+
+      shiny::observeEvent(localizers_active(), {
+
+        if(localizers_hover()){
+
+          session$sendCustomMessage(ns("changeCursor"), "grab")
+
+        } else {
+
+          session$sendCustomMessage(ns("changeCursor"), "crosshair")
+
+        }
+
+      })
+
       # --- updates of slice_pos from the controller side
       shiny::observeEvent(slice_sag(), {
 
@@ -1572,6 +1627,8 @@ moduleMriPlaneServer <- function(id,
       }, bg = "transparent")
 
       output$mriLocalizerPlot <- shiny::renderPlot({
+
+        shiny::req(show_localizer())
 
         plot_mri_frame(col = col_seq(), row = row_seq())
 
@@ -2300,6 +2357,26 @@ moduleMriPlaneServer <- function(id,
 
       }, bg = "transparent")
 
+      output$mriScorePlot <- shiny::renderPlot({
+
+        shiny::req(show_score())
+        shiny::req(input$transp_score)
+
+        plot_mri_frame(col = col_seq(), row = row_seq())
+
+        voxels_show <- interaction_template()
+
+        graphics::rect(
+          xleft = voxels_show$col - 0.5,
+          xright = voxels_show$col + 0.5,
+          ybottom = voxels_show$row - 0.5,
+          ytop = voxels_show$row + 0.5,
+          col = ggplot2::alpha(score_set_up$colors[voxels_show$CBscore+1], 1-input$transp_score),
+          border = NA
+        )
+
+      }, bg = "transparent")
+
       output$mriSlicePlot <- renderUI({
 
         if(plane == "axi"){
@@ -2520,6 +2597,8 @@ moduleMriPlaneServer <- function(id,
           }
 
         }
+
+        assign("out", out, envir = .GlobalEnv)
 
         return(out)
 

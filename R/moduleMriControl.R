@@ -325,25 +325,21 @@ moduleMriControlServer <- function(id,
                 shiny::h5(shiny::strong("View:")) %>% add_helper("selection_view"),
                 shiny::splitLayout(
                   cellWidths = c("60%", "40%"),
-                  shiny::tagList(
-                    shiny::actionButton(
-                      inputId = ns("viewer3D"),
-                      label = "3D",
-                      icon = shiny::icon("brain"),
-                      width = "100%",
-                      disabled = TRUE,
-                      style = style_ab
-                    )
+                  shiny::actionButton(
+                    inputId = ns("viewer3D"),
+                    label = "3D",
+                    icon = shiny::icon("brain"),
+                    width = "100%",
+                    disabled = TRUE,
+                    style = style_ab
                   ),
-                  shiny::tagList(
-                    shiny::actionButton(
-                      inputId = ns("selection_focus"),
-                      label = NULL,
-                      icon = shiny::icon("crosshairs"),
-                      width = "100%",
-                      disabled = TRUE,
-                      style = style_ab
-                    )
+                  shiny::actionButton(
+                    inputId = ns("selection_focus"),
+                    label = NULL,
+                    icon = shiny::icon("crosshairs"),
+                    width = "100%",
+                    disabled = TRUE,
+                    style = style_ab
                   )
                 )
               ),

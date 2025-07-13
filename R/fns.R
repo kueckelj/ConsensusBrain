@@ -810,9 +810,10 @@ ggpLayer_MRI <- function(lim_col = 256, lim_row = 256, lab_fill = NULL, ...){
     ggplot2::theme_bw() +
     ggplot2::theme(
       panel.background = ggplot2::element_rect(fill = "black"),
-      panel.grid = ggplot2::element_blank()
+      panel.grid = ggplot2::element_blank(),
+      strip.background = ggplot2::element_blank()
       ),
-    ggplot2::labs(x = "Column", y = "Row", fill = lab_fill)
+    ggplot2::labs(x = NULL, y = NULL, fill = lab_fill)
   )
 
 }
