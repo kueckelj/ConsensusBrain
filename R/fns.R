@@ -3,8 +3,14 @@
 # objects -----------------------------------------------------------------
 
 # do not change the order!
+
+#' @export
 ccs_labels <- c("x", "z", "y")
+
+#' @export
 mri_planes <- c("sag", "cor", "axi")
+
+#' @export
 mri_planes_pretty <- c("sag" = "Sagittal", "cor" = "Coronal",  "axi" = "Axial")
 
 # functions ---------------------------------------------------------------
@@ -1971,6 +1977,7 @@ req_axes_2d <- function(plane, mri = FALSE, ccs_val = TRUE){
 
 }
 
+#' @export
 switch_axis_label <- function(label){
 
   purrr::map_chr(
