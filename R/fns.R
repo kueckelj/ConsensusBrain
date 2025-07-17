@@ -938,6 +938,7 @@ identify_brois <- function(voxel_df){
 
 }
 
+#' @export
 identify_debris <- function(voxel_df, eps = 1.5, minPts = 8, min_size = 250){
 
   voxel_selection <- dplyr::filter(voxel_df, selected)
