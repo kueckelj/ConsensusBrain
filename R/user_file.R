@@ -43,4 +43,12 @@ userName <- function(object){
 
 }
 
+userNameAbbr <- function(object){
+
+  userName(object) %>%
+    abbreviate() %>%
+    unname()
+
+}
+
 

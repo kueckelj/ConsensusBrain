@@ -46,6 +46,7 @@ css_styles <-
   )
 
 
+cb_colors <- c("steelblue", "#8BC34A", "#FFEB3B", "#FF9800", "#F44336")
 
 # rules:
 # 1. first value of choices must correspond to the missing (not-yet-assigned) value
@@ -55,11 +56,12 @@ css_styles <-
 score_set_up = list(
   label = "Resection Risk",
   choices = c("Missing" = 0,
-              "Safely " = 1,
+              "Safely" = 1,
               "Low-Medium" = 2,
               "Medium-High" = 3,
               "Not Resectable" = 4),
-  colors = c("steelblue", "#8BC34A", "#FFEB3B", "#FF9800", "#F44336")
+  colors = cb_colors,
+  clrsp = grDevices::colorRampPalette(cb_colors[2:5])(100)
 )
 
 

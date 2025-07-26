@@ -19,6 +19,7 @@ Imports:
     countrycode,
     dbscan,
     dplyr,
+    emayili,
     ggplot2,
     ggsci,
     glue,

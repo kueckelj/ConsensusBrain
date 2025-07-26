@@ -103,6 +103,125 @@ adjust_sub_colors <- function(df,
 
 }
 
+animate2D <- function(voxel_df,
+                      color_by,
+                      planes = c("axi", "cor", "sag"),
+                      score_alpha = 0.4,
+                      layer_colors = list(),
+                      fill_lab = str_to_title(color_by),
+                      fps = 5){
+
+  for(plane in planes){
+
+    message(glue::glue("Working on plane {plane}."))
+    message("Preparing data.")
+
+    slices <- sort(unique(voxel_df[[switch_axis_label(plane)]]))
+
+    pb <- confuns::create_progress_bar(length(slices))
+
+    out_df <-
+      purrr::map_dfr(
+        .x = slices,
+        .f = function(slice){
+
+          pb$tick()
+
+          dplyr::left_join(
+            x = dplyr::rename(get_slice_df(mni_template, plane = plane, slice = slice), t1 = value),
+            y = get_slice_df(input = voxel_df, plane = plane, slice = slice, var = color_by),
+            by = c("col", "row")
+          ) %>%
+            dplyr::mutate(plane = {{plane}}, slice = {{slice}})
+
+        }
+      ) %>%
+      dplyr::mutate(
+        t1_alpha = dplyr::if_else(is.na(value), true = 1, false = 1-{{score_alpha}})
+      )
+
+    out_df$row <- max(out_df$row) - out_df$row
+
+    vdf <- dplyr::filter(out_df, !is.na(value))
+    crange <- range(vdf$col)
+    rrange <- range(vdf$row)
+
+    cdist <- as.numeric(dist(crange))
+    rdist <- as.numeric(dist(rrange))
+
+    if(cdist > rdist){
+
+      buffer <- (cdist-rdist)/2
+
+      xlim <- crange
+      ylim <- c(min(rrange)-buffer, max(rrange)+buffer)
+
+    } else if(rdist > cdist){
+
+      buffer <- (rdist-cdist)/2
+
+      xlim <- c(min(crange)-buffer, max(crange)+buffer)
+      ylim <- rrange
+
+    } else {
+
+      xlim <- crange
+      ylim <- rrange
+
+    }
+
+    out_df <-
+      dplyr::filter(
+        .data = out_df,
+        !is.na(value) &
+        dplyr::between(x = col, left = xlim[1], right = xlim[2]) &
+        dplyr::between(x = row, left = ylim[1], right = ylim[2])
+      )
+
+    p <-
+      ggplot2::ggplot(out_df, mapping = ggplot2::aes(x = col, y = row)) +
+      ggplot2::theme_void() +
+      ggplot2::geom_raster(mapping = ggplot2::aes(fill = t1), alpha = out_df$t1_alpha) +
+      confuns::scale_color_add_on(
+        aes = "fill",
+        variable = out_df$t1,
+        clrsp = c("black", "white"),
+        guide = "none"
+      ) +
+      ggnewscale::new_scale_fill() +
+      ggplot2::geom_raster(mapping = ggplot2::aes(fill = value), alpha = score_alpha) +
+      layer_colors +
+      ggplot2::coord_fixed(
+        ratio = 1,
+        xlim = xlim,
+        ylim = ylim,
+      ) +
+      ggplot2::theme(
+        panel.background = ggplot2::element_rect(fill = "black"),
+        panel.grid = ggplot2::element_blank(),
+        strip.background = ggplot2::element_blank()
+      ) +
+      ggplot2::labs(x = NULL, y = NULL, fill = fill_lab) +
+      gganimate::transition_manual(slice)
+
+    message("Preparing animation. This can take a few moments.")
+
+    anim <- gganimate::animate(p, fps = fps)
+
+    message("Saving animation.")
+
+    gganimate::anim_save(
+      filename = paste0("animations/consensus_", plane, "_", color_by, ".gif"),
+      animation = anim
+    )
+
+    message("Done.")
+
+  }
+
+}
+
+
 animate3D_prepare <- function(fig,
                               n_frames = 360,
                               angle_range = c(0, 360),
@@ -773,6 +892,55 @@ find_intro_html <- function(dir, project){
 
 }
 
+from_nifti_with_instructions <- function(nifti, instr, dbscan = FALSE){
+
+  if(instr$slice < 1){
+
+    # assumes RAS+ orientation!
+    mx <-
+      dplyr::case_when(
+        instr$plane == "sag" ~ dim(nifti)[1],
+        instr$plane == "cor" ~ dim(nifti)[2],
+        instr$plane == "axi" ~ dim(nifti)[3]
+      )
+
+    instr$slice <- round(instr$slice * mx)
+
+  }
+
+  slice_df <-
+    imgR::get_slice_df(
+      input = nifti,
+      orientation = instr$plane,
+      slice = instr$slice
+    ) %>%
+    dplyr::rename(col = Var1, row = Var2) %>%
+    dplyr::mutate(
+      plane = instr$plane,
+      slice = instr$slice
+    ) %>%
+    dplyr::filter(value != 0)
+
+  if(isTRUE(dbscan)){
+
+    if(nrow(slice_df) != 0){
+
+      dbscan_out <- dbscan::dbscan(x = slice_df[, c("col", "row")], eps = 1.5, minPts = 8)
+      slice_df$dbscan <- as.character(dbscan_out$cluster)
+      slice_df <- dplyr::filter(slice_df, dbscan != 0)
+
+    } else {
+
+      slice_df$dbscan <- ""
+
+    }
+
+  }
+
+  return(slice_df)
+
+}
+
 generate_color_gradient <- function(colors, n) {
   stopifnot(length(colors) >= 2)
   grDevices::colorRampPalette(colors)(n)
@@ -866,33 +1034,6 @@ ggpLayer_slice <- function(slice_df,
   }
 
   return(out)
-
-}
-
-resource_file <- function(file){
-
- ifelse(local_launch(), file.path("www", file), file)
-
-}
-
-videoBox <- function(name, width = 6){
-
-  help_name <- paste0("video_", name)
-
-  shiny::column(
-    width = width,
-    shiny::div(
-      class = "video-container",
-      shiny::strong(shiny::h4(CB_help[[help_name]]$title)) %>% add_helper(help_name),
-      shiny::tags$video(
-        src = paste0(resource_file(name), ".mp4"),
-        width = "100%",
-        type = "video/mp4",
-        controls = NA
-      ),
-      shiny::helpText(CB_help[[help_name]]$short)
-    )
-  )
 
 }
 
@@ -1236,6 +1377,20 @@ identify_updated_voxels <- function(new, old){
 
 }
 
+list_sequences <- function(dir_session, space = "reg", ...){
+
+  if(space == "dicom"){
+
+    list.files(file.path(dir_session, "dicom"), ...)
+
+  } else {
+
+    list.files(file.path(dir_session, "nifti"), ...)
+
+  }
+
+}
+
 load_consensus_template <- function(as_df = TRUE, t1 = TRUE, subcortical = TRUE){
 
   data("consensus_template")
@@ -1288,6 +1443,22 @@ load_non_brain_template <- function(){
 
 }
 
+local_launch <- function(session = NULL){
+
+  if(!is.null(session)){
+
+    hostname <- session$clientData$url_hostname
+
+    grepl("localhost", hostname) || grepl("^127\\.0\\.0\\.1$", hostname)
+
+  } else {
+
+    dir.exists("/Users/heilandr/lab/projects/ConsensusBrain")
+
+  }
+
+}
+
 make_CBscore_label <- function(voxel_df, score_set_up){
 
   voxel_df$CBscore_label <- ""
@@ -1305,6 +1476,7 @@ make_CBscore_label <- function(voxel_df, score_set_up){
   return(voxel_df)
 
 }
+
 
 make_pretty_label <- function(labels){
 
@@ -1411,6 +1583,24 @@ map_values_to_colors <- function(values, clrsp = "Viridis", n = 100){
 
 }
 
+mask_bb <- function(dir_session, mask, space = "reg"){
+
+  require(ConsensusBrain)
+
+  mask_df <-
+    oro.nifti::readNIfTI(file.path(dir_session, "nifti", paste0("mask_", mask, "_", space, ".nii.gz"))) %>%
+    ConsensusBrain::nifti_to_voxel_df(black_rm = T, verbose = FALSE)
+
+  purrr::map(
+    .x = switch_axis_label(ConsensusBrain::mri_planes),
+    .f = ~ range(mask_df[[.x]])
+  ) %>%
+    purrr::set_names(nm = ConsensusBrain::mri_planes)
+
+}
+
+
+
 plot_mri_frame <- function(col = c(1,256),
                            row = c(1,256),
                            type = "n",
@@ -1451,6 +1641,464 @@ plane_to_ccs <- function(plane){
   out <- c("sag" = "x", "axi" = "y", "cor" = "z")[plane]
 
   unname(out)
+
+}
+
+
+#' @title Visualize MRI slices from structured NIfTI inputs
+#'
+#' @description
+#' Visualizes single or multiple slices from MRI sequences based on a structured directory and file naming convention.
+#' Files are expected to follow the format `<type>_<sequence>_<space>.nii.gz`, where:
+#'
+#' - `type`: denotes the kind of image (e.g., `"brainm"` for skull-stripped, `"raw"` for original, `"mask"` for binary masks).
+#' - `sequence`: the MRI modality (e.g., `"t1"`, `"t1ce"`, `"t2"`, `"flair"`).
+#' - `space`: the spatial context (e.g., `"orig"` for unregistered space, `"regRef"` for session-specific reference-registered space, `"regMNI"` for mni-registered space).
+#'
+#' Each image is read, sliced, and displayed based on instructions passed through the `planes` and `slices` arguments.
+#'
+#' @param input A path to a directory containing NIfTI files named according to the `<type>_<sequence>_<space>.nii.gz` convention,
+#'              a path to a single NIfTI file, or a NIfTI object directly.
+#' @param type A string specifying the file prefix (e.g., `"brainm"` for skull-stripped images). Default is `"brainm"`.
+#' @param space A string specifying the spatial suffix (e.g., `"regRef"`, `"regMNI"`, `"orig"`). Default is `"fsMNI"`.
+#' @param sequences Character vector of MRI sequences to load (e.g., `"t1ce"`, `"flair"`). Can also include `"mni"` to overlay a reference.
+#' @param planes Character vector specifying which anatomical planes to plot: any combination of `"sag"`, `"axi"`, `"cor"`.
+#' @param slices A numeric vector of slice indices (or fractions < 1 to indicate percent of axis) to display. If `NULL` and a mask is given,
+#'        slices are chosen to best capture the mask extent.
+#' @param mask Optional string indicating which mask to load (e.g., `"tumor"`). The function expects a file named `mask_<mask>_<space>.nii.gz`.
+#' @param mask_alpha Alpha transparency of the mask overlay.
+#' @param mask_color Fill and border color of the mask.
+#' @param mask_linesize Line width of the mask outline.
+#' @param grid Optional grid to overlay (either vector of values or fraction of image size).
+#' @param grid_x,grid_y Vectors of x/y-positions for gridlines (overrides `grid` if set separately).
+#' @param grid_alpha Alpha transparency of the grid lines.
+#' @param grid_color Color of grid lines.
+#' @param grid_linesize Line width of grid lines.
+#' @param slice_num Logical; if `TRUE`, displays slice numbers as text overlay.
+#' @param slice_num_fct Numeric vector (length 1 or 2) for horizontal and vertical placement of slice numbers as fraction of image size.
+#' @param slice_num_size Font size of the slice number labels.
+#' @param guide Type of fill legend guide to use (default `"none"`).
+#' @param cols,rows Column and row variables for faceting.
+#' @param ncol,nrow Numeric; number of columns and rows for facet layout (if applicable).
+#'
+#' @details
+#' If `input` is a directory, the function searches for files matching the naming scheme `<type>_<sequence>_<space>.nii.gz` inside the `nifti/` subdirectory.
+#' If a mask is provided, and `slices` is `NULL`, the function identifies the most informative slices based on mask voxel density per plane.
+#'
+#' Slices are extracted using custom axis conversion and projected as 2D images with optional overlays for masks and grid lines.
+#'
+#' The function supports multi-sequence and multi-plane faceting. To avoid overplotting, it restricts combinations of more than two varying dimensions (`plane`, `slice`, `sequence`).
+#'
+#' @return A `ggplot` object with the requested slice visualization.
+#'
+#' @examples
+#' \dontrun{
+#' # Plot one axial slice from T1-CE image, with tumor mask overlay
+#' plot_subject(input = "sub-001/",
+#'              type = "brainm",
+#'              space = "regRef",
+#'              sequences = "t1ce",
+#'              mask = "tumor",
+#'              planes = "axi",
+#'              slices = 128)
+#'
+#' # Plot 3 anatomical planes through the most informative tumor slices
+#' plot_subject(input = "sub-002/",
+#'              type = "brainm",
+#'              space = "regRef",
+#'              sequences = "t1ce",
+#'              mask = "tumor")
+#' }
+#'
+#' @import ggplot2 dplyr tidyr purrr oro.nifti
+#' @export
+
+plot_subject <- function(input,
+                         type = "raw",
+                         space = "regMNI",
+                         sequences = "t1ce",
+                         planes = c("sag", "axi", "cor"),
+                         slices = NULL,
+                         mask = NULL,
+                         mask_alpha = 0.25,
+                         mask_color = "red",
+                         mask_linesize = 1,
+                         grid = NULL,
+                         grid_x = NULL,
+                         grid_y = NULL,
+                         grid_alpha = 0.25,
+                         grid_color = "white",
+                         grid_linesize = 0.25,
+                         slice_num = TRUE,
+                         slice_num_fct = 0.975,
+                         slice_num_size = 2.5,
+                         guide = "none",
+                         offset_slices = 0,
+                         offset_dir = "left",
+                         mni_path = NULL,
+                         mni_dir = "/Users/heilandr/lab/data/mri/MNI_templates/MNI152",
+                         cols = NULL,
+                         rows = NULL,
+                         ncol = NULL,
+                         nrow = NULL){
+
+  require(oro.nifti)
+
+  stopifnot(length(type) == 1)
+  stopifnot(length(space) == 1)
+
+  slices_rm <- FALSE
+
+  # start with mask, if required
+  if(length(mask) == 1){
+
+    if(!is.character(input) && !file.info(input)[["isdir"]]){
+
+      warning("Parameter `mask` can not be used with a non-directory value for `input`.")
+
+    } else {
+
+      mask_path <- file.path(input, "nifti", paste0("mask_", mask, "_", space, ".nii.gz"))
+
+      if(!file.exists(mask_path)){
+
+        mp <- file.path("/nifti", basename(mask_path))
+        stop(glue::glue("Mask path '{mp}' not found in '{input}'."))
+
+      }
+
+      nifti_mask <- oro.nifti::readNIfTI(mask_path, reorient = FALSE)
+
+      # if no slice specified -> pick slices that contain most mask pixels
+      if(is.null(slices)){
+
+        nifti_mask_df <-
+          ConsensusBrain::nifti_to_voxel_df(nifti_mask, verbose = FALSE) %>%
+          dplyr::filter(value != 0)
+
+        seq_instr <-
+          purrr::map_df(
+            .x = ConsensusBrain::switch_axis_label(planes),
+            .f = function(ccs_axis){
+
+              dplyr::group_by(nifti_mask_df, !!rlang::sym(ccs_axis)) %>%
+                dplyr::summarize(n = dplyr::n()) %>%
+                dplyr::slice_max(order_by = n, with_ties = FALSE) %>%
+                dplyr::transmute(
+                  plane = ConsensusBrain::switch_axis_label(ccs_axis),
+                  slice = !!rlang::sym(ccs_axis)
+                )
+
+            }
+          )
+
+        slices_rm <- TRUE
+
+      } else {
+
+        # make seq instructions
+        seq_instr <- tidyr::expand_grid(plane = planes, slice = slices)
+
+      }
+
+      # iterate over seq_instr
+      mask_layer <-
+        purrr::map_df(
+          .x = 1:nrow(seq_instr),
+          .f = function(i){
+
+            mask_df <-
+              from_nifti_with_instructions(nifti_mask, seq_instr[i, ], dbscan = TRUE) %>%
+              dplyr::select(col, row, value, dbscan) %>%
+              dplyr::filter(value != 0)
+
+            if(nrow(mask_df) != 0){
+
+              out <-
+                purrr::map_df(
+                  .x = unique(mask_df$dbscan),
+                  .f = function(group){
+
+                    dplyr::filter(mask_df, dbscan == {{group}}) %>%
+                      dplyr::select(col, row) %>%
+                      as.matrix() %>%
+                      concaveman::concaveman(points = ., concavity = 2) %>%
+                      tibble::as_tibble() %>%
+                      magrittr::set_colnames(value = c("col", "row")) %>%
+                      dplyr::mutate(
+                        plane = as.character(seq_instr[i,"plane"]),
+                        slice = seq_instr[i,][["slice"]],
+                        dbscan = {{group}}
+                      )
+
+                  }
+                )
+
+            } else {
+
+              out <- NULL
+
+            }
+
+            return(out)
+
+          }
+        ) %>%
+        ggplot2::geom_polygon(
+          data = .,
+          mapping = ggplot2::aes(group = dbscan),
+          alpha = mask_alpha,
+          color = mask_color,
+          fill = mask_color
+        )
+
+    }
+
+  } else {
+
+    mask_layer <- NULL
+    seq_instr <- NULL
+
+  }
+
+  # make seq_instr if not already created during mask reading
+  if(is.null(seq_instr)){
+
+    slices <- if(is.null(slices)){ 0.5 } else { slices }
+
+    # make seq instructions
+    seq_instr <- tidyr::expand_grid(plane = planes, slice = slices, sequence = sequences)
+
+  }
+
+  if(length(slices) == 1 && all(slices < 1)){ slices_rm <- TRUE }
+
+  # make image data list from input
+  if(oro.nifti::is.nifti(input)){
+
+    nifti_lst <- purrr::set_names(list(input), nm = "Input (Nifti)")
+    sequences <- "Input (Nifti)"
+
+    # make list from folder or file
+  } else if(is.character(input)){
+
+    # input does not exist
+    if(is.na(file.info(input)[["isdir"]])){
+
+      stop("Input path '{input}' does not exist.")
+
+      # input is folder: make sequence paths from folder
+    } else if(file.info(input)[["isdir"]]){
+
+      seq_paths <- vector(mode = "character", length = length(sequences))
+
+      file_names <- paste0(type, "_", sequences[sequences != "mni"], "_", space, ".nii.gz")
+      seq_paths[sequences != "mni"] <- file.path(input, "nifti", file_names)
+
+      if("mni" %in% sequences){
+
+        if(is.character(mni_path)){
+
+          # path to 182x218x182 brain
+          seq_paths[sequences == "mni"] <- mni_path
+
+        } else {
+
+          file_mni <- paste0(type, "_mni_orig.nii.gz")
+          mni_path <- file.path(mni_dir, file_mni)
+          seq_paths[sequences == "mni"] <- mni_path
+
+        }
+
+      }
+
+      # check file availability
+      for(sp in seq_paths){
+
+        if(!file.exists(sp)){
+
+          stop(glue::glue("Did not find '{sp}'."))
+
+        }
+
+      }
+
+      # input is file: make sequence paths from input path
+    } else if(!file.info(input)[["isdir"]]) {
+
+      seq_paths <- input
+      sequences <- "Input (Dir)"
+
+    }
+
+    nifti_lst <-
+      purrr::map(seq_paths, .f = ~ oro.nifti::readNIfTI(.x, reorient = FALSE)) %>%
+      purrr::set_names(nm = sequences)
+
+  } else {
+
+    stop("Invalid input.")
+
+  }
+
+  # make seq_df for plotting
+  plot_df_seq <-
+    purrr::imap_dfr(
+      .x = nifti_lst,
+      .f = function(nifti, seq){
+
+        # iterate over seq_instr
+        purrr::map_df(
+          .x = 1:nrow(seq_instr),
+          .f = ~ from_nifti_with_instructions(nifti, seq_instr[.x, ])
+        ) %>%
+          dplyr::filter(value != 0) %>%
+          dplyr::mutate(sequence = {{seq}})
+
+      }
+    )
+
+  # facets required?
+  multiple <-
+    purrr::keep(
+      .x = c("plane", "slice", "sequence"),
+      .p = ~ dplyr::n_distinct(plot_df_seq[[.x]]) > 1
+    )
+
+  if(isTRUE(slices_rm)){ multiple <- multiple[multiple != "slice"]}
+
+  if(length(multiple) == 3){
+
+    stop("Too many dimensions to plot. Either `planes`, `sequences` or `slices` must be of length 1.")
+
+  } else if(length(multiple) == 2){
+
+    cols <- ifelse(is.null(cols), multiple[1], cols)
+    rows <- ifelse(is.null(rows), multiple[2], rows)
+
+    facet_formula <- as.formula(paste(cols, "~", rows, collapse = " "))
+    facet_layer <- ggplot2::facet_grid(facet_formula)
+
+  } else if(length(multiple) == 1){
+
+    facet_formula <- as.formula(paste0(". ~ ", multiple))
+    facet_layer <- ggplot2::facet_wrap(facet_formula, ncol = ncol, nrow = nrow)
+
+  } else {
+
+    facet_layer <- NULL
+
+  }
+
+  # T1
+  intensity_layer <-
+    purrr::map(
+      .x = sequences,
+      .f = function(seq){
+
+        list(
+          ggplot2::geom_raster(
+            data = plot_df_seq[plot_df_seq$sequence == seq,],
+            mapping = ggplot2::aes(x = col, y = row, fill = value)
+          ),
+          ggplot2::scale_fill_gradient(low = "black", high = "white", guide = guide),
+          ggnewscale::new_scale_fill()
+        )
+
+      }
+    )
+
+  # Grid
+  if(is.numeric(grid)){
+
+    smaller1 <- which(grid < 1)
+    grid[smaller1] <- purrr::map_int(grid[smaller1], .f = ~ .x * max(plot_df_seq[,c("col", "row")]))
+
+    grid_x <- grid_y <- grid
+
+  }
+
+  grid_layer <-
+    list(
+      if(is.numeric(grid_x)){ ggplot2::geom_vline(xintercept = grid_x, alpha = grid_alpha, color = grid_color, linewidth = grid_linesize) },
+      if(is.numeric(grid_y)){ ggplot2::geom_hline(yintercept = grid_y, alpha = grid_alpha, color = grid_color, linewidth = grid_linesize) }
+    )
+
+  # slice number
+  if(isTRUE(slice_num) && !"slice" %in% multiple){
+
+    if(length(slice_num_fct) == 1){ slice_num_fct <- rep(slice_num_fct, 2) }
+
+    # assumes that all images are in the same space
+    nifti <- nifti_lst[[1]]
+
+    seq_instr <-
+      purrr::map_df(
+        .x = 1:nrow(seq_instr),
+        .f = function(i){
+
+          instr <- seq_instr[i,]
+
+          if(instr$slice < 1){
+
+            # assumes RAS+ orientation!
+            mx <-
+              dplyr::case_when(
+                instr$plane == "sag" ~ dim(nifti)[1],
+                instr$plane == "cor" ~ dim(nifti)[2],
+                instr$plane == "axi" ~ dim(nifti)[3]
+              )
+
+            instr$slice <- round(instr$slice*mx)
+
+          }
+
+          return(instr)
+
+        }
+      )
+
+    slice_num_df <-
+      dplyr::mutate(
+        .data = seq_instr,
+        col = max(plot_df_seq$col)*slice_num_fct[1],
+        row = max(plot_df_seq$row)*slice_num_fct[2],
+        label = paste0("N=",slice)
+      )
+
+    slice_num_layer <-
+      ggplot2::geom_text(
+        data = slice_num_df,
+        mapping = ggplot2::aes(label = paste0("Sl.: ", slice)),
+        color = "white",
+        size = slice_num_size,
+        hjust = 1
+      )
+
+  } else {
+
+    slice_num_layer <- NULL
+
+  }
+
+  ggplot2::ggplot(mapping = ggplot2::aes(x = col, y = row)) +
+    intensity_layer +
+    mask_layer +
+    slice_num_layer +
+    grid_layer +
+    facet_layer +
+    ggplot2::coord_equal(expand = FALSE) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+      axis.text = ggplot2::element_text(color = "white"),
+      strip.background = ggplot2::element_rect(fill = "black", color = "black"),
+      strip.text = ggplot2::element_text(color = "white"),
+      panel.background = ggplot2::element_rect(fill = "black"),
+      panel.grid = ggplot2::element_blank(),
+      plot.background = ggplot2::element_rect(fill = "black")
+    ) +
+    ggplot2::scale_y_reverse() +
+    ggplot2::labs(x = NULL, y = NULL)
 
 }
 
@@ -1978,6 +2626,14 @@ req_axes_2d <- function(plane, mri = FALSE, ccs_val = TRUE){
 
 }
 
+resource_file <- function(file){
+
+  ifelse(local_launch(), file.path("www", file), file)
+
+}
+
+
+
 #' @export
 switch_axis_label <- function(label){
 
@@ -2482,21 +3138,6 @@ reduce_stack <- function(stacks, which){
 
 }
 
-local_launch <- function(session = NULL){
-
-  if(!is.null(session)){
-
-    hostname <- session$clientData$url_hostname
-    grepl("localhost", hostname) || grepl("^127\\.0\\.0\\.1$", hostname)
-
-  } else {
-
-    dir.exists("/Users/heilandr/lab/projects/ConsensusBrain")
-
-  }
-
-}
-
 
 saturate_colors <- function(cols, sat = 1.5) {
   # Convert colors to HSV
@@ -2514,32 +3155,56 @@ saturate_colors <- function(cols, sat = 1.5) {
 
 }
 
-showModalWelcome <- function(){
+
+send_mail <- function(subject,
+                      text,
+                      from = "consensusbrain@gmx.de",
+                      to = "consensusbrain@gmx.de",
+                      username = "consensusbrain@gmx.de",
+                      attachment_path = NULL,
+                      password = NULL){
+
+  email <-
+    emayili::envelope() %>%
+    emayili::from(from) %>%
+    emayili::to(to) %>%
+    emayili::subject(subject) %>%
+    emayili::text(text)
+
+  if(is.character(attachment_path)){
+
+    email <- emayili::attachment(msg = email, path = attachment_path)
+
+  }
+
+  smtp <-
+    emayili::server(
+      host = "mail.gmx.net",
+      port = 587,
+      username = username,
+      password = password
+    )
+
+  smtp(email)
+
+}
+
+showModalFinalized <- function(){
 
   shiny::showModal(
-    ui = shiny::modalDialog(
-      title = shiny::tags$div(
-        style = "display: flex; align-items: center; justify-content: space-between;",
-
-        shiny::tags$h2(
-          shiny::strong("Welcome!"),
-          style = "margin: 0; padding-top: 0; width = 70%;"
-        ),
-
-        shiny::tags$img(
-          src = ifelse(local_launch(), "www/rano_resect_logo.jpeg", "rano_resect_logo.jpeg"),
-          style = "width: 30%;"
-        )
-      ),
-
+    shiny::modalDialog(
+      title = "Thank you for participating!",
       shiny::helpText(
-        "If this is your first time here at ConsensusBrain, please click on New User.
-          If you've visited before and want to continue where you left off, click 'Browse...' and select the file you previously
-          downloaded that contains your saved progress - a file that ends with .rds!"
+        "You’ve completed ConsensusBrain. The file you just downloaded contains your final results."
       ),
-
+      shiny::helpText(
+        "Like the intermediate progress files, this final file can be reloaded into ConsensusBrain at any time for review or adjustments."
+      ),
+      shiny::helpText(
+        "If you're certain that your results are final, you can submit them directly by clicking 'Send'. Otherwise, you may choose to send the file manually to the study supervisors."
+      ),
       shiny::div(
-        id = "login_panel",
+        id = "finalized_panel",
         style = "width: 500px; max-width: 100%; margin: 0 auto; padding: 20px;",
         shiny::fluidRow(
           shiny::column(
@@ -2547,27 +3212,26 @@ showModalWelcome <- function(){
             align = "left",
             style = "border-right: 1px solid lightgrey; height: 100%;",
             shiny::actionButton(
-              inputId = "new_user",
-              label = "New User",
-              icon = shiny::icon("person"),
+              inputId = "send_finalized_file",
+              label = "Send",
+              icon = shiny::icon("paper-plane"),
               width = "100%"
             )
           ),
           shiny::column(
             width = 6,
             align = "left",
-            shiny::fileInput(
-              inputId = "upload_file",
-              label = NULL,
-              width = "100%",
-              accept = ".RDS"
+            shiny::actionButton(
+              inputId = "dont_send_finalized_file",
+              label = "No thanks",
+              icon = shiny::icon("ban"),
+              width = "100%"
             )
           )
         )
       ),
       footer = shiny::tagList(),
-      easyClose = FALSE,
-      size = "xl"
+      easyClose = FALSE
     )
   )
 
@@ -2784,62 +3448,6 @@ showModalNewUser <- function(session, project = ""){
           width = 12,
           align = "left",
           shiny::br(),
-          shiny::splitLayout(
-            cellWidths = "50%",
-            shiny::textInput(
-              inputId = "userInp_first_name",
-              label = shiny::tagList(shiny::icon("person"), "First Name:"),
-              value = ifelse(local_launch(session), "Jan", ""),
-              width = "100%"
-            ),
-            shiny::textInput(
-              inputId = "userInp_last_name",
-              label = "Last Name:",
-              value = ifelse(local_launch(session), "Kueckelhaus", ""),
-              width = "100%"
-            )
-          ),
-          shinyBS::bsPopover(
-            id = "userInp_first_name",
-            title = NULL,
-            content = "Enter your first ame as it should appear in a publication.",
-            placement = "bottom",
-            trigger = "hover"
-          ),
-          shinyBS::bsPopover(
-            id = "userInp_last_name",
-            title = NULL,
-            content = "Enter your last ame as it should appear in a publication.",
-            placement = "bottom",
-            trigger = "hover"
-          ),
-          shiny::splitLayout(
-            cellWidths = "50%",
-            shiny::textInput(
-              inputId = "userInp_email",
-              value = ifelse(local_launch(session), "jankueckelhaus@gmx.de", ""),
-              label = shiny::tagList(shiny::icon("envelope"), "E-Mail:")
-            ),
-            shiny::textInput(
-              inputId = "userInp_email_confirm",
-              value = ifelse(local_launch(session), "jankueckelhaus@gmx.de", ""),
-              label = shiny::tagList(shiny::icon("envelope"), "E-Mail (Confirm):")
-            )
-          ),
-          shiny::textInput(
-            inputId = "userInp_affiliation",
-            label = shiny::tagList(shiny::icon("institution"), "Affiliation:"),
-            width = "100%",
-            value = ifelse(local_launch(session), "Department of Neurosurgery, University Clinic Erlangen", ""),
-            placeholder = "As denoted in publications."
-          ),
-          shinyBS::bsPopover(
-            id = "userInp_affiliation",
-            title = NULL,
-            content = "Enter your affiliation as it should appear in a publication.",
-            placement = "bottom",
-            trigger = "hover"
-          ),
           shiny::fluidRow(
             shiny::column(
               width = 4,
@@ -2990,7 +3598,7 @@ showModalNewUser <- function(session, project = ""){
               width = 12,
               align = "center",
               shiny::uiOutput(outputId = "helptext_login")
-            ),
+            )
           )
         ),
         footer = shiny::tagList()
@@ -3003,6 +3611,64 @@ showModalNewUser <- function(session, project = ""){
 
 }
 
+showModalWelcome <- function(){
+
+  shiny::showModal(
+    ui = shiny::modalDialog(
+      title = shiny::tags$div(
+        style = "display: flex; align-items: center; justify-content: space-between;",
+
+        shiny::tags$h2(
+          shiny::strong("Welcome!"),
+          style = "margin: 0; padding-top: 0; width = 70%;"
+        ),
+
+        shiny::tags$img(
+          src = ifelse(local_launch(), "www/rano_resect_logo.jpeg", "rano_resect_logo.jpeg"),
+          style = "width: 30%;"
+        )
+      ),
+
+      shiny::helpText(
+        "If this is your first time here at ConsensusBrain, please click on New User.
+          If you've visited before and want to continue where you left off, click 'Browse...' and select the file you previously
+          downloaded that contains your saved progress - a file that ends with .rds!"
+      ),
+
+      shiny::div(
+        id = "login_panel",
+        style = "width: 500px; max-width: 100%; margin: 0 auto; padding: 20px;",
+        shiny::fluidRow(
+          shiny::column(
+            width = 6,
+            align = "left",
+            style = "border-right: 1px solid lightgrey; height: 100%;",
+            shiny::actionButton(
+              inputId = "new_user",
+              label = "New User",
+              icon = shiny::icon("person"),
+              width = "100%"
+            )
+          ),
+          shiny::column(
+            width = 6,
+            align = "left",
+            shiny::fileInput(
+              inputId = "upload_file",
+              label = NULL,
+              width = "100%",
+              accept = ".RDS"
+            )
+          )
+        )
+      ),
+      footer = shiny::tagList(),
+      easyClose = FALSE,
+      size = "xl"
+    )
+  )
+
+}
 
 
 score_label_colors <- function(score_set_up){
@@ -3152,6 +3818,27 @@ valid_name_symbols <- function(name){
     purrr::map_lgl(
       .x = strsplit(name, split = "")[[1]],
       .f = ~ stringr::str_detect(.x, pattern = stringr::str_c(unique(c(letters, LETTERS, " ")), collapse = "|"))
+    )
+  )
+
+}
+
+videoBox <- function(name, width = 6){
+
+  help_name <- paste0("video_", name)
+
+  shiny::column(
+    width = width,
+    shiny::div(
+      class = "video-container",
+      shiny::strong(shiny::h4(CB_help[[help_name]]$title)) %>% add_helper(help_name),
+      shiny::tags$video(
+        src = paste0(resource_file(name), ".mp4"),
+        width = "100%",
+        type = "video/mp4",
+        controls = NA
+      ),
+      shiny::helpText(CB_help[[help_name]]$short)
     )
   )
 

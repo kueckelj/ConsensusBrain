@@ -981,7 +981,12 @@ moduleMriPlaneServer <- function(id,
 
         })
 
-      pb_mask_on_this_plane <- shiny::reactive({ length(data$paintbrush) != 0 })
+      pb_mask_on_this_plane <- shiny::reactive({
+
+        length(data$paintbrush) != 0 |
+        length(data$paintbrush_erase) != 0
+
+        })
 
       pb_mask_on_diff_plane <- shiny::reactive({
 

@@ -27,10 +27,47 @@ ConsensusBrainServer <- function(input, output, session, nifti_object, project =
   saving_reminder <- shiny::reactiveVal(value = 5)
 
   # debug
-  shiny::observeEvent(input$test, {
+  shiny::observeEvent(finalized_clicked(), {
 
-    print(input$sidebar_menu)
-    print(workflow_macro_area())
+    if(finalized_clicked() > 0){
+
+      showModalFinalized()
+
+    }
+
+  })
+
+  shiny::observeEvent(input$send_finalized_file, {
+
+    temp_path <- tempfile(fileext = ".rds")
+    saveRDS(CBfile(), temp_path)
+
+    pw <- Sys.getenv("GMX_PASS")
+
+    send_mail(
+      subject = paste0("ConsensusBrain Finalized - ", userName(CBfile())),
+      text = paste0("Sent at ", Sys.time()),
+      attachment_path = temp_path,
+      password = pw
+    )
+
+    unlink(temp_path)
+
+    shiny::removeModal()
+
+    shinyWidgets::sendSweetAlert(
+      session = session,
+      title = "Done!",
+      text = "The file has been sent.",
+      type = "success",
+      btn_labels = "Continue"
+    )
+
+  })
+
+  shiny::observeEvent(input$dont_send_finalized_file, {
+
+    shiny::removeModal()
 
   })
 
@@ -68,33 +105,31 @@ ConsensusBrainServer <- function(input, output, session, nifti_object, project =
   iv <- shinyvalidate::InputValidator$new()
 
   # all
-  iv$add_rule("userInp_first_name", shinyvalidate::sv_required())
-  iv$add_rule("userInp_first_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
-  iv$add_rule("userInp_first_name", ~ if(!valid_name_symbols(.)) "Only letters are allowed.")
-
-  iv$add_rule("userInp_last_name", shinyvalidate::sv_required())
-  iv$add_rule("userInp_last_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
-  iv$add_rule("userInp_last_name", ~ if(!valid_name_symbols(.)) "Only letters are allowed.")
-
-  iv$add_rule("userInp_affiliation", shinyvalidate::sv_required())
-
-  iv$add_rule("userInp_email", shinyvalidate::sv_required())
-  iv$add_rule("userInp_email", shinyvalidate::sv_email())
-
-  iv$add_rule("userInp_email_confirm", shinyvalidate::sv_required())
-  iv$add_rule("userInp_email_confirm", function(value) {
-    if(value != input$userInp_email){
-      "The email addresses do not match."
-    }
-  })
-
   iv$add_rule("userInp_years_of_experience", shinyvalidate::sv_required())
-
   iv$add_rule("userInp_annual_case_load", shinyvalidate::sv_required())
 
   # Original Project
   if(project == ""){
 
+    iv$add_rule("userInp_first_name", shinyvalidate::sv_required())
+    iv$add_rule("userInp_first_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
+    iv$add_rule("userInp_first_name", ~ if(!valid_name_symbols(.)) "Only letters are allowed.")
+
+    iv$add_rule("userInp_last_name", shinyvalidate::sv_required())
+    iv$add_rule("userInp_last_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
+    iv$add_rule("userInp_last_name", ~ if(!valid_name_symbols(.)) "Only letters are allowed.")
+
+    iv$add_rule("userInp_affiliation", shinyvalidate::sv_required())
+
+    iv$add_rule("userInp_email", shinyvalidate::sv_required())
+    iv$add_rule("userInp_email", shinyvalidate::sv_email())
+
+    iv$add_rule("userInp_email_confirm", shinyvalidate::sv_required())
+    iv$add_rule("userInp_email_confirm", function(value) {
+      if(value != input$userInp_email){
+        "The email addresses do not match."
+      }
+    })
     iv$add_rule("userInp_country", shinyvalidate::sv_required())
 
   }
@@ -168,8 +203,8 @@ ConsensusBrainServer <- function(input, output, session, nifti_object, project =
       annual_case_load = input$userInp_annual_case_load,
       country = input$userInp_country,
       email = input$userInp_email,
-      first_name = stringr::str_to_title(input$userInp_first_name),
-      last_name = stringr::str_to_title(input$userInp_last_name),
+      first_name = input$userInp_first_name,
+      last_name = input$userInp_last_name,
       n_institutions = input$userInp_n_institutions,
       perc_surgery_awake = input$userInp_perc_surgery_awake,
       perc_surgery_ionm = input$userInp_perc_surgery_ionm,
@@ -177,7 +212,8 @@ ConsensusBrainServer <- function(input, output, session, nifti_object, project =
       terms_of_use = input$userInp_terms_of_use,
       total_case_laod = input$userInp_total_case_load,
       years_of_experience = input$userInp_years_of_experience
-    )
+    ) %>%
+      purrr::discard(.p = is.null)
 
   })
 
@@ -445,9 +481,6 @@ ConsensusBrainServer <- function(input, output, session, nifti_object, project =
 
     })
 
-
-
-
   # Tab Progress ----------------------------------------------------------------
 
   # Dynamic UI
@@ -520,11 +553,10 @@ ConsensusBrainServer <- function(input, output, session, nifti_object, project =
     filename = function() {
 
       name_abbr <-
-        strsplit(userName(CBfile()), split = " ")[[1]]%>%
-        purrr::map_chr(.f = ~ toupper(strsplit(.x, split = "")[[1]][1])) %>%
-        stringr::str_c(collapse = "")
+        userNameAbbr(CBfile()) %>%
+        stringr::str_c(., "_")
 
-      paste0("CB_progress_", name_abbr, "_", format(Sys.Date(), "%d%m"), ".rds")
+      paste0("CB_progress_", name_abbr, format(Sys.Date(), "%m%d"), ".rds")
 
     },
     content = function(file) {
@@ -552,14 +584,13 @@ ConsensusBrainServer <- function(input, output, session, nifti_object, project =
 
       # then save
       name_abbr <-
-        strsplit(userName(CBfile()), split = " ")[[1]]%>%
-        purrr::map_chr(.f = ~ toupper(strsplit(.x, split = "")[[1]][1])) %>%
-        stringr::str_c(collapse = "")
+        userNameAbbr(CBfile()) %>%
+        stringr::str_c(., "_")
 
-      paste0("CB_progress_", name_abbr, "_", format(Sys.Date(), "%d%m"), ".rds")
+      paste0("CB_progress_", name_abbr, format(Sys.Date(), "%m%d"), ".rds")
 
     },
-    content = function(file) {
+    content = function(file){
 
       cb_file <- CBfile()
 
@@ -572,18 +603,23 @@ ConsensusBrainServer <- function(input, output, session, nifti_object, project =
     }
   )
 
+  finalized_clicked <- shiny::reactiveVal(value = 0)
+
   # Final output handler
   output$save_finalized_results_button <- shiny::downloadHandler(
     filename = function() {
+
+      finalized_clicked({ finalized_clicked() + 1 })
 
       name <-
         stringr::str_replace_all(
           string = userName(CBfile()),
           pattern = " ",
           replacement = "_"
-          )
+          ) %>%
+        stringr::str_c("_", .)
 
-      paste0("CB_finalized_", name, ".rds")
+      paste0("CB_finalized", name, ".rds")
 
     },
     content = function(file) {
@@ -592,14 +628,12 @@ ConsensusBrainServer <- function(input, output, session, nifti_object, project =
 
       cb_df({ assign_remaining_scores_by_NN(cb_df()) })
 
-      cb_file@progress <-
-        dplyr::select(cb_df(), x, y, z, CBscore)
+      cb_file@progress <- dplyr::select(cb_df(), x, y, z, CBscore)
 
       saveRDS(cb_file, file)
 
     }
   )
-
 
 }
 
