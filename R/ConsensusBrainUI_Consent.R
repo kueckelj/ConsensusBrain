@@ -1,4 +1,4 @@
-ConsensusBrainUI_Step2 <- function(project = ""){
+ConsensusBrainUI_Consent <- function(project = ""){
 
   shinydashboard::dashboardPage(
 
@@ -156,8 +156,8 @@ ConsensusBrainUI_Step2 <- function(project = ""){
           shiny::tags$iframe(
             src = ifelse(
               test = local_launch(),
-              yes = find_intro_html("www/Introduction_Step2.html", project),
-              no = find_intro_html("Introduction_Step2.html", project)
+              yes = find_intro_html("www/Introduction_consent.html", project),
+              no = find_intro_html("Introduction_consent.html", project)
             ),
             width = '100%',
             height = 1000,

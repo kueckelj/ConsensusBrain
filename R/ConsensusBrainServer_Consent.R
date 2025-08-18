@@ -1,4 +1,4 @@
-ConsensusBrainServer_Step2 <- function(input, output, session, nifti_object, project = ""){
+ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, project = ""){
 
   require(oro.nifti)
   require(shiny)

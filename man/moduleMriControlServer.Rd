@@ -11,6 +11,7 @@ moduleMriControlServer(
   mri_cor_out,
   voxel_df_input,
   mode_init = "selection",
+  mode_opts = list(),
   external_selection = function() {
      NULL
  },

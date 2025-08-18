@@ -815,7 +815,7 @@ ConsensusBrain <- function(nifti_object = NULL, project = ""){
 }
 
 #' @export
-ConsensusBrain_Step2 <- function(nifti_object = NULL, project = ""){
+ConsensusBrain_Consent <- function(nifti_object = NULL, project = ""){
 
   # draw from package data
   if(is.null(nifti_object)){ nifti_object <- ConsensusBrain::mni_template }
@@ -823,10 +823,10 @@ ConsensusBrain_Step2 <- function(nifti_object = NULL, project = ""){
   if(local_launch()){ shiny::addResourcePath("www", "inst/app/www") }
 
   shiny::shinyApp(
-    ui = ConsensusBrainUI_Step2(project = project),
+    ui = ConsensusBrainUI_Consent(project = project),
     server = function(input, output, session){
 
-      ConsensusBrainServer_Step2(
+      ConsensusBrainServer_Consent(
         input = input,
         output = output,
         session = session,
@@ -856,10 +856,10 @@ launchCB <- function(project = ""){
 }
 
 #' @export
-launchCB_Step2 <- function(){
+launchCB_Consent <- function(){
 
   shiny::runApp(
-    appDir = ConsensusBrain_Step2(),
+    appDir = ConsensusBrain_Consent(),
     launch.browser = TRUE
   )
 
