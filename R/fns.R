@@ -106,9 +106,14 @@ adjust_sub_colors <- function(df,
 animate2D <- function(voxel_df,
                       color_by,
                       planes = c("axi", "cor", "sag"),
-                      score_alpha = 0.4,
+                      smooth_span = 0,
                       layer_colors = list(),
+                      layers_misc = list(),
+                      fill_alpha = 0.4,
                       fill_lab = str_to_title(color_by),
+                      folder = "animations",
+                      filename = "consensus_{plane}_{color_by}",
+                      filetype = "gif",
                       fps = 5){
 
   for(plane in planes){
@@ -127,17 +132,26 @@ animate2D <- function(voxel_df,
 
           pb$tick()
 
-          dplyr::left_join(
-            x = dplyr::rename(get_slice_df(mni_template, plane = plane, slice = slice), t1 = value),
-            y = get_slice_df(input = voxel_df, plane = plane, slice = slice, var = color_by),
-            by = c("col", "row")
-          ) %>%
-            dplyr::mutate(plane = {{plane}}, slice = {{slice}})
+          slice_df <-
+            dplyr::left_join(
+              x = dplyr::rename(get_slice_df(mni_template, plane = plane, slice = slice), t1 = value),
+              y = get_slice_df(input = voxel_df, plane = plane, slice = slice, var = color_by),
+              by = c("col", "row")
+            ) %>%
+            dplyr::mutate(slice = {{slice}})
+
+          if(smooth_span > 0 & sum(!is.na(slice_df$value)) > 5){
+
+            slice_df <- smooth_2d(slice_df, span = smooth_span, var_in = "value")
+
+          }
+
+          return(slice_df)
 
         }
       ) %>%
       dplyr::mutate(
-        t1_alpha = dplyr::if_else(is.na(value), true = 1, false = 1-{{score_alpha}})
+        t1_alpha = dplyr::if_else(is.na(value), true = 1, false = 1-{{fill_alpha}})
       )
 
     out_df$row <- max(out_df$row) - out_df$row
@@ -170,6 +184,8 @@ animate2D <- function(voxel_df,
 
     }
 
+    assign("out_df", out_df, envir = .GlobalEnv)
+
     out_df <-
       dplyr::filter(
         .data = out_df,
@@ -189,7 +205,7 @@ animate2D <- function(voxel_df,
         guide = "none"
       ) +
       ggnewscale::new_scale_fill() +
-      ggplot2::geom_raster(mapping = ggplot2::aes(fill = value), alpha = score_alpha) +
+      ggplot2::geom_raster(mapping = ggplot2::aes(fill = value), alpha = fill_alpha) +
       layer_colors +
       ggplot2::coord_fixed(
         ratio = 1,
@@ -202,20 +218,33 @@ animate2D <- function(voxel_df,
         strip.background = ggplot2::element_blank()
       ) +
       ggplot2::labs(x = NULL, y = NULL, fill = fill_lab) +
+      layers_misc +
       gganimate::transition_manual(slice)
 
     message("Preparing animation. This can take a few moments.")
 
-    anim <- gganimate::animate(p, fps = fps)
+    # Ensure output folder exists
+    if (!dir.exists(folder)) {
+      dir.create(folder, recursive = TRUE)
+    }
 
-    message("Saving animation.")
+    out_path <- file.path(folder, paste0(glue::glue(filename, .envir = environment()), ".", filetype))
 
-    gganimate::anim_save(
-      filename = paste0("animations/consensus_", plane, "_", color_by, ".gif"),
-      animation = anim
-    )
+    if(filetype == "gif"){
 
-    message("Done.")
+      anim <- gganimate::animate(p, fps = fps, renderer = gganimate::gifski_renderer(out_path))
+
+    } else if(filetype == "mp4"){
+
+      anim <- gganimate::animate(p, fps = fps, renderer = gganimate::av_renderer(out_path))
+
+    } else {
+
+      stop("Invalid input for `filetype`. Supported types are 'gif' and 'mp4'.")
+
+    }
+
+    message(glue::glue("Saved animation to {out_path}."))
 
   }
 
@@ -352,6 +381,25 @@ apply_erase_mask <- function(voxel_df,
   voxel_df$broi <- NULL
 
   return(voxel_df)
+
+}
+
+apply_offset <- function(df, offset_dist, offset_dir){
+
+  dplyr::mutate(
+    .data = df,
+    idx = as.numeric(factor(slice, levels = sort(unique(slice))))-1
+  ) %>%
+    dplyr::group_by(
+      dplyr::across(
+        .cols = dplyr::any_of(c("plane", "sequence", "slice", "mask"))
+      )
+    ) %>%
+    dplyr::mutate(
+      col = comp_offset_col(col, idx = unique(idx), dir = {{offset_dir}}, dist = {{offset_dist}}),
+      row = comp_offset_row(row, idx = unique(idx), dir = {{offset_dir}}, dist = {{offset_dist}})
+    ) %>%
+    dplyr::ungroup()
 
 }
 
@@ -546,6 +594,51 @@ circular_progress_plot <- function(voxel_df, ...) {
 
 }
 
+circular_progress_plot <- function(voxel_df, inner_r = 0.5, outer_r = 1) {
+
+  score_set_up <- ConsensusBrain::score_set_up
+  voxel_df <- make_CBscore_label(voxel_df, score_set_up)
+
+  df_summary <- voxel_df |>
+    dplyr::count(CBscore_label) |>
+    dplyr::mutate(
+      fraction  = n / sum(n),
+      cumulative = cumsum(fraction),
+      ymin = dplyr::lag(cumulative, default = 0),
+      ymax = cumulative
+    )
+
+  # keep unused levels (legend/order safety)
+  missing_levels <- setdiff(names(score_set_up$choices), df_summary$CBscore_label)
+  if (length(missing_levels) > 0) {
+    df_summary <- dplyr::bind_rows(
+      df_summary,
+      tibble::tibble(CBscore_label = missing_levels, fraction = 0, ymin = 0, ymax = 0, n = 0)
+    )
+  }
+  df_summary$CBscore_label <- factor(df_summary$CBscore_label, levels = names(score_set_up$choices))
+
+  ggplot2::ggplot(
+    df_summary,
+    ggplot2::aes(ymin = ymin, ymax = ymax, xmin = inner_r, xmax = outer_r, fill = CBscore_label)
+  ) +
+    ggplot2::geom_rect(color = "black") +
+    ggplot2::coord_polar(theta = "y", clip = "on") +
+    ggplot2::theme_void() +
+    ggplot2::scale_fill_manual(
+      values = purrr::set_names(score_set_up$colors, names(score_set_up$choices)),
+      drop = FALSE, limits = names(score_set_up$choices),
+      guide = ggplot2::guide_legend(override.aes = list(alpha = 1, color = NA))
+    ) +
+    ggplot2::scale_x_continuous(limits = c(0, outer_r), expand = c(0, 0)) +  # <- fills panel
+    ggplot2::scale_y_continuous(expand = c(0, 0)) +
+    ggplot2::theme(
+      legend.position = "right",
+      plot.margin = ggplot2::margin(0, 0, 0, 0),
+      aspect.ratio = 1
+    ) +
+    ggplot2::labs(fill = "Score")
+}
 
 
 
@@ -611,6 +704,42 @@ comp_outline_bb <- function(outlines){
     range()
 
   return(out)
+
+}
+
+comp_offset_col <- function(col, idx, dir, dist){
+
+  if(dir %in% c("left", "right")){
+
+    fct <- ifelse(dir == "left", -1, 1)
+    dist <- dist * fct * idx
+
+    col <- col + dist
+
+  }
+
+  return(col)
+
+}
+
+comp_offset_row <- function(row, idx, dir, dist){
+
+  if(dir %in% c("top", "bottom")){
+
+    fct <- ifelse(dir == "top", -1, 1)
+    dist <- dist * fct * idx
+
+    row <- row + dist
+
+  }
+
+  return(row)
+
+}
+
+comp_progress <- function(voxel_df){
+
+  floor((sum(voxel_df$CBscore != 0)/nrow(voxel_df))*100)
 
 }
 
@@ -686,10 +815,51 @@ ConsensusBrain <- function(nifti_object = NULL, project = ""){
 }
 
 #' @export
+ConsensusBrain_Step2 <- function(nifti_object = NULL, project = ""){
+
+  # draw from package data
+  if(is.null(nifti_object)){ nifti_object <- ConsensusBrain::mni_template }
+
+  if(local_launch()){ shiny::addResourcePath("www", "inst/app/www") }
+
+  shiny::shinyApp(
+    ui = ConsensusBrainUI_Step2(project = project),
+    server = function(input, output, session){
+
+      ConsensusBrainServer_Step2(
+        input = input,
+        output = output,
+        session = session,
+        nifti_object = nifti_object,
+        project = project
+      )
+
+    }
+  )
+
+}
+
+dim_nifti <- function(nifti){
+
+  purrr::set_names(x = dim(nifti), nm = c("sag", "cor", "axi"))
+
+}
+
+#' @export
 launchCB <- function(project = ""){
 
   shiny::runApp(
     appDir = ConsensusBrain(project = project),
+    launch.browser = TRUE
+  )
+
+}
+
+#' @export
+launchCB_Step2 <- function(){
+
+  shiny::runApp(
+    appDir = ConsensusBrain_Step2(),
     launch.browser = TRUE
   )
 
@@ -874,11 +1044,7 @@ exchange_raster_colors <- function(mri_list,
 
 
 
-comp_progress <- function(voxel_df){
 
-  floor((sum(voxel_df$CBscore != 0)/nrow(voxel_df))*100)
-
-}
 
 find_intro_html <- function(dir, project){
 
@@ -892,7 +1058,7 @@ find_intro_html <- function(dir, project){
 
 }
 
-from_nifti_with_instructions <- function(nifti, instr, dbscan = FALSE){
+from_nifti_with_instructions <- function(nifti, instr, dbscan = FALSE, rm_zero = FALSE){
 
   if(instr$slice < 1){
 
@@ -918,8 +1084,9 @@ from_nifti_with_instructions <- function(nifti, instr, dbscan = FALSE){
     dplyr::mutate(
       plane = instr$plane,
       slice = instr$slice
-    ) %>%
-    dplyr::filter(value != 0)
+    )
+
+  if(isTRUE(rm_zero) | isTRUE(dbscan)){ slice_df <- dplyr::filter(slice_df, value != 0) }
 
   if(isTRUE(dbscan)){
 
@@ -927,7 +1094,19 @@ from_nifti_with_instructions <- function(nifti, instr, dbscan = FALSE){
 
       dbscan_out <- dbscan::dbscan(x = slice_df[, c("col", "row")], eps = 1.5, minPts = 8)
       slice_df$dbscan <- as.character(dbscan_out$cluster)
+
       slice_df <- dplyr::filter(slice_df, dbscan != 0)
+
+      if(nrow(slice_df) != 0){
+
+        slice_df <-
+          dplyr::group_by(slice_df, dbscan) %>%
+          dplyr::mutate(dbscan_count = dplyr::n()) %>%
+          dplyr::ungroup() %>%
+          dplyr::filter(dbscan_count == max(dbscan_count)) %>%
+          dplyr::select(-dbscan_count)
+
+      }
 
     } else {
 
@@ -1463,6 +1642,9 @@ make_CBscore_label <- function(voxel_df, score_set_up){
 
   voxel_df$CBscore_label <- ""
 
+  # deal with decimals created during aggregation
+  voxel_df$CBscore <- as.integer(voxel_df$CBscore)
+
   for(i in seq_along(score_set_up$choices)){
 
     value <- score_set_up$choices[i]
@@ -1493,6 +1675,20 @@ make_pretty_label <- function(labels){
   return(pretty)
 
 }
+
+map_cbscore_colors <- function(x,
+                               colors  = c("#B6E880", "#FFF970", "#FFB340", "#FF7266"),
+                               domain  = c(1, 4),
+                               na_color = "#BFBFBF",
+                               alpha    = 1,
+                               space    = "Lab",
+                               clip     = TRUE) {
+  x <- (x - domain[1]) / diff(domain)
+  rgbm <- grDevices::colorRamp(colors, space = space)(x)
+  a    <- round(pmax(0, pmin(1, alpha)) * 255)
+  grDevices::rgb(rgbm[,1], rgbm[,2], rgbm[,3], alpha = a, maxColorValue = 255)
+}
+
 
 map_refinement_mask_to_broi <- function(mask,
                                         slice,
@@ -1719,10 +1915,11 @@ plot_subject <- function(input,
                          sequences = "t1ce",
                          planes = c("sag", "axi", "cor"),
                          slices = NULL,
-                         mask = NULL,
+                         masks = NULL,
                          mask_alpha = 0.25,
-                         mask_color = "red",
+                         mask_clrp_adjust = NULL,
                          mask_linesize = 1,
+                         mask_main = 1,
                          grid = NULL,
                          grid_x = NULL,
                          grid_y = NULL,
@@ -1733,145 +1930,69 @@ plot_subject <- function(input,
                          slice_num_fct = 0.975,
                          slice_num_size = 2.5,
                          guide = "none",
-                         offset_slices = 0,
+                         offset_dist = 0,
                          offset_dir = "left",
                          mni_path = NULL,
                          mni_dir = "/Users/heilandr/lab/data/mri/MNI_templates/MNI152",
+                         layers_misc = list(),
+                         ratio = 1,
                          cols = NULL,
                          rows = NULL,
                          ncol = NULL,
-                         nrow = NULL){
+                         nrow = NULL,
+                         axes_rm = FALSE,
+                         animate = NULL){
 
   require(oro.nifti)
 
   stopifnot(length(type) == 1)
   stopifnot(length(space) == 1)
 
-  slices_rm <- FALSE
+  # do not remove from facets by default
+  # can be overwritten within the function depending on the set up
+  slice_rm <- FALSE
 
-  # start with mask, if required
-  if(length(mask) == 1){
+  # test input in case of animate==TRUE
+  if(is.list(animate)){
 
-    if(!is.character(input) && !file.info(input)[["isdir"]]){
+    stopifnot(is.numeric(animate$fps) & length(animate$fps) == 1)
+    stopifnot(is.character(animate$path) & length(animate$path) == 1)
 
-      warning("Parameter `mask` can not be used with a non-directory value for `input`.")
+    if(offset_dist > 0){
 
-    } else {
+      message("Ignoring `offset_dist = {offset_dist}` due to `animate = TRUE`.")
 
-      mask_path <- file.path(input, "nifti", paste0("mask_", mask, "_", space, ".nii.gz"))
-
-      if(!file.exists(mask_path)){
-
-        mp <- file.path("/nifti", basename(mask_path))
-        stop(glue::glue("Mask path '{mp}' not found in '{input}'."))
-
-      }
-
-      nifti_mask <- oro.nifti::readNIfTI(mask_path, reorient = FALSE)
-
-      # if no slice specified -> pick slices that contain most mask pixels
-      if(is.null(slices)){
-
-        nifti_mask_df <-
-          ConsensusBrain::nifti_to_voxel_df(nifti_mask, verbose = FALSE) %>%
-          dplyr::filter(value != 0)
-
-        seq_instr <-
-          purrr::map_df(
-            .x = ConsensusBrain::switch_axis_label(planes),
-            .f = function(ccs_axis){
-
-              dplyr::group_by(nifti_mask_df, !!rlang::sym(ccs_axis)) %>%
-                dplyr::summarize(n = dplyr::n()) %>%
-                dplyr::slice_max(order_by = n, with_ties = FALSE) %>%
-                dplyr::transmute(
-                  plane = ConsensusBrain::switch_axis_label(ccs_axis),
-                  slice = !!rlang::sym(ccs_axis)
-                )
-
-            }
-          )
-
-        slices_rm <- TRUE
-
-      } else {
-
-        # make seq instructions
-        seq_instr <- tidyr::expand_grid(plane = planes, slice = slices)
-
-      }
-
-      # iterate over seq_instr
-      mask_layer <-
-        purrr::map_df(
-          .x = 1:nrow(seq_instr),
-          .f = function(i){
-
-            mask_df <-
-              from_nifti_with_instructions(nifti_mask, seq_instr[i, ], dbscan = TRUE) %>%
-              dplyr::select(col, row, value, dbscan) %>%
-              dplyr::filter(value != 0)
-
-            if(nrow(mask_df) != 0){
-
-              out <-
-                purrr::map_df(
-                  .x = unique(mask_df$dbscan),
-                  .f = function(group){
-
-                    dplyr::filter(mask_df, dbscan == {{group}}) %>%
-                      dplyr::select(col, row) %>%
-                      as.matrix() %>%
-                      concaveman::concaveman(points = ., concavity = 2) %>%
-                      tibble::as_tibble() %>%
-                      magrittr::set_colnames(value = c("col", "row")) %>%
-                      dplyr::mutate(
-                        plane = as.character(seq_instr[i,"plane"]),
-                        slice = seq_instr[i,][["slice"]],
-                        dbscan = {{group}}
-                      )
-
-                  }
-                )
-
-            } else {
-
-              out <- NULL
-
-            }
-
-            return(out)
-
-          }
-        ) %>%
-        ggplot2::geom_polygon(
-          data = .,
-          mapping = ggplot2::aes(group = dbscan),
-          alpha = mask_alpha,
-          color = mask_color,
-          fill = mask_color
-        )
+      offset_dist <- 0
 
     }
 
-  } else {
+    if(length(planes) != 1){
 
-    mask_layer <- NULL
-    seq_instr <- NULL
+      stop("Can not animate multiple planes at once.")
+
+    }
+
+    if(is.null(slices)){ # NULL, default
+
+      message("Using all slices for animation.")
+
+    } else if(length(slices) == 1){
+
+      stop("Need more than 1 slice if `animate = TRUE`.")
+
+    } else if(length(slices) > 1){
+
+      message(glue::glue("Using slices {min(slices)} till {max(slices)} for animation."))
+
+    }
+
+    slice_rm <- TRUE
 
   }
 
-  # make seq_instr if not already created during mask reading
-  if(is.null(seq_instr)){
+  mask_colors <- c("cavity" = "goldenrod", "edema" = "steelblue", "necrosis" = "black", "tumor" = "darkred")
+  for(m in names(mask_clrp_adjust)){ mask_colors[m] <- mask_clrp_adjust[m] }
 
-    slices <- if(is.null(slices)){ 0.5 } else { slices }
-
-    # make seq instructions
-    seq_instr <- tidyr::expand_grid(plane = planes, slice = slices, sequence = sequences)
-
-  }
-
-  if(length(slices) == 1 && all(slices < 1)){ slices_rm <- TRUE }
 
   # make image data list from input
   if(oro.nifti::is.nifti(input)){
@@ -1941,6 +2062,198 @@ plot_subject <- function(input,
 
   }
 
+  # check out dimensions
+  dim_df <-
+    purrr::imap_dfr(
+      .x = nifti_lst,
+      .f = function(nifti, seq){
+
+        dims <- dim_nifti(nifti)
+
+        out <- tibble::tibble(seq = {{seq}})
+
+        for(plane in planes){ out[[plane]] <- dims[plane]}
+
+        return(out)
+
+      }
+    )
+
+  n_slices_equal <-
+    apply(
+      X = dim_df[,planes],
+      MARGIN = 2,
+      FUN = function(x){ all(x == x[1]) }
+      )
+
+  if(!all(unname(n_slices_equal))){
+
+    if(animate){
+
+      stop("Slice number of planes are not equal across sequences. Can not animate.")
+
+    } else {
+
+      warning("Slices number of planes are not equal across sequences.")
+
+    }
+
+  }
+
+  # set slices in case of animation
+  if(is.list(animate) & is.null(slices)){
+
+    slices <- 1:unique(dim_df[[planes]])
+
+  }
+
+  # assumes that dimensions are equal -> all from a registered space
+  #dims <- purrr::set_names(x = as.numeric(dim_df[1,planes]), nm = planes)
+
+  # start with mask, if required
+  if(length(masks) != 0){
+
+    if(!is.character(input) && !file.info(input)[["isdir"]]){
+
+      warning("Parameter `masks` can not be used with a non-directory value for `input`.")
+
+    } else {
+
+      mask_paths <-
+        purrr::set_names(
+          x = file.path(input, "nifti", paste0("mask_", masks, "_", space, ".nii.gz")),
+          nm = masks
+        )
+
+      mask_paths_exist <-
+        purrr::map_lgl(
+          .x = mask_paths,
+          .f = function(mp){
+
+            exists <- file.exists(mp)
+
+            if(!exists){
+
+              mp_ref <- file.path("/nifti", basename(mp))
+              warning(glue::glue("Mask path '{mp_ref}' not found in '{input}'."))
+
+            }
+
+            return(exists)
+
+          })
+
+      mask_paths <- mask_paths[unname(mask_paths_exist)]
+
+      nifti_lst_masks <-
+        purrr::map(.x = mask_paths, ~ oro.nifti::readNIfTI(.x, reorient = FALSE))
+
+      # if no slice specified -> slices that contain most mask pixels
+      if(is.null(slices)){
+
+        nifti_mask_df <-
+          ConsensusBrain::nifti_to_voxel_df(nifti_lst_masks[[mask_main]], verbose = FALSE) %>%
+          dplyr::filter(value != 0)
+
+        seq_instr <-
+          purrr::map_df(
+            .x = ConsensusBrain::switch_axis_label(planes),
+            .f = function(ccs_axis){
+
+              dplyr::group_by(nifti_mask_df, !!rlang::sym(ccs_axis)) %>%
+                dplyr::summarize(n = dplyr::n()) %>%
+                dplyr::slice_max(order_by = n, with_ties = FALSE) %>%
+                dplyr::transmute(
+                  plane = ConsensusBrain::switch_axis_label(ccs_axis),
+                  slice = !!rlang::sym(ccs_axis)
+                )
+
+            }
+          )
+
+        slice_rm <- TRUE
+
+      } else {
+
+        # make seq instructions
+        seq_instr <- tidyr::expand_grid(plane = planes, slice = slices)
+
+      }
+
+      # iterate over seq_instr
+      plot_df_mask <-
+        purrr::imap_dfr(
+          .x = nifti_lst_masks,
+          .f = function(nifti_mask, mask_name){
+
+            purrr::map_df(
+              .x = 1:nrow(seq_instr),
+              .f = function(i){
+
+                mask_df <-
+                  from_nifti_with_instructions(nifti_mask, seq_instr[i, ], rm_zero = TRUE, dbscan = TRUE) %>%
+                  dplyr::select(col, row, value, dbscan)
+
+                if(nrow(mask_df) != 0){
+
+                  out <-
+                    purrr::map_df(
+                      .x = unique(mask_df$dbscan),
+                      .f = function(group){
+
+                        dplyr::filter(mask_df, dbscan == {{group}}) %>%
+                          dplyr::select(col, row) %>%
+                          as.matrix() %>%
+                          concaveman::concaveman(points = ., concavity = 2) %>%
+                          tibble::as_tibble() %>%
+                          magrittr::set_colnames(value = c("col", "row")) %>%
+                          dplyr::mutate(
+                            plane = as.character(seq_instr[i,"plane"]),
+                            slice = seq_instr[i,][["slice"]],
+                            dbscan = paste0({{group}}, slice)
+                          )
+
+                      }
+                    )
+
+                } else {
+
+                  out <- NULL
+
+                }
+
+                return(out)
+
+              }
+            ) %>%
+              dplyr::mutate(mask = {{mask_name}})
+
+          }
+        ) %>%
+        dplyr::mutate(
+          group = paste0(mask, dbscan),
+          mask = factor(mask, levels = {{masks}})
+          )
+
+    }
+
+  } else {
+
+    plot_df_mask <- NULL
+    seq_instr <- NULL
+
+  }
+
+  # make seq_instr if not already created during mask reading
+  if(is.null(seq_instr)){
+
+    slices <- if(is.null(slices)){ 0.5 } else { slices }
+
+    # make seq instructions
+    seq_instr <- tidyr::expand_grid(plane = planes, slice = slices)
+
+  }
+
   # make seq_df for plotting
   plot_df_seq <-
     purrr::imap_dfr(
@@ -1953,10 +2266,41 @@ plot_subject <- function(input,
           .f = ~ from_nifti_with_instructions(nifti, seq_instr[.x, ])
         ) %>%
           dplyr::filter(value != 0) %>%
-          dplyr::mutate(sequence = {{seq}})
+          dplyr::mutate(
+            value = scales::rescale(x = value, to = c(0,1)),
+            sequence = {{seq}}
+            )
 
       }
     )
+
+  # how to handle multiple slices
+  if(length(slices) == 1 && all(slices < 1)){ slice_rm <- TRUE }
+
+  if(offset_dist > 0){
+
+    axis <- ifelse(offset_dir %in% c("left", "right"), "col", "row")
+
+    if(offset_dist < 1){
+
+      offset_dist <- max(as.matrix(plot_df_seq[,axis]))*offset_dist
+
+    }
+
+    offset_dist <- as.integer(offset_dist)
+
+    plot_df_seq <- apply_offset(plot_df_seq, offset_dist = offset_dist, offset_dir = offset_dir)
+
+    if(is.data.frame(plot_df_mask)){
+
+      plot_df_mask <- apply_offset(plot_df_mask, offset_dist = offset_dist, offset_dir = offset_dir)
+
+    }
+
+    slice_rm <- TRUE
+    slice_num <- FALSE
+
+  }
 
   # facets required?
   multiple <-
@@ -1965,7 +2309,7 @@ plot_subject <- function(input,
       .p = ~ dplyr::n_distinct(plot_df_seq[[.x]]) > 1
     )
 
-  if(isTRUE(slices_rm)){ multiple <- multiple[multiple != "slice"]}
+  if(isTRUE(slice_rm)){ multiple <- multiple[multiple != "slice"]}
 
   if(length(multiple) == 3){
 
@@ -1990,7 +2334,7 @@ plot_subject <- function(input,
 
   }
 
-  # T1
+  # Intensity
   intensity_layer <-
     purrr::map(
       .x = sequences,
@@ -2001,12 +2345,44 @@ plot_subject <- function(input,
             data = plot_df_seq[plot_df_seq$sequence == seq,],
             mapping = ggplot2::aes(x = col, y = row, fill = value)
           ),
-          ggplot2::scale_fill_gradient(low = "black", high = "white", guide = guide),
-          ggnewscale::new_scale_fill()
+          ggplot2::scale_fill_gradient(low = "black", high = "white", guide = guide)
         )
 
       }
     )
+
+  # Mask
+  if(is.data.frame(plot_df_mask)){
+
+    mask_layer <-
+      list(
+        ggnewscale::new_scale_fill(), # no new_scale_color needed, is first
+        ggplot2::geom_polygon(
+          data = plot_df_mask,
+          mapping = ggplot2::aes(group = group, fill = mask, color = mask),
+          alpha = mask_alpha,
+          linewidth = mask_linesize
+        ),
+        confuns::scale_color_add_on(
+          aes = "fill",
+          variable = plot_df_mask$mask,
+          clrp = "default",
+          clrp.adjust = mask_colors,
+          guide = guide
+          ),
+        confuns::scale_color_add_on(
+          aes = "color",
+          variable = plot_df_mask$mask,
+          clrp = "default",
+          clrp.adjust = mask_colors,
+          guide = guide
+        )
+      )
+
+  } else {
+
+    mask_layer <- list()
+  }
 
   # Grid
   if(is.numeric(grid)){
@@ -2081,7 +2457,39 @@ plot_subject <- function(input,
 
   }
 
-  ggplot2::ggplot(mapping = ggplot2::aes(x = col, y = row)) +
+  if(is.numeric(ratio)){
+
+    ratio_use <- ratio
+
+  } else if(is.function(ratio)){
+
+    ratio_use <- ratio(plot_df_seq$col, plot_df_seq$row)
+
+  } else {
+
+    stop("Invalid input for `ratio`. Must be a function or of class numeric.")
+
+  }
+
+  if(axes_rm){
+
+    layer_axes <-
+      ggplot2::theme(
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank()
+      )
+
+  } else {
+
+    layer_axes <-
+      ggplot2::theme(
+        axis.text = ggplot2::element_text(color = "white")
+      )
+
+  }
+
+  output <-
+    ggplot2::ggplot(plot_df_seq, mapping = ggplot2::aes(x = col, y = row)) +
     intensity_layer +
     mask_layer +
     slice_num_layer +
@@ -2090,15 +2498,40 @@ plot_subject <- function(input,
     ggplot2::coord_equal(expand = FALSE) +
     ggplot2::theme_bw() +
     ggplot2::theme(
-      axis.text = ggplot2::element_text(color = "white"),
       strip.background = ggplot2::element_rect(fill = "black", color = "black"),
       strip.text = ggplot2::element_text(color = "white"),
       panel.background = ggplot2::element_rect(fill = "black"),
       panel.grid = ggplot2::element_blank(),
-      plot.background = ggplot2::element_rect(fill = "black")
+      plot.background = ggplot2::element_rect(fill = "black", color = "black")
     ) +
+    layer_axes +
     ggplot2::scale_y_reverse() +
-    ggplot2::labs(x = NULL, y = NULL)
+    ggplot2::labs(x = NULL, y = NULL, fill = NULL) +
+    layers_misc
+
+  if(is.list(animate)){
+
+    message(glue::glue("{Sys.time()}: Preparing animation."))
+
+    output <- output + gganimate::transition_manual(slice)
+
+    if(stringr::str_detect(animate$path, "gif$")){
+
+      output <- gganimate::animate(output, fps = animate$fps, renderer = gganimate::gifski_renderer(animate$path))
+
+    } else if(stringr::str_detect(animate$path, "mp4$")){
+
+      output <- gganimate::animate(output, fps = animate$fps, renderer = gganimate::av_renderer(animate$path))
+
+    } else {
+
+      stop("Invalid input for `animate$path`. Supported types are 'gif' and 'mp4'.")
+
+    }
+
+  }
+
+  return(output)
 
 }
 
@@ -3189,6 +3622,51 @@ send_mail <- function(subject,
 
 }
 
+showModalDownloadAdjustments <- function() {
+
+  shiny::showModal(
+    shiny::modalDialog(
+      title = "Download Adjustments",
+      size = "l",
+      easyClose = FALSE,
+      footer = shiny::tagList(
+        shiny::fluidRow(
+          shiny::column(
+            width = 6, align = "center",
+            shiny::downloadButton(
+              outputId = "download_adjustments_confirm",
+              label = "Download",
+              width = "80%"
+            )
+          ),
+          shiny::column(
+            width = 6, align = "center",
+            shiny::actionButton(
+              inputId = "download_adjustments_cancel",
+              label   = "Cancel",
+              width   = "90%",
+              class   = "btn btn-outline-secondary"
+            )
+          )
+        )
+      ),
+      shiny::tagList(
+        shiny::p("Download your adjusted resectability map using the button below."),
+        shiny::tags$ul(
+          shiny::tags$li(shiny::HTML("The file will be named <code>CB_adjusted_consent.rds</code>")),
+          shiny::tags$li(
+            shiny::HTML("Please email the file to ", "philipp.karschnia@uk-erlangen.de!")
+          )
+        ),
+        shiny::tags$hr(),
+        shiny::p("Thank you for your time and contribution to this study.")
+      )
+    )
+  )
+
+}
+
+
 showModalFinalized <- function(){
 
   shiny::showModal(
@@ -3607,7 +4085,361 @@ showModalNewUser <- function(session, project = ""){
 
   }
 
+}
 
+showModalQuickRescore <- function(atlas, region, hemisphere){
+
+  # Set up JavaScript according to score setup
+  lc <- length(score_set_up$choices)
+
+  java_script <-
+    purrr::map2_chr(
+      .x = score_set_up$choices[2:lc],
+      .y = score_set_up$colors[2:lc],
+      .f = function(value, color){
+        glue::glue(
+          "$(\"input:radio[name='\" + inputID + \"'][value='{value}']\").parent().css({{ 'background-color': '{color}', 'color': 'black' }});"
+        )
+      }
+    ) %>%
+    stringr::str_c(collapse = "")
+
+  shiny::showModal(
+    shiny::modalDialog(
+      size = "l",
+      easyClose = FALSE,
+      title = "Change Resectability Score",
+
+      # Scoped styles (subtle cards, no background override on buttons)
+      shiny::tags$style(shiny::HTML("
+      .cb-modal .cb-row          { display:flex; align-items:stretch; gap:16px; }
+      .cb-modal .cb-col          { display:flex; flex-direction:column; justify-content:center; }
+      .cb-modal .cb-card         { background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px;
+                                   padding:14px 16px; box-shadow:0 1px 2px rgba(0,0,0,.04); height:100%; }
+      .cb-modal .cb-card h5      { margin:0 0 8px 0; color:#374151; font-weight:600; }
+      .cb-modal .cb-meta dt      { font-weight:600; color:#374151; }
+      .cb-modal .cb-meta dd      { margin:0 0 10px 0; color:#111827; }
+      .cb-modal .cb-divider-left { border-left:1px solid #e5e7eb; }
+      .cb-modal .cb-legend .btn  { display:flex; align-items:center; justify-content:flex-start; gap:8px;
+                                   width:100%; border:1px solid #e5e7eb !important; text-align:left; }
+      .cb-modal .cb-legend .btn.active { border-color:#111827 !important;
+                                         box-shadow:0 0 0 2px rgba(17,24,39,.16) inset; font-weight:600; }
+      .cb-modal .cb-help         { color:#4b5563; margin-top:8px; }
+    ")),
+
+      # Main row
+      shiny::fluidRow(
+        class = "cb-modal cb-row",
+
+        # LEFT: Region details
+        shiny::column(
+          width = 3, class = "cb-col",
+          shiny::div(class = "cb-card",
+                     shiny::h4("Region details"),
+                     shiny::tags$dl(class = "cb-meta",
+                                    shiny::tags$dt("Atlas"),
+                                    shiny::tags$dd(ann_var_names[atlas]),
+                                    shiny::tags$dt("Region"),
+                                    shiny::tags$dd(make_pretty_label(region)),
+                                    shiny::tags$dt("Hemisphere"),
+                                    shiny::tags$dd(stringr::str_to_title(hemisphere))
+                     )
+          )
+        ),
+
+        # MIDDLE: Distribution plot
+        shiny::column(
+          width = 5, class = "cb-col cb-divider-left",
+          shiny::div(class = "cb-card",
+                     shiny::h4("Score distribution (current)"),
+                     shiny::plotOutput("plot_region_score_distr")
+          )
+        ),
+
+        # RIGHT: New score (legend-style buttons, colored via your JS)
+        shiny::column(
+          width = 4, class = "cb-col cb-divider-left",
+          shiny::div(class = "cb-card",
+                     shiny::h4("Select new score"),
+                     shiny::div(class = "cb-legend",
+                                shinyWidgets::radioGroupButtons(
+                                  inputId = "CBrescore",
+                                  label = NULL,
+                                  selected = character(),
+                                  choiceValues = unname(score_set_up$choices)[2:lc],
+                                  choiceNames  = names(score_set_up$choices)[2:lc],
+                                  direction = "vertical",
+                                  justified  = TRUE,
+                                  individual = FALSE,
+                                  size = "normal",
+                                  width = "100%"
+                                )
+                     ),
+                     # Apply your color mapping to the buttons (uses your `java_script`)
+                     shiny::tags$script(shiny::HTML(glue::glue("
+            $(function() {{
+              var inputID = 'CBrescore';
+              function colorizeButtons(){{
+                {java_script}  // <-- your generated lines set background-color + text color
+              }}
+              // Initial apply + after Shiny updates/changes
+              colorizeButtons();
+              $(document).on('shiny:inputchanged', function(e) {{
+                if (e.name === inputID) setTimeout(colorizeButtons, 0);
+              }});
+              // Selection highlight (keeps your colors, just adds emphasis)
+              $(document).on('change', \"input:radio[name='\" + inputID + \"']\", function() {{
+                var $all = $(\"input:radio[name='\" + inputID + \"']\").parent();
+                $all.removeClass('active');
+                $(this).parent().addClass('active');
+              }});
+            }});
+          ")))
+          )
+        )
+      ),
+
+      # Note
+      shiny::fluidRow(
+        shiny::column(
+          width = 12, align = "center",
+          shiny::helpText("This window allows quick rescoring of whole brain regions. For fine-grained voxel edits, use the Adjust tab.")
+        )
+      ),
+
+      # Footer
+      footer = shiny::tagList(
+        shiny::fluidRow(
+          shiny::column(width = 2),
+          shiny::column(
+            width = 4, align = "center",
+            shiny::actionButton("rescore_confirm", "Confirm", width = "80%", disabled = TRUE)
+          ),
+          shiny::column(
+            width = 4, align = "center",
+            shiny::actionButton("rescore_cancel", "Cancel", width = "80%")
+          ),
+          shiny::column(width = 2)
+        )
+      )
+    )
+  )
+
+}
+
+showModalQuickRescore <- function(atlas, region, hemisphere){
+
+  # Set up JavaScript according to score setup
+  lc <- length(score_set_up$choices)
+
+  java_script <-
+    purrr::map2_chr(
+      .x = score_set_up$choices[2:lc],
+      .y = score_set_up$colors[2:lc],
+      .f = function(value, color){
+        glue::glue(
+          "$(\"input:radio[name='\" + inputID + \"'][value='{value}']\").parent().css({{ 'background-color': '{color}', 'color': 'black' }});"
+        )
+      }
+    ) %>%
+    stringr::str_c(collapse = "")
+
+  shiny::showModal(
+    shiny::modalDialog(
+      size = "l",
+      easyClose = FALSE,
+      title = "Change Resectability Score",
+
+      # Scoped styles (subtle cards, no background override on buttons)
+      shiny::tags$style(shiny::HTML("
+      .cb-modal .cb-row          { display:flex; align-items:stretch; gap:16px; }
+      .cb-modal .cb-col          { display:flex; flex-direction:column; justify-content:center; }
+      .cb-modal .cb-card         { background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px;
+                                   padding:14px 16px; box-shadow:0 1px 2px rgba(0,0,0,.04); height:100%; }
+      .cb-modal .cb-card h5      { margin:0 0 8px 0; color:#374151; font-weight:600; }
+      .cb-modal .cb-meta dt      { font-weight:600; color:#374151; }
+      .cb-modal .cb-meta dd      { margin:0 0 10px 0; color:#111827; }
+      .cb-modal .cb-divider-left { border-left:1px solid #e5e7eb; }
+      .cb-modal .cb-legend .btn  { display:flex; align-items:center; justify-content:flex-start; gap:8px;
+                                   width:100%; border:1px solid #e5e7eb !important; text-align:left; }
+      .cb-modal .cb-legend .btn.active { border-color:#111827 !important;
+                                         box-shadow:0 0 0 2px rgba(17,24,39,.16) inset; font-weight:600; }
+      .cb-modal .cb-help         { color:#4b5563; margin-top:8px; }
+    ")),
+
+      # Main row
+      shiny::fluidRow(
+        class = "cb-modal cb-row",
+
+        # LEFT: Region details
+        shiny::column(
+          width = 6, class = "cb-col",
+          shiny::div(class = "cb-card",
+                     shiny::h4("Region details"),
+                     shiny::tags$dl(class = "cb-meta",
+                                    shiny::tags$dt("Atlas"),
+                                    shiny::tags$dd(ann_var_names[atlas]),
+                                    shiny::tags$dt("Region"),
+                                    shiny::tags$dd(make_pretty_label(region)),
+                                    shiny::tags$dt("Hemisphere"),
+                                    shiny::tags$dd(stringr::str_to_title(hemisphere))
+                     )
+          )
+        ),
+
+        # RIGHT: New score (legend-style buttons, colored via your JS)
+        shiny::column(
+          width = 6, class = "cb-col cb-divider-left",
+          shiny::div(class = "cb-card",
+                     shiny::h4("Select new score"),
+                     shiny::div(class = "cb-legend",
+                                shinyWidgets::radioGroupButtons(
+                                  inputId = "CBrescore",
+                                  label = NULL,
+                                  selected = character(),
+                                  choiceValues = unname(score_set_up$choices)[2:lc],
+                                  choiceNames  = names(score_set_up$choices)[2:lc],
+                                  direction = "vertical",
+                                  justified  = TRUE,
+                                  individual = FALSE,
+                                  size = "normal",
+                                  width = "100%"
+                                )
+                     ),
+                     # Apply your color mapping to the buttons (uses your `java_script`)
+                     shiny::tags$script(shiny::HTML(glue::glue("
+            $(function() {{
+              var inputID = 'CBrescore';
+              function colorizeButtons(){{
+                {java_script}  // <-- your generated lines set background-color + text color
+              }}
+              // Initial apply + after Shiny updates/changes
+              colorizeButtons();
+              $(document).on('shiny:inputchanged', function(e) {{
+                if (e.name === inputID) setTimeout(colorizeButtons, 0);
+              }});
+              // Selection highlight (keeps your colors, just adds emphasis)
+              $(document).on('change', \"input:radio[name='\" + inputID + \"']\", function() {{
+                var $all = $(\"input:radio[name='\" + inputID + \"']\").parent();
+                $all.removeClass('active');
+                $(this).parent().addClass('active');
+              }});
+            }});
+          ")))
+          )
+        )
+      ),
+      shiny::br(),
+      shiny::fluidRow(
+        class = "cb-modal cb-row",
+        # MIDDLE: Distribution plot
+        shiny::column(
+          width = 12, class = "cb-col cb-divider-top",
+          shiny::div(class = "cb-card",
+                     shiny::h4("Regional score distribution (current)"),
+                     shiny::plotOutput("plot_region_score_distr")
+          )
+        ),
+      ),
+
+      # Note
+      shiny::fluidRow(
+        shiny::column(
+          width = 12, align = "center",
+          shiny::helpText("This window allows quick rescoring of whole brain regions. For fine-grained voxel edits, use the Adjust tab.")
+        )
+      ),
+
+      # Footer
+      footer = shiny::tagList(
+        shiny::fluidRow(
+          shiny::column(width = 2),
+          shiny::column(
+            width = 4, align = "center",
+            shiny::actionButton("rescore_confirm", "Confirm", width = "80%", disabled = TRUE)
+          ),
+          shiny::column(
+            width = 4, align = "center",
+            shiny::actionButton("rescore_cancel", "Cancel", width = "80%")
+          ),
+          shiny::column(width = 2)
+        )
+      )
+    )
+  )
+
+}
+
+
+showModalSubmitConsent <- function(){
+
+  shiny::showModal(
+    ui = shiny::modalDialog(
+      title = "Submit Consent",
+      size = "l",
+      shiny::helpText(
+        "You have clicked on 'Submit Consent.' This indicates that you agree with the aggregated resectability model,
+         which is based on the combined results from all participants in this study and displayed in the MRIs on this tab.
+         To confirm, please enter your name and email address in the fields below.
+         After clicking 'Confirm,' your consent will be submitted to us. No further action is required.
+         You should receive a confirmation email within a few minutes."
+      ),
+      shiny::splitLayout(
+        cellWidths = c("50%", "50%"),
+        shiny::textInput(
+          inputId = "userInp_first_name",
+          label = "First Name"
+          ),
+        shiny::textInput(
+          inputId = "userInp_last_name",
+          label = "Last Name"
+          )
+      ),
+      shiny::splitLayout(
+        cellWidths = c("50%", "50%"),
+        shiny::textInput(
+          inputId = "userInp_email",
+          label = shiny::tagList(shiny::icon("envelope"), "E-Mail:")
+          ),
+        shiny::textInput(
+          inputId = "userInp_email_confirm",
+          label = shiny::tagList(shiny::icon("envelope"), "E-Mail (Confirm):")
+          )
+      ),
+      footer = shiny::tagList(
+        shiny::fluidRow(
+          shiny::column(width = 2),
+          shiny::column(
+            width = 4,
+            align = "center",
+            shiny::actionButton(
+              inputId = "submit_consent_confirm",
+              label = "Confirm",
+              width = "80%",
+              disabled = TRUE
+            )
+          ),
+          shiny::column(
+            width = 4,
+            align = "center",
+            shiny::actionButton(
+              inputId = "submit_consent_cancel",
+              label = "Cancel",
+              width = "80%"
+            )
+          ),
+          shiny::column(width = 2)
+        ),
+        shiny::fluidRow(
+          shiny::column(
+            width = 12,
+            align = "center",
+            shiny::uiOutput("submit_consent_helptext")
+          )
+        )
+      )
+    )
+  )
 
 }
 
@@ -3674,6 +4506,132 @@ showModalWelcome <- function(){
 score_label_colors <- function(score_set_up){
 
   purrr::set_names(nm = names(score_set_up$choices), x = score_set_up$colors)
+
+}
+
+smooth_2d <- function(slice_df, span, var_in, var_out = NULL){
+
+  stopifnot(is.numeric(slice_df[[var_in]]))
+
+  slice_df_na <- dplyr::filter(slice_df, is.na(!!rlang::sym(var_in)))
+  slice_df <- dplyr::filter(slice_df, !is.na(!!rlang::sym(var_in)))
+
+  formula <- as.formula(paste0(var_in, " ~ col * row"))
+  model <- stats::loess(formula = formula, data = slice_df, span = span/10)
+
+  if(is.null(var_out)){ var_out <- var_in }
+
+  slice_df[[var_out]] <- stats::predict(object = model)
+
+  if(nrow(slice_df_na) != 0){
+
+    slice_df_na[[var_out]] <- NA
+    slice_df <- rbind(slice_df, slice_df_na)
+
+  }
+
+  return(slice_df)
+
+}
+
+smooth_cbscore_continuous <- function(df,
+                                      score_col = "CBscore",
+                                      coord_cols = c("x","y","z"),
+                                      sigma = 1.5,  # in voxel units
+                                      truncate = 3,              # kernel half-width ~ truncate*sigma
+                                      snap_to_half_steps = FALSE) {
+
+  stopifnot(all(coord_cols %in% names(df)), score_col %in% names(df))
+  stopifnot(length(sigma) == 1)
+  sigma <- rep(sigma, 3)
+
+  x <- df[[coord_cols[1]]]
+  y <- df[[coord_cols[2]]]
+  z <- df[[coord_cols[3]]]
+  v <- as.numeric(df[[score_col]])
+
+  # Build grid (regular lattice assumed)
+  xu <- sort(unique(x)); yu <- sort(unique(y)); zu <- sort(unique(z))
+  nx <- length(xu); ny <- length(yu); nz <- length(zu)
+  ix <- match(x, xu); iy <- match(y, yu); iz <- match(z, zu)
+  lin_index <- ix + (iy - 1L) * nx + (iz - 1L) * nx * ny
+
+  # Place values and a mask into arrays
+  vol  <- array(NA_real_, dim = c(nx, ny, nz))
+  mask <- array(0,         dim = c(nx, ny, nz))
+  vol[lin_index]  <- v
+  mask[lin_index] <- 1
+
+  # ----- 1D Gaussian kernels (normalized) -----
+  make_k1d <- function(sg) {
+    r <- max(1L, ceiling(truncate * sg))
+    xs <- -r:r
+    k <- dnorm(xs, 0, sg)
+    k / sum(k)
+  }
+  hx <- make_k1d(sigma[1]); hy <- make_k1d(sigma[2]); hz <- make_k1d(sigma[3])
+
+  # ----- 1D padded filtering along a given dimension -----
+  # padding = replicate edge values; centered filtering
+  filt1d_pad_center <- function(vec, h) {
+    r <- (length(h) - 1L) / 2L
+    if (r < 0.5) return(vec)  # length(h)==1
+    r <- as.integer(r)
+    pad <- function(x, r) c(rep.int(x[1L], r), x, rep.int(x[length(x)], r))
+    stats::filter(pad(vec, r), filter = h, sides = 2, circular = FALSE)[(r+1):(length(vec)+r)]
+  }
+
+  # Apply 1D filter along dim = 1 (x), 2 (y), or 3 (z)
+  conv_along_dim <- function(arr, h, dim) {
+    stopifnot(length(dim(arr)) == 3, dim %in% 1:3)
+    d <- dim(arr)
+    out <- array(NA_real_, dim = d)
+
+    if (dim == 1L) {                # along x
+      for (j in seq_len(d[2])) {
+        for (k in seq_len(d[3])) {
+          out[, j, k] <- filt1d_pad_center(arr[, j, k], h)
+        }
+      }
+    } else if (dim == 2L) {         # along y
+      for (i in seq_len(d[1])) {
+        for (k in seq_len(d[3])) {
+          out[i, , k] <- filt1d_pad_center(arr[i, , k], h)
+        }
+      }
+    } else {                        # along z
+      for (i in seq_len(d[1])) {
+        for (j in seq_len(d[2])) {
+          out[i, j, ] <- filt1d_pad_center(arr[i, j, ], h)
+        }
+      }
+    }
+    out
+  }
+
+  # ----- Edge-aware smoothing: convolve value*mask and mask, then divide -----
+  vol0 <- ifelse(mask == 1, vol, 0)
+
+  # three separable passes (x -> y -> z)
+  num <- conv_along_dim(vol0, hx, 1L)
+  num <- conv_along_dim(num , hy, 2L)
+  num <- conv_along_dim(num , hz, 3L)
+
+  den <- conv_along_dim(mask, hx, 1L)
+  den <- conv_along_dim(den , hy, 2L)
+  den <- conv_along_dim(den , hz, 3L)
+
+  smooth <- ifelse(den > .Machine$double.eps, num / den, NA_real_)
+
+  # Optional: snap back to nearest 0.5 to preserve the median's reporting granularity
+  if (isTRUE(snap_to_half_steps)) {
+    smooth <- round(smooth * 2) / 2
+  }
+
+  # Return in original row order
+  df$CBscore_smooth <- smooth[lin_index]
+
+  return(df)
 
 }
 

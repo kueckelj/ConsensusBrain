@@ -287,12 +287,7 @@ moduleMriPlaneUI <- function(id,
               status = "success"
             ),
 
-            shinyWidgets::materialSwitch(
-              inputId = ns("show_score"),
-              label = "Show Score",
-              value = FALSE,
-              status = "success"
-            ),
+            shiny::uiOutput(ns("show_score")),
 
             shiny::conditionalPanel(
               condition = sprintf("input['%s'] === true", ns("show_score")),
@@ -356,7 +351,9 @@ moduleMriPlaneServer <- function(id,
                                  voxel_df_input,
                                  mri_control,
                                  color_selected = function(){ colorsCB$selected },
-                                 mode_init = "inspection"
+                                 mode_init = "inspection",
+                                 mode_opts = list(),
+                                 reset_quick_select = NULL
                                  ){
 
   # define once
@@ -381,7 +378,7 @@ moduleMriPlaneServer <- function(id,
 
         print("-----------------------")
         print("Test")#
-        slice_idx({ slice_idx()+1 })
+        print(voxels_quick_select())
 
       }, ignoreInit = TRUE)
 
@@ -419,7 +416,34 @@ moduleMriPlaneServer <- function(id,
 
       output$options_bottom <- shiny::renderUI({
 
-        if(mode() == "selection"){
+        if(mode() == "inspection"){
+
+          if(isTRUE(mode_opts$quick_select)){
+
+            if(cursor_on_brain_tissue()){
+
+              shiny::column(
+                offset = 1,
+                width = 10,
+                align = "center",
+                shiny::helpText("Double-click to change the score of this region.")
+              )
+
+            } else {
+
+              what  <- ifelse(isTRUE(mri_control_input$highlight_hover), "highlight and select", "select")
+              shiny::column(
+                offset = 1,
+                width = 10,
+                align = "center",
+                shiny::helpText(glue::glue("Hover over brain regions to {what}."))
+              )
+
+            }
+
+          }
+
+        } else if(mode() == "selection"){
 
           if(selection_tool() == "region_click"){
 
@@ -613,6 +637,20 @@ moduleMriPlaneServer <- function(id,
 
       })
 
+      output$show_score <- shiny::renderUI({
+
+        if(mode_init == "selection"){
+
+          shinyWidgets::materialSwitch(
+            inputId = ns("show_score"),
+            label = "Show Score",
+            value = FALSE,
+            status = "success"
+          )
+
+        }
+
+      })
 
       # Reactive Values ---------------------------------------------------------
 
@@ -633,6 +671,8 @@ moduleMriPlaneServer <- function(id,
           cursor_on_plane = character(1),
 
           # inspection
+          highlight_hover = logical(1),
+          highlight_var = character(1),
           hover_vars = numeric(1),
           voxels_highlighted = character(1),
 
@@ -656,31 +696,16 @@ moduleMriPlaneServer <- function(id,
           voxels_selected = character(1)
         )
 
-      stacks <- shiny::reactiveValues(zoom = list())
+      plane_selection_state <- shiny::reactiveVal(value = character())
+
+      #slice_df_hover_highlight is defined below due to dependency reasons
+
+      slice_idx <- shiny::reactiveVal(value = 128)
+      slice_idx_debounce <- shiny::debounce(r = slice_idx, millis = 200)
 
       slice_pos <- shiny::reactiveValues(sag = 128, axi = 128, cor = 128)
 
-      voxel_df <- shiny::reactive({
-
-        dplyr::mutate(
-          .data = voxel_df_input(),
-          selected = id %in% c(mri_control_input$voxels_selected)
-        )
-
-      })
-
-      plane_selection_state <- shiny::reactiveVal(value = character())
-
-      shiny::observeEvent(mri_control_input$voxels_selected, {
-
-        if(!identical(x = sort(plane_selection_state()), y = sort(mri_control_input$voxels_selected))){
-
-          plane_selection_state({ mri_control_input$voxels_selected })
-
-        }
-
-      })
-
+      stacks <- shiny::reactiveValues(zoom = list())
 
       # Reactive Expressions ----------------------------------------------------
 
@@ -698,7 +723,7 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      cursor_on_brain_tissue <- shiny::reactive({ nrow(slice_df_hover()) != 0 })
+      cursor_on_brain_tissue <- shiny::reactive({ !is.null(slice_df_hover()) && nrow(slice_df_hover()) != 0 })
 
       cursor_on_mri <- shiny::reactiveVal(value = FALSE)
 
@@ -729,7 +754,7 @@ moduleMriPlaneServer <- function(id,
 
           TRUE
 
-        } else {
+        } else if(mode() == "selection") {
 
           !stringr::str_detect(interaction_tool(), pattern = "outline|paintbrush")
 
@@ -845,19 +870,33 @@ moduleMriPlaneServer <- function(id,
 
       localizer_active_h <- shiny::reactive({
 
-        show_localizer() &&
-        cursor_on_mri() &&
-        !drawing_active() &&
-        abs(round(cursor_pos()[2], 0) - slice_pos[[ra_mri[["row"]]]]) <= mri_side_length()*0.01
+        if(shiny::isTruthy(input$mriPlot_hover)){ # cursor_on_mri() invalidates too late! - why?
+
+          show_localizer() &&
+            !drawing_active() &&
+            abs(round(cursor_pos()[2], 0) - slice_pos[[ra_mri[["row"]]]]) <= mri_side_length()*0.01
+
+        } else {
+
+          FALSE
+
+        }
 
       })
 
       localizer_active_v <- shiny::reactive({
 
-        show_localizer() &&
-        cursor_on_mri() &&
-        !drawing_active() &&
-        abs(round(cursor_pos()[1], 0) - slice_pos[[ra_mri[["col"]]]]) <= mri_side_length()*0.01
+        if(shiny::isTruthy(input$mriPlot_hover)){ # cursor_on_mri() invalidates too late! - why?
+
+          show_localizer() &&
+            !drawing_active() &&
+            abs(round(cursor_pos()[1], 0) - slice_pos[[ra_mri[["col"]]]]) <= mri_side_length()*0.01
+
+        } else {
+
+          FALSE
+
+        }
 
       })
 
@@ -1102,8 +1141,16 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      slice_idx <- shiny::reactiveVal(value = 128)
-      slice_idx_debounce <- shiny::debounce(r = slice_idx, millis = 200)
+      slice_df_hover_highlight <- shiny::debounce(r = slice_df_hover, millis = 175)
+
+      voxel_df <- shiny::reactive({
+
+        dplyr::mutate(
+          .data = voxel_df_input(),
+          selected = id %in% c(mri_control_input$voxels_selected)
+        )
+
+      })
 
 
       # ----- Observers
@@ -2276,21 +2323,33 @@ moduleMriPlaneServer <- function(id,
 
         voxels_show <- inspection_template()
 
-        if(length(mri_control_input$voxels_highlighted) == 0){
+        highlight <- voxels_show$id %in% mri_control_input$voxels_highlighted
 
-          col <- ggplot2::alpha(score_set_up$colors[voxels_show$CBscore+1], 0.4)
-          col[voxels_show$CBscore == 0] <- ggplot2::alpha(col[voxels_show$CBscore == 0], 0.2)
+        if(isTRUE(mri_control_input$highlight_hover) && cursor_on_brain_tissue() && !cursor_down()){
 
-        } else {
+          hvar <- mri_control_input$highlight_var
+          hem <- slice_df_hover_highlight()[["hemisphere"]]
 
-          highlight <- voxels_show$id %in% mri_control_input$voxels_highlighted
+          highlight_hover <-
+            voxels_show[[hvar]] == slice_df_hover_highlight()[[hvar]] &
+            voxels_show[["hemisphere"]] == slice_df_hover_highlight()[["hemisphere"]]
+
+          highlight <- highlight | highlight_hover
+
+        }
+
+        if(mode_opts$inspection_var == "CBscore"){
 
           col <- score_set_up$colors[voxels_show$CBscore+1]
 
-          col[highlight] <- ggplot2::alpha(col[highlight], 0.6)
-          col[!highlight] <- ggplot2::alpha(col[!highlight], 0.1)
+        } else if(mode_opts$inspection_var == "CBscore_smooth"){
+
+          col <- map_cbscore_colors(voxels_show$CBscore_smooth, colors = score_set_up$colors[2:5])
 
         }
+
+        col[highlight] <- ggplot2::alpha(col[highlight], 0.6)
+        col[!highlight] <- ggplot2::alpha(col[!highlight], ifelse(any(highlight), 0.2, 0.4))
 
         graphics::rect(
           xleft = voxels_show$col - 0.5,
@@ -2424,7 +2483,17 @@ moduleMriPlaneServer <- function(id,
 
       # 1. Mode: Inspection -----------------------------------------------------
 
-      # Observe Events (MRI Interaction) ----------------------------------------
+      # ----- Reactive values
+
+      voxels_quick_select <- shiny::reactiveVal(value = character())
+
+      # ----- Observe Events
+
+      shiny::observeEvent(reset_quick_select(), {
+
+        voxels_quick_select({ character() })
+
+      }, ignoreInit = TRUE)
 
       shiny::observeEvent(input$mriPlot_dblclick, {
 
@@ -2434,8 +2503,36 @@ moduleMriPlaneServer <- function(id,
         slice_pos[[col_axis]] <- round(cursor_pos()[1])
         slice_pos[[row_axis]] <- round(cursor_pos()[2])
 
-      })
+        if(isTRUE(mode_opts$quick_select)){
 
+          if(!cursor_on_brain_tissue()){
+
+            shiny::showNotification(
+              ui = "Can not select non-brain tissue.",
+              duration = 5,
+              type = "error"
+            )
+
+            shiny::req(FALSE)
+
+          }
+
+          hvar <- mri_control_input$highlight_var
+          brain_region <- slice_df_hover()[[hvar]]
+          hemisphere <- slice_df_hover()[["hemisphere"]]
+
+          voxels_quick_select({
+
+            dplyr::filter(
+              .data = voxel_df(),
+              !!rlang::sym(hvar) == {{brain_region}} & hemisphere == {{hemisphere}}
+            )[["id"]]
+
+          })
+
+        }
+
+      })
 
       # 2. Mode: Selection ------------------------------------------------------
 
@@ -2651,6 +2748,18 @@ moduleMriPlaneServer <- function(id,
       })
 
       # ----- Observers
+
+      # --- pass selection from controler
+      shiny::observeEvent(mri_control_input$voxels_selected, {
+
+        if(!identical(x = sort(plane_selection_state()), y = sort(mri_control_input$voxels_selected))){
+
+          plane_selection_state({ mri_control_input$voxels_selected })
+
+        }
+
+      })
+
 
       # --- (de-)selection by region click
       # --- dblclick + region_click -> updates voxel_df() immediately
@@ -3237,7 +3346,8 @@ moduleMriPlaneServer <- function(id,
           drawing_outline_confirmed = drawing_outline_confirmed(),
           paintbrushed_ids = paintbrushed_ids(),
           plane_selection_state = plane_selection_state(),
-          slice_pos = slice_pos
+          slice_pos = slice_pos,
+          voxels_quick_select = voxels_quick_select()
         )
 
         })

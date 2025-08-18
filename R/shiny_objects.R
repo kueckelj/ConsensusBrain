@@ -47,6 +47,7 @@ css_styles <-
 
 
 cb_colors <- c("steelblue", "#8BC34A", "#FFEB3B", "#FF9800", "#F44336")
+cb_colors_bright <- c("steelblue", "#B6E880", "#FFF970", "#FFB340", "#FF7266")
 
 # rules:
 # 1. first value of choices must correspond to the missing (not-yet-assigned) value
@@ -63,7 +64,6 @@ score_set_up = list(
   colors = cb_colors,
   clrsp = grDevices::colorRampPalette(cb_colors[2:5])(100)
 )
-
 
 mri_slider_labels <- list(
   sag = c("Right", "Left"),        # Sagittal: Moves left - right

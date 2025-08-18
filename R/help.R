@@ -44,10 +44,19 @@ CB_help <-
         type = "inline"
       ),
 
+    "highlight_hover" =
+      list(
+        content = c(
+          "Set to Yes if you want to highlight the region you are currently hovering over."
+        ),
+        type = "inline"
+      ),
+
     "highlight_scope" =
       list(
         content = c(
-          "Select the scope among which to pick brain regions to highlight."
+          "Select the atlas from which to pick the regions you want to highlight.
+          This also affects what is highlighted when hovering over the MRI - if Highlight on Hover is set to Yes."
         ),
         type = "inline"
       ),

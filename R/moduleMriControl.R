@@ -14,6 +14,7 @@ moduleMriControlServer <- function(id,
                                    mri_cor_out,
                                    voxel_df_input,
                                    mode_init = "selection",
+                                   mode_opts = list(),
                                    external_selection = function(){ NULL },
                                    external_selection_opts = list()
                                    ){
@@ -210,6 +211,19 @@ moduleMriControlServer <- function(id,
           shiny::tagList(
             shiny::column(
               width = 2,
+              shiny::h5(shiny::strong("Highlight on Hover:")) %>% add_helper("highlight_hover"),
+              shinyWidgets::switchInput(
+                inputId = ns("highlight_hover"),
+                label = NULL,
+                size = "normal",
+                onLabel = "Yes",
+                offLabel = "No",
+                value = FALSE,
+                width = "100%"
+              )
+            ),
+            shiny::column(
+              width = 2,
               align = "left",
               shiny::h5(shiny::strong("Highlight Control:")) %>% add_helper("highlight_control"),
               shiny::splitLayout(
@@ -241,9 +255,9 @@ moduleMriControlServer <- function(id,
                   "Macroanatomical" = "ann_macro",
                   "Desikan-Kiliany" = "ann_dk_adj",
                   "Destrieux" = "ann_dt_adj",
-                  "Fibert Tracts" = "fiber_tract",
+                  "Fiber Tracts" = "fiber_tract",
                   "Score" = "CBscore"
-                ),
+                )[if(isTRUE(mode_opts$quick_select)) 2:3 else 1:5],
                 width = "100%",
                 multiple = FALSE,
                 options = shinyWidgets::pickerOptions(
@@ -271,11 +285,10 @@ moduleMriControlServer <- function(id,
                 checkIcon = list(yes = shiny::icon("ok", lib = "glyphicon"))
               )
             ),
-            shiny::column(width = 2),
             shiny::column(
               width = 2,
               align = "left",
-              shiny::h5(shiny::strong("Hover:")) %>% add_helper("hover_vars"),
+              shiny::h5(shiny::strong("Hover Text:")) %>% add_helper("hover_vars"),
               shinyWidgets::pickerInput(
                 inputId = ns("hover_vars"),
                 choices = c(
@@ -870,9 +883,24 @@ moduleMriControlServer <- function(id,
 
       })
 
-      # 4. Manage Inspection Mode -----------------------------------------------
+      # 4. Purpose: Manage Inspection Mode --------------------------------------
 
       voxels_highlighted <- shiny::reactiveVal(value = character())
+      voxels_quick_select <- shiny::reactiveVal(value = character())
+
+      shiny::observe({
+
+        voxels_quick_select({
+
+          c(
+            mri_sag_out()$voxels_quick_select,
+            mri_axi_out()$voxels_quick_select,
+            mri_cor_out()$voxels_quick_select
+          )
+
+        })
+
+      })
 
       shiny::observeEvent(input$highlight_update, {
 
@@ -1755,9 +1783,12 @@ moduleMriControlServer <- function(id,
           output <-
             list(
               cursor_on_plane = cursor_on_plane(),
+              highlight_hover = input$highlight_hover,
+              highlight_var = input$highlight_var,
               hover_vars = as.numeric(input$hover_vars),
               slice_state = slice_state,
-              voxels_highlighted = voxels_highlighted()
+              voxels_highlighted = voxels_highlighted(),
+              voxels_quick_select = voxels_quick_select()
             )
 
         } else if(mode() == "selection"){

@@ -224,7 +224,6 @@ ConsensusBrainServer <- function(input, output, session, nifti_object, project =
 
       shiny::helpText("Please enter the required information.")
 
-
     } else if(!isTRUE(input$userInp_terms_of_use)) {
 
       shiny::helpText("Please agree to the terms of use.")
