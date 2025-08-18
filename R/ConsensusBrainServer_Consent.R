@@ -55,12 +55,26 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
 
     result_altered(TRUE)
 
+    shinyWidgets::sendSweetAlert(
+      session = session,
+      title = "New score received!",
+      text = "Integrating the score in the map. This should only take a few seconds.",
+      type = "success",
+      btn_labels = NA
+    )
+
     cb_df({
 
       update_CBscore(cb_df = cb_df(), update_df = mo_score_adjust()) %>%
         smooth_cbscore_continuous(sigma = 1.5, snap_to_half_steps = FALSE)
 
     })
+
+    shinyWidgets::sendSweetAlert(
+      session = session,
+      title = "Map adjusted!",
+      type = "success"
+    )
 
   }, ignoreInit = TRUE)
 
@@ -185,11 +199,14 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
 
   shiny::observeEvent(input$rescore_confirm, {
 
+    shiny::removeModal()
+
     shinyWidgets::sendSweetAlert(
       session = session,
       title = "New score received!",
       text = "Integrating the score in the map. This should only take a few seconds.",
-      type = "success"
+      type = "success",
+      btn_labels = NA
     )
 
     cb_df({
@@ -206,10 +223,8 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
 
     })
 
-    result_altered(TRUE)
-
     reset_quick_select({ reset_quick_select()+1 })
-    shiny::removeModal()
+    result_altered(TRUE)
 
     shinyWidgets::sendSweetAlert(
       session = session,
@@ -339,6 +354,20 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
 
   shiny::observeEvent(input$submit_consent, {
 
+    if(result_altered()){
+
+      shinyWidgets::sendSweetAlert(
+        session = session,
+        title = "Map has been changed!",
+        text = "You have changed the score of at least one brain region.
+        Plase use the `Download Adjustments` button to download the map you would consent to and send it to us by mail.",
+        type = "info"
+      )
+
+      shiny::req(FALSE)
+
+    }
+
     showModalSubmitConsent()
 
   }, ignoreInit = TRUE)
@@ -400,6 +429,20 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
 
   # Summon modal download adjustments
   shiny::observeEvent(input$download_adjustments, {
+
+    if(!result_altered()){
+
+      shinyWidgets::sendSweetAlert(
+        session = session,
+        title = "Map has not been changed!",
+        text = "No adjustments have been made to the preliminary map.
+        If you consent without any further adjustments, just click on `Submit Consent`.",
+        type = "info"
+      )
+
+      shiny::req(FALSE)
+
+    }
 
     showModalDownloadAdjustments()
 

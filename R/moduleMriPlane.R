@@ -287,7 +287,7 @@ moduleMriPlaneUI <- function(id,
               status = "success"
             ),
 
-            shiny::uiOutput(ns("show_score")),
+            shiny::uiOutput(ns("show_score_ui")),
 
             shiny::conditionalPanel(
               condition = sprintf("input['%s'] === true", ns("show_score")),
@@ -637,7 +637,7 @@ moduleMriPlaneServer <- function(id,
 
       })
 
-      output$show_score <- shiny::renderUI({
+      output$show_score_ui <- shiny::renderUI({
 
         if(mode_init == "selection"){
 
