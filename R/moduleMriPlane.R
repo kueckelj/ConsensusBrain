@@ -2322,6 +2322,7 @@ moduleMriPlaneServer <- function(id,
         plot_mri_frame(col = col_seq(), row = row_seq())
 
         voxels_show <- inspection_template()
+        shiny::req(nrow(voxels_show) != 0)
 
         highlight <- voxels_show$id %in% mri_control_input$voxels_highlighted
 
@@ -2428,14 +2429,26 @@ moduleMriPlaneServer <- function(id,
 
         plot_mri_frame(col = col_seq(), row = row_seq())
 
-        voxels_show <- interaction_template()
+        voxels_show <- dplyr::filter(interaction_template(), !is.na(CBscore))
+
+        shiny::req(nrow(voxels_show) != 0)
+
+        if("CBscore_smooth" %in% names(voxels_show) ){
+
+          col <- map_cbscore_colors(voxels_show$CBscore_smooth, colors = score_set_up$colors[2:5])
+
+        } else {
+
+          col <- score_set_up$colors[voxels_show$CBscore+1]
+
+        }
 
         graphics::rect(
           xleft = voxels_show$col - 0.5,
           xright = voxels_show$col + 0.5,
           ybottom = voxels_show$row - 0.5,
           ytop = voxels_show$row + 0.5,
-          col = ggplot2::alpha(score_set_up$colors[voxels_show$CBscore+1], 1-input$transp_score),
+          col = ggplot2::alpha(col, 1-input$transp_score),
           border = NA
         )
 
@@ -2699,8 +2712,6 @@ moduleMriPlaneServer <- function(id,
           }
 
         }
-
-        assign("out", out, envir = .GlobalEnv)
 
         return(out)
 

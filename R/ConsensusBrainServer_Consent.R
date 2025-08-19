@@ -273,26 +273,23 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
       ggplot2::annotation_raster(r, xmin = 1, xmax = 4, ymin = -Inf, ymax = Inf)
     }
 
+    assign("df", df, envir = .GlobalEnv)
+
     ggplot2::ggplot(df, ggplot2::aes(x = CBscore_smooth)) +
       add_cb_gradient_bg() +
       ggplot2::geom_density(
         color = "black",
-        fill = ggplot2::alpha("lightgrey", 0.33),
+        fill = ggplot2::alpha("lightgrey", 0.5),
         linewidth = 0.9
         ) +
       ggplot2::scale_x_continuous(
-        limits = c(1, 4),
-        expand = c(0, 0)
+        limits = c(1, 4), expand = c(0, 0)
       ) +
-      ggplot2::scale_y_continuous(
-        limits = c(0, NA),
-        expand = c(0, 0)
-      )+
       ggplot2::theme_bw(base_size = 13) +
       ggplot2::theme(
-        text = ggplot2::element_text(size = 15),
         panel.grid = ggplot2::element_blank(),
-        plot.background = ggplot2::element_rect(fill = "#f9fafb", color = NA)
+        plot.background = ggplot2::element_rect(fill = "#f9fafb", color = NA),
+        text = ggplot2::element_text(size = 15)
       ) +
       ggplot2::labs(x = "Consensus-Based Resectability Risk", y = "Density")
 
@@ -459,7 +456,7 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
     },
     content = function(file) {
 
-      saveRDS(cb_df(), file)
+      saveRDS(cb_df()[,c("x", "y", "z", "CBscore", "CBscore_smooth")], file)
 
     }
   )
