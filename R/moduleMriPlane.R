@@ -95,26 +95,19 @@ moduleMriPlaneUI <- function(id,
       });
 
       // Zooming
-      Shiny.addCustomMessageHandler('{{ns('set_zoom')}}', function(data) {
-        const zoom = data.zoom;
-        const allImgs = document.querySelectorAll('#{{ns('mriSlicePlot')}} .zoomable-image');
-
-        allImgs.forEach(function(img) {
-          img.style.transform = 'scale(' + zoom + ')';
-          img.style.transformOrigin = 'center center';
+        Shiny.addCustomMessageHandler('{{ns('set_zoom')}}', function(data) {
+          const zoom = data.zoom;
+          const img = document.getElementById('{{ns('singleSlice')}}');
+          if (img) {
+            img.style.transform = 'scale(' + zoom + ')';
+            img.style.transformOrigin = 'center center';
+          }
         });
 
-      });
-
-      // Ensure that initial slice is shown directly
-      Shiny.addCustomMessageHandler('{{ns('show_slice')}}', function(slice_idx) {
-        for (let i = {{rmin}}; i <= {{rmax}}; i++) {
-          const el = document.getElementById('slice_' + i + '_{{id}}' + '-'); // with + '-'! due to how ns() works
-          if (el) {
-            el.style.display = (i === slice_idx) ? 'block' : 'none';
-          }
-        }
-      });
+        Shiny.addCustomMessageHandler('{{ns('set_slice_src')}}', function(src) {
+          const img = document.getElementById('{{ns('singleSlice')}}');
+          if (img) { img.src = src; }
+        });
 
       setTimeout(function() {
         Shiny.setInputValue('{{ns('show_slice_direct')}}', 128, {priority: 'event'});
@@ -2454,45 +2447,80 @@ moduleMriPlaneServer <- function(id,
 
       }, bg = "transparent")
 
-      output$mriSlicePlot <- renderUI({
+      if(F){
 
-        if(plane == "axi"){
+        output$mriSlicePlot <- renderUI({
 
-          shiny::showNotification(
-            ui = "MRI data is loading. This can take a few seconds - even if the red busy indicator is not displayed.",
-            type = "message",
-            duration = 10
+          if(plane == "axi"){
+
+            shiny::showNotification(
+              ui = "MRI data is loading. This can take a few seconds - even if the red busy indicator is not displayed.",
+              type = "message",
+              duration = 10
+            )
+
+          }
+
+          rp <- range(brain_dims[plane])
+
+          tags$div(
+            id = ns("mriSlicePlot"),
+            style = "width: 100%; height: 100%; overflow: hidden; border: 1px solid #ccc;",
+            lapply(X = rp[1]:rp[2], FUN = function(i) {
+              tags$img(
+                id = paste0("slice_", i, "_", ns("")),
+                src = pre_rendered_slices[[plane]][[i]],
+                class = "zoomable-image",
+                style =
+                  ifelse(
+                    test = i==128,
+                    yes = "display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;",
+                    no = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+                  )
+              )
+            })
           )
 
-        }
+        })
 
-        rp <- range(brain_dims[plane])
+        shiny::observe({
 
-        tags$div(
-          id = ns("mriSlicePlot"),
-          style = "width: 100%; height: 100%; overflow: hidden; border: 1px solid #ccc;",
-          lapply(X = rp[1]:rp[2], FUN = function(i) {
+          session$sendCustomMessage(ns("show_slice"), slice_idx())
+
+        })
+
+      } else {
+
+        print("New UI")
+        # UI: replace the whole output$mriSlicePlot container with a single <img>
+        output$mriSlicePlot <- renderUI({
+          # initial slice (current)
+          cur <- slice_idx()
+          src <- pre_rendered_slices[[plane]][[cur]]
+
+          tags$div(
+            id = ns("mriSlicePlot"),
+            style = "width: 100%; height: 100%; overflow: hidden; border: 1px solid #ccc;",
             tags$img(
-              id = paste0("slice_", i, "_", ns("")),
-              src = pre_rendered_slices[[plane]][[i]],
+              id = ns("singleSlice"),
+              src = src,
               class = "zoomable-image",
-              style =
-                ifelse(
-                  test = i==128,
-                  yes = "display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;",
-                  no = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
-                )
+              style = "display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
             )
-          })
-        )
+          )
+        })
 
-      })
+        observe({
+          req(slice_idx())
+          # compute new URL on the R side
+          session$sendCustomMessage(
+            ns("set_slice_src"),
+            pre_rendered_slices[[plane]][[slice_idx()]]
+          )
+        })
 
-      shiny::observe({
+      }
 
-        session$sendCustomMessage(ns("show_slice"), slice_idx())
-
-      })
 
       # 1. Mode: Inspection -----------------------------------------------------
 
