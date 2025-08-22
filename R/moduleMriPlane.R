@@ -2466,38 +2466,26 @@ moduleMriPlaneServer <- function(id,
 
         }
 
-        print("hello3")
-
         rp <- range(brain_dims[plane])
         X <- rp[1]:rp[2]
 
         tags$div(
           id = ns("mriSlicePlot"),
           style = "width: 100%; height: 100%; overflow: hidden; border: 1px solid #ccc;",
-          shiny::withProgress(
-            message = glue::glue("Loading {mri_planes_pretty[plane]}."),
-            value = 0,
-            expr = {
+          lapply(X = X, FUN = function(i) {
 
-              lapply(X = X, FUN = function(i) {
-
-                shiny::incProgress(amount = 1/length(X), detail = "Progress:")
-
-                tags$img(
-                  id = paste0("slice_", i, "_", ns("")),
-                  src = pre_rendered_slices[[plane]][[i]],
-                  class = "zoomable-image",
-                  style =
-                    ifelse(
-                      test = i==128,
-                      yes = "display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;",
-                      no = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
-                    )
+            tags$img(
+              id = paste0("slice_", i, "_", ns("")),
+              src = pre_rendered_slices[[plane]][[i]],
+              class = "zoomable-image",
+              style =
+                ifelse(
+                  test = i==128,
+                  yes = "display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;",
+                  no = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
                 )
-              })
-
-            }
-          )
+            )
+          })
 
         )
 
