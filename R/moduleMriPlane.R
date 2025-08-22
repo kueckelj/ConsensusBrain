@@ -109,46 +109,26 @@ moduleMriPlaneUI <- function(id,
 // Keep the original immediate toggle, but nudge PNGs to decode ASAP
 Shiny.addCustomMessageHandler('{{ns('show_slice')}}', function(slice_idx) {
   const rmin = {{rmin}}, rmax = {{rmax}};
-  const idSuffix = '_{{id}}' + '-'; // ns() quirk
+  const idSuffix = '_{{id}}' + '-';
 
-  // 1) Give the target slice priority + kick off decoding (non-blocking)
-  const nextEl = document.getElementById('slice_' + slice_idx + idSuffix);
-  if (nextEl) {
-    try { nextEl.loading = 'eager'; } catch(e) {}
-    try { nextEl.decoding = 'sync'; } catch(e) {}        // hint: decode now
-    try { nextEl.fetchPriority = 'high'; } catch(e) {}   // Chromium hint
-
-    if (!(nextEl.complete && nextEl.naturalWidth > 0)) {
-      // Nudge some browsers to start work immediately
-      const src = nextEl.getAttribute('src');
-      if (src) nextEl.src = src;
-      if (typeof nextEl.decode === 'function') {
-        nextEl.decode().catch(() => {});                 // fire-and-forget
-      }
-    }
-  }
-
-  // 2) Do your original fast toggle (keeps UI responsive)
+  // original fast toggle (keeps UI reactive)
   for (let i = rmin; i <= rmax; i++) {
     const el = document.getElementById('slice_' + i + idSuffix);
-    if (!el) continue;
-    el.style.display = (i === slice_idx) ? 'block' : 'none';
+    if (el) el.style.display = (i === slice_idx) ? 'block' : 'none';
   }
 
-  // 3) Warm up neighbors (+/-2) AND decode them too
+  // warm up neighbors (+/-2) – trigger actual decode in background
   [slice_idx - 2, slice_idx - 1, slice_idx + 1, slice_idx + 2]
     .filter(i => i >= rmin && i <= rmax)
     .forEach(i => {
       const el = document.getElementById('slice_' + i + idSuffix);
       if (!el) return;
-      try { el.loading = 'eager'; } catch(e) {}
-      try { el.fetchPriority = 'high'; } catch(e) {}
-      if (!(el.complete && el.naturalWidth > 0)) {
-        const src = el.getAttribute('src');
-        if (src) el.src = src;            // ensure request is in-flight
-        if (typeof el.decode === 'function') {
-          el.decode().catch(() => {});    // schedule a real decode
-        }
+      try { el.loading = 'eager'; } catch(e){}
+      try { el.fetchPriority = 'high'; } catch(e){}
+      const src = el.getAttribute('src');
+      if (!(el.complete && el.naturalWidth > 0) && src) {
+        el.src = src;                          // ensure request
+        if (typeof el.decode === 'function') el.decode().catch(() => {});
       }
     });
 });
