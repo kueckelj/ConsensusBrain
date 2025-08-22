@@ -106,28 +106,52 @@ moduleMriPlaneUI <- function(id,
 
       });
 
-      // Ensure that initial slice is shown directly and keep scrubbing smooth
-      Shiny.addCustomMessageHandler('{{ns('show_slice')}}', function(slice_idx) {
-        // Toggle visibility
-        for (let i = {{rmin}}; i <= {{rmax}}; i++) {
-          const el = document.getElementById('slice_' + i + '_{{id}}' + '-'); // trailing '-' due to ns()
-          if (el) {
-            el.style.display = (i === slice_idx) ? 'block' : 'none';
-          }
+// Keep the original immediate toggle, but nudge PNGs to decode ASAP
+Shiny.addCustomMessageHandler('{{ns('show_slice')}}', function(slice_idx) {
+  const rmin = {{rmin}}, rmax = {{rmax}};
+  const idSuffix = '_{{id}}' + '-'; // ns() quirk
+
+  // 1) Give the target slice priority + kick off decoding (non-blocking)
+  const nextEl = document.getElementById('slice_' + slice_idx + idSuffix);
+  if (nextEl) {
+    try { nextEl.loading = 'eager'; } catch(e) {}
+    try { nextEl.decoding = 'sync'; } catch(e) {}        // hint: decode now
+    try { nextEl.fetchPriority = 'high'; } catch(e) {}   // Chromium hint
+
+    if (!(nextEl.complete && nextEl.naturalWidth > 0)) {
+      // Nudge some browsers to start work immediately
+      const src = nextEl.getAttribute('src');
+      if (src) nextEl.src = src;
+      if (typeof nextEl.decode === 'function') {
+        nextEl.decode().catch(() => {});                 // fire-and-forget
+      }
+    }
+  }
+
+  // 2) Do your original fast toggle (keeps UI responsive)
+  for (let i = rmin; i <= rmax; i++) {
+    const el = document.getElementById('slice_' + i + idSuffix);
+    if (!el) continue;
+    el.style.display = (i === slice_idx) ? 'block' : 'none';
+  }
+
+  // 3) Warm up neighbors (+/-2) AND decode them too
+  [slice_idx - 2, slice_idx - 1, slice_idx + 1, slice_idx + 2]
+    .filter(i => i >= rmin && i <= rmax)
+    .forEach(i => {
+      const el = document.getElementById('slice_' + i + idSuffix);
+      if (!el) return;
+      try { el.loading = 'eager'; } catch(e) {}
+      try { el.fetchPriority = 'high'; } catch(e) {}
+      if (!(el.complete && el.naturalWidth > 0)) {
+        const src = el.getAttribute('src');
+        if (src) el.src = src;            // ensure request is in-flight
+        if (typeof el.decode === 'function') {
+          el.decode().catch(() => {});    // schedule a real decode
         }
-
-        // Preload neighbors (±2) for smooth scrolling
-        [slice_idx - 2, slice_idx - 1, slice_idx + 1, slice_idx + 2]
-          .filter(i => i >= {{rmin}} && i <= {{rmax}})
-          .forEach(i => {
-            const el = document.getElementById('slice_' + i + '_{{id}}' + '-');
-            if (el && !el.complete) {
-              const tmp = new Image();
-              tmp.src = el.getAttribute('src');
-            }
-          });
-      });
-
+      }
+    });
+});
 
       setTimeout(function() {
         Shiny.setInputValue('{{ns('show_slice_direct')}}', 128, {priority: 'event'});
@@ -2484,7 +2508,7 @@ moduleMriPlaneServer <- function(id,
           lapply(X = rp[1]:rp[2], FUN = function(i) {
             tags$img(
               id = paste0("slice_", i, "_", ns("")),
-              src = paste0("www/slices/", plane, "/", i, ".png"),
+              src = paste0(ifelse(local_launch(), "www/", ""), "slices/", plane, "/", i, ".png"),
               loading = if (i == 128) "eager" else "lazy",
               decoding = "async",
               class = "zoomable-image",
