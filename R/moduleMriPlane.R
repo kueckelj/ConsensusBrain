@@ -106,15 +106,28 @@ moduleMriPlaneUI <- function(id,
 
       });
 
-      // Ensure that initial slice is shown directly
+      // Ensure that initial slice is shown directly and keep scrubbing smooth
       Shiny.addCustomMessageHandler('{{ns('show_slice')}}', function(slice_idx) {
+        // Toggle visibility
         for (let i = {{rmin}}; i <= {{rmax}}; i++) {
-          const el = document.getElementById('slice_' + i + '_{{id}}' + '-'); // with + '-'! due to how ns() works
+          const el = document.getElementById('slice_' + i + '_{{id}}' + '-'); // trailing '-' due to ns()
           if (el) {
             el.style.display = (i === slice_idx) ? 'block' : 'none';
           }
         }
+
+        // Preload neighbors (±2) for smooth scrolling
+        [slice_idx - 2, slice_idx - 1, slice_idx + 1, slice_idx + 2]
+          .filter(i => i >= {{rmin}} && i <= {{rmax}})
+          .forEach(i => {
+            const el = document.getElementById('slice_' + i + '_{{id}}' + '-');
+            if (el && !el.complete) {
+              const tmp = new Image();
+              tmp.src = el.getAttribute('src');
+            }
+          });
       });
+
 
       setTimeout(function() {
         Shiny.setInputValue('{{ns('show_slice_direct')}}', 128, {priority: 'event'});
@@ -2455,15 +2468,12 @@ moduleMriPlaneServer <- function(id,
       }, bg = "transparent")
 
       output$mriSlicePlot <- renderUI({
-
         if(plane == "axi"){
-
           shiny::showNotification(
             ui = "MRI data is loading. This can take a few seconds - even if the red busy indicator is not displayed.",
             type = "message",
             duration = 10
           )
-
         }
 
         rp <- range(brain_dims[plane])
@@ -2474,18 +2484,19 @@ moduleMriPlaneServer <- function(id,
           lapply(X = rp[1]:rp[2], FUN = function(i) {
             tags$img(
               id = paste0("slice_", i, "_", ns("")),
-              src = pre_rendered_slices[[plane]][[i]],
+              src = paste0("www/slices/", plane, "/", i, ".png"),
+              loading = if (i == 128) "eager" else "lazy",
+              decoding = "async",
               class = "zoomable-image",
               style =
                 ifelse(
-                  test = i==128,
+                  test = i == 128,
                   yes = "display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%;",
-                  no = "display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+                  no  = "display: none;  position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
                 )
             )
           })
         )
-
       })
 
       shiny::observe({
