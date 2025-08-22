@@ -20,23 +20,6 @@ ConsensusBrainUI_Consent <- function(project = ""){
           icon = shiny::icon("info-circle")
         ),
         shinydashboard::menuItem(
-          text = "Guide",
-          tabName = "tab_guide",
-          icon = shiny::icon("graduation-cap"),
-          shinydashboard::menuSubItem(
-            text = "Workflow (Videos)",
-            tabName = "tab_tut_workflow"
-          ),
-          shinydashboard::menuSubItem(
-            text = "Selection (Videos)",
-            tabName = "tab_tut_selection"
-          ),
-          shinydashboard::menuSubItem(
-            text = "Refinement (Videos)",
-            tabName = "tab_tut_refinement"
-          )
-        ),
-        shinydashboard::menuItem(
           text = "Adjust",
           tabName = "tab_adjust",
           icon = shiny::icon("edit")
@@ -162,46 +145,6 @@ ConsensusBrainUI_Consent <- function(project = ""){
             width = '100%',
             height = 1000,
             style = "border:none;"
-          )
-        ),
-
-        # Guide -------------------------------------------------------------------
-
-        shinydashboard::tabItem(
-          tabName = "tab_tut_workflow",
-          shiny::fluidRow(
-            videoBox(name = "mri_interface"),
-            videoBox(name = "selection_and_score_assignment")
-          ),
-          shiny::fluidRow(
-            videoBox(name = "the_progress_tab"),
-            videoBox(name = "score_overwriting_rules")
-          ),
-          shiny::fluidRow(
-            videoBox(name = "score_clearing")
-          )
-        ),
-
-        shinydashboard::tabItem(
-          tabName = "tab_tut_selection",
-          shiny::fluidRow(
-            videoBox(name = "brain_regions_and_atlases"),
-            videoBox(name = "paintbrush")
-          ),
-          shiny::fluidRow(
-            videoBox(name = "paintbrush_sphere"),
-            videoBox(name = "paintbrush_ray")
-          )
-        ),
-
-        shinydashboard::tabItem(
-          tabName = "tab_tut_refinement",
-          shiny::fluidRow(
-            videoBox(name = "paintbrush_erase"),
-            videoBox(name = "undo_and_debris_removal")
-          ),
-          shiny::fluidRow(
-            videoBox(name = "safety_margin")
           )
         ),
 
