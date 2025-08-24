@@ -372,7 +372,6 @@ moduleMriPlaneServer <- function(id,
     module = function(input, output, session){
 
       ns <- session$ns
-
       # ----- Debugging/Testing
       shiny::observeEvent(input$test,{
 

@@ -41,6 +41,28 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
 
   result_altered <- shiny::reactiveVal(value = FALSE)
 
+
+  # Intro text --------------------------------------------------------------
+
+  # triggers once at the initiation
+  shiny::observe({
+
+    showModalConsentIntro()
+
+  })
+
+  shiny::observeEvent(input$open_consent_intro, {
+
+    showModalConsentIntro()
+
+  })
+
+  shiny::observeEvent(input$close_consent_intro, {
+
+    shiny::removeModal()
+
+  })
+
   # Workflow ------------------------------------------------------------
 
   mo_score_adjust <-
@@ -272,8 +294,6 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
       r   <- grDevices::as.raster(matrix(pal(1024), nrow = 1))
       ggplot2::annotation_raster(r, xmin = 1, xmax = 4, ymin = -Inf, ymax = Inf)
     }
-
-    assign("df", df, envir = .GlobalEnv)
 
     ggplot2::ggplot(df, ggplot2::aes(x = CBscore_smooth)) +
       add_cb_gradient_bg() +

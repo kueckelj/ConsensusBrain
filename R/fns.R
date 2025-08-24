@@ -3093,10 +3093,13 @@ switch_axis_label <- function(label){
 plot_brain_2d <- function(voxel_df,
                           plane,
                           slice,
-                          color_by = "t1",
+                          color_by,
+                          layer_fill = NULL,
                           clrp = "default",
                           clrp_adjust = NULL,
-                          clrsp = c("black", "white"),
+                          clrsp = NULL,
+                          alpha = 0.9,
+                          bgt1 = FALSE,
                           nrow = NULL,
                           ncol = NULL){
 
@@ -3135,18 +3138,56 @@ plot_brain_2d <- function(voxel_df,
 
   }
 
+  if(isTRUE(bgt1)){
+
+    ctp_df <- load_consensus_template()
+
+    bg_df <-
+      purrr::map2_dfr(
+        .x = combinations$planes,
+        .y = combinations$slices,
+        .f = function(plane, slice){
+
+          get_slice_df(input = ctp_df, plane = plane, slice = slice, var = "t1") %>%
+            dplyr::mutate(plane = {{plane}}, slice = {{slice}})
+
+        }
+      ) %>%
+      dplyr::rename(t1 = value)
+
+    layers_bg <-
+      list(
+        ggnewscale::new_scale_fill(),
+        ggplot2::geom_raster(data = bg_df, mapping = ggplot2::aes(fill = t1)),
+        ggplot2::scale_fill_gradient(low = "black", high = "white")
+      )
+
+  } else {
+
+    layers_bg <- list()
+
+  }
+
+  if(is.null(layer_fill)){
+
+    layer_fill <-
+      confuns::scale_color_add_on(
+        aes = "fill",
+        variable = out_df$value,
+        clrp = clrp,
+        clrsp = clrsp,
+        clrp.adjust = clrp_adjust
+      )
+
+  }
+
   ggplot2::ggplot(out_df, mapping = ggplot2::aes(x = col, y = row)) +
-    ggplot2::geom_raster(mapping = ggplot2::aes(fill = value)) +
-    confuns::scale_color_add_on(
-      aes = "fill",
-      variable = out_df$value,
-      clrp = clrp,
-      clrsp = clrsp,
-      clrp.adjust = clrp_adjust
-    ) +
+    layers_bg +
+    ggnewscale::new_scale_fill() +
+    ggplot2::geom_raster(mapping = ggplot2::aes(fill = value), alpha = alpha) +
+    layer_fill +
     facet_add_on +
     ggpLayer_MRI(lab_fill = color_by)
-
 
 }
 
@@ -3619,6 +3660,41 @@ send_mail <- function(subject,
     )
 
   smtp(email)
+
+}
+
+showModalConsentIntro <- function(){
+
+  shiny::showModal(
+    shiny::modalDialog(
+      title = "Welcome back to ConsensusBrain",
+      easyClose = TRUE, size = "l",
+      tags$iframe(
+        src = ifelse(local_launch(), "www/introduction_consent.html", "introduction_cnsent.html"),
+        style = "width:100%;height:80vh;border:0;"
+      ),
+      footer = shiny::tagList(
+        shiny::div(
+          id = "finalized_panel",
+          style = "width: 500px; max-width: 100%; margin: 0 auto; padding: 20px;",
+          shiny::fluidRow(
+            shiny::column(width = 3),
+            shiny::column(
+              width = 6,
+              align = "center",
+              style = "border-right: 1px solid lightgrey; height: 100%;",
+              shiny::actionButton(
+                inputId = "close_consent_intro",
+                label = "Okay",
+                width = "100%"
+              )
+            ),
+            shiny::column(width = 3)
+          )
+        )
+      )
+    )
+  )
 
 }
 

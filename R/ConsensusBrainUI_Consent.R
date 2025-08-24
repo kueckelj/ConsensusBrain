@@ -10,24 +10,19 @@ ConsensusBrainUI_Consent <- function(project = ""){
     # sidebar =
     shinydashboard::dashboardSidebar(
       collapsed = FALSE,
-
       # Menu
       shinydashboard::sidebarMenu(
         id = "sidebar_menu",
         shinydashboard::menuItem(
-          tabName = "tab_introduction",
-          text = "Introduction",
-          icon = shiny::icon("info-circle")
+          text = "Consent",
+          icon = shiny::icon("brain"),
+          tabName = "tab_consent",
+          selected = TRUE
         ),
         shinydashboard::menuItem(
           text = "Adjust",
           tabName = "tab_adjust",
-          icon = shiny::icon("edit")
-        ),
-        shinydashboard::menuItem(
-          text = "Consent",
-          icon = shiny::icon("brain"),
-          tabName = "tab_consent",
+          icon = shiny::icon("edit"),
           selected = FALSE
         )
       ),
@@ -132,36 +127,22 @@ ConsensusBrainUI_Consent <- function(project = ""){
       # tabs
       shinydashboard::tabItems(
 
-        # Home -----------------------------------------------------------------
-
-        shinydashboard::tabItem(
-          tabName = "tab_introduction",
-          shiny::tags$iframe(
-            src = ifelse(
-              test = local_launch(),
-              yes = find_intro_html("www/Introduction_consent.html", project),
-              no = find_intro_html("Introduction_consent.html", project)
-            ),
-            width = '100%',
-            height = 1000,
-            style = "border:none;"
-          )
-        ),
-
-        # Score Assignment --------------------------------------------------------
-
-        # Workflow
-        shinydashboard::tabItem(
-          tabName = "tab_adjust",
-
-          moduleWorkflowMacroAreaUI(id = "adjust")
-
-        ),
-
-        # Progress ----------------------------------------------------------------
+        # Consent ----------------------------------------------------------------
 
         shinydashboard::tabItem(
           tabName = "tab_consent",
+          shiny::fluidRow(
+            shiny::column(
+              width = 4,
+              shinyWidgets::actionBttn(
+                inputId = "open_consent_intro",
+                label = "Intro Text",
+                style = "simple",
+                color = "primary",
+                icon = shiny::icon("book-open")
+              )
+            )
+          ),
           shiny::fluidRow(
             shiny::column(
               width = 12,
@@ -182,7 +163,18 @@ ConsensusBrainUI_Consent <- function(project = ""){
             ),
             shiny::column(width = 2)
           )
+        ),
+
+        # Adjust --------------------------------------------------------
+
+        # Workflow
+        shinydashboard::tabItem(
+          tabName = "tab_adjust",
+
+          moduleWorkflowMacroAreaUI(id = "adjust")
+
         )
+
       )
     )
   )
