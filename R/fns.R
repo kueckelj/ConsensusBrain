@@ -3670,7 +3670,7 @@ showModalConsentIntro <- function(){
       title = "Welcome back to ConsensusBrain",
       easyClose = TRUE, size = "l",
       tags$iframe(
-        src = ifelse(local_launch(), "www/introduction_consent.html", "introduction_cnsent.html"),
+        src = ifelse(local_launch(), "www/Introduction_consent.html", "Introduction_consent.html"),
         style = "width:100%;height:80vh;border:0;"
       ),
       footer = shiny::tagList(
