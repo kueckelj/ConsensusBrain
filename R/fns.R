@@ -3682,7 +3682,6 @@ showModalConsentIntro <- function(){
             shiny::column(
               width = 6,
               align = "center",
-              style = "border-right: 1px solid lightgrey; height: 100%;",
               shiny::actionButton(
                 inputId = "close_consent_intro",
                 label = "Okay",
