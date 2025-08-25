@@ -743,7 +743,6 @@ comp_progress <- function(voxel_df){
 
 }
 
-
 comp_progress_values <- function(voxel_df, var, values){
 
   if(!is.character(values)){
@@ -839,6 +838,54 @@ ConsensusBrain_Consent <- function(nifti_object = NULL, project = ""){
 
 }
 
+# ---- CSS function ----
+cssRiskScoreLegend <- function() {
+  tags$head(
+    tags$style(HTML('
+      .risk-legend{
+        --c1:#8BC34A; /* Low */
+        --c2:#FFEB3B; /* Low–Medium */
+        --c3:#FF9800; /* Medium–High */
+        --c4:#F44336; /* High (Not Resectable) */
+        max-width: 100%;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      }
+
+      /* Bigger labels */
+      .risk-legend__labels{
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        margin-bottom: 12px;      /* extra space for top ticks */
+        font-size: 1.25rem;       /* bigger */
+        font-weight: 600;         /* bolder */
+        line-height: 1.3;
+      }
+      .risk-legend__labels > span{
+        white-space: nowrap;
+      }
+      .risk-legend__labels > .left  { text-align: left; }
+      .risk-legend__labels > .center{ text-align: center; }
+      .risk-legend__labels > .right { text-align: right; }
+
+      .risk-legend__bar{
+        position: relative;
+        height: 16px;
+        border-radius: 999px;
+        background: linear-gradient(
+          to right,
+          var(--c1) 0%,
+          var(--c2) 33.333%,
+          var(--c3) 66.666%,
+          var(--c4) 100%
+        );
+        box-shadow:
+          inset 0 0 0 1px rgba(0,0,0,0.15),
+          0 0 0 0.5px rgba(0,0,0,0.04);
+      }
+
+    '))
+  )
+}
 dim_nifti <- function(nifti){
 
   purrr::set_names(x = dim(nifti), nm = c("sag", "cor", "axi"))
@@ -1216,6 +1263,20 @@ ggpLayer_slice <- function(slice_df,
 
 }
 
+htmlRiskScoreLegend <- function() {
+  HTML('
+    <div class="risk-legend" aria-label="Resectability risk legend">
+      <div class="risk-legend__labels" aria-hidden="true">
+        <span class="left">Low</span>
+        <span class="center">Low–Medium</span>
+        <span class="center">Medium–High</span>
+        <span class="right">High</span>
+      </div>
+      <div class="risk-legend__bar" role="img"
+           aria-label="Gradient from Low (green) to High (red)"></div>
+    </div>
+  ')
+}
 
 identify_brois <- function(voxel_df){
 
@@ -3591,6 +3652,40 @@ plot_brain_surface_3d <- function(vdf,
 
 }
 
+read_rater_scoring <- function(){
+
+  ctp_df <- load_consensus_template()
+  ctp_scores <- dplyr::select(ctp_df, x, y, z)
+
+  files <- list.files("finalized", full.names = TRUE)
+  raters <- vector(mode = "character", length = length(files))
+
+  pb <- confuns::create_progress_bar(length(files))
+
+  for(i in seq_along(files)){
+
+    pb$tick()
+
+    cb_out <- readRDS(files[i])
+
+    name_expert <- paste0(cb_out@user_meta$first_name, "_", cb_out@user_meta$last_name)
+    name_expert <- stringr::str_replace(name_expert, pattern = " ", replacement = "_")
+
+    raters[i] <- name_expert
+
+    ctp_scores <-
+      dplyr::left_join(
+        x = ctp_scores,
+        y = dplyr::rename(cb_out@progress, {{name_expert}} := CBscore),
+        by = c("x", "y", "z")
+      )
+
+  }
+
+  return(ctp_scores)
+
+}
+
 
 reduce_stack <- function(stacks, which){
 
@@ -3663,7 +3758,7 @@ send_mail <- function(subject,
 
 }
 
-showModalConsentIntro <- function(){
+showModalIntro <- function(){
 
   shiny::showModal(
     shiny::modalDialog(
@@ -3683,7 +3778,7 @@ showModalConsentIntro <- function(){
               width = 6,
               align = "center",
               shiny::actionButton(
-                inputId = "close_consent_intro",
+                inputId = "close_intro",
                 label = "Okay",
                 width = "100%"
               )
@@ -3785,6 +3880,106 @@ showModalFinalized <- function(){
       ),
       footer = shiny::tagList(),
       easyClose = FALSE
+    )
+  )
+
+}
+
+showModalGuideAdjust <- function(){
+
+  shiny::showModal(
+    ui = shiny::modalDialog(
+      title = "Adjust and Download Adjustments",
+      size = "l",
+      shiny::fluidRow(
+        shiny::column(
+          width = 12,
+          shiny::div(
+            class = "video-container",
+            shiny::tags$video(
+              src = paste0(resource_file("guide_adjust"), ".mp4"),
+              width = "100%",
+              type = "video/mp4",
+              controls = NA
+            )
+          ),
+          shiny::helpText(
+            "In this tab, you can adjust the risk scores of regions.",
+            "For example, the video shows how to change the score of the left precentral gyrus.",
+            "",
+            "As shown in the scoring dialog’s density plot, many raters split the precentral gyrus: the superior portion was often scored 4 (High—Not resectable), while the inferior portion was scored 3 (Medium–High). If you disagree, adjust the region’s score as demonstrated in the video.",
+            "You can repeat this for as many regions as needed. Use the Highlight Scope option in the toolbar below to choose the atlas that defines the regions.",
+            "When you’re finished, click “Download Adjustments” to export your changes and email the file to us."
+          )
+        )
+      ),
+      footer = shiny::tagList(
+        shiny::div(
+          id = "finalized_panel",
+          style = "width: 500px; max-width: 100%; margin: 0 auto; padding: 20px;",
+          shiny::fluidRow(
+            shiny::column(width = 3),
+            shiny::column(
+              width = 6,
+              align = "center",
+              shiny::actionButton(
+                inputId = "close_guide_adjust",
+                label = "Okay",
+                width = "100%"
+              )
+            ),
+            shiny::column(width = 3)
+          )
+        )
+      )
+    )
+  )
+
+}
+
+showModalGuideConsent <- function(){
+
+  shiny::showModal(
+    ui = shiny::modalDialog(
+      title = "Submit Consent",
+      size = "l",
+      shiny::fluidRow(
+        shiny::column(
+          width = 12,
+          shiny::div(
+            class = "video-container",
+            shiny::tags$video(
+              src = paste0(resource_file("guide_consent"), ".mp4"),
+              width = "100%",
+              type = "video/mp4",
+              controls = NA
+            )
+          ),
+          shiny::helpText(
+            "In this tab, review the consensus resectability map produced by our integration (see the introduction).",
+            "If you agree with this map, click “Submit Consent”, enter your credentials, and confirm. We’ll be notified—no further action is required."
+          )
+        )
+      ),
+      footer = shiny::tagList(
+        shiny::div(
+          id = "finalized_panel",
+          style = "width: 500px; max-width: 100%; margin: 0 auto; padding: 20px;",
+          shiny::fluidRow(
+            shiny::column(width = 3),
+            shiny::column(
+              width = 6,
+              align = "center",
+              shiny::actionButton(
+                inputId = "close_guide_consent",
+                label = "Okay",
+                width = "100%"
+              )
+            ),
+            shiny::column(width = 3)
+          )
+        )
+      )
     )
   )
 
@@ -4162,145 +4357,6 @@ showModalNewUser <- function(session, project = ""){
 
 }
 
-showModalQuickRescore <- function(atlas, region, hemisphere){
-
-  # Set up JavaScript according to score setup
-  lc <- length(score_set_up$choices)
-
-  java_script <-
-    purrr::map2_chr(
-      .x = score_set_up$choices[2:lc],
-      .y = score_set_up$colors[2:lc],
-      .f = function(value, color){
-        glue::glue(
-          "$(\"input:radio[name='\" + inputID + \"'][value='{value}']\").parent().css({{ 'background-color': '{color}', 'color': 'black' }});"
-        )
-      }
-    ) %>%
-    stringr::str_c(collapse = "")
-
-  shiny::showModal(
-    shiny::modalDialog(
-      size = "l",
-      easyClose = FALSE,
-      title = "Change Resectability Score",
-
-      # Scoped styles (subtle cards, no background override on buttons)
-      shiny::tags$style(shiny::HTML("
-      .cb-modal .cb-row          { display:flex; align-items:stretch; gap:16px; }
-      .cb-modal .cb-col          { display:flex; flex-direction:column; justify-content:center; }
-      .cb-modal .cb-card         { background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px;
-                                   padding:14px 16px; box-shadow:0 1px 2px rgba(0,0,0,.04); height:100%; }
-      .cb-modal .cb-card h5      { margin:0 0 8px 0; color:#374151; font-weight:600; }
-      .cb-modal .cb-meta dt      { font-weight:600; color:#374151; }
-      .cb-modal .cb-meta dd      { margin:0 0 10px 0; color:#111827; }
-      .cb-modal .cb-divider-left { border-left:1px solid #e5e7eb; }
-      .cb-modal .cb-legend .btn  { display:flex; align-items:center; justify-content:flex-start; gap:8px;
-                                   width:100%; border:1px solid #e5e7eb !important; text-align:left; }
-      .cb-modal .cb-legend .btn.active { border-color:#111827 !important;
-                                         box-shadow:0 0 0 2px rgba(17,24,39,.16) inset; font-weight:600; }
-      .cb-modal .cb-help         { color:#4b5563; margin-top:8px; }
-    ")),
-
-      # Main row
-      shiny::fluidRow(
-        class = "cb-modal cb-row",
-
-        # LEFT: Region details
-        shiny::column(
-          width = 3, class = "cb-col",
-          shiny::div(class = "cb-card",
-                     shiny::h4("Region details"),
-                     shiny::tags$dl(class = "cb-meta",
-                                    shiny::tags$dt("Atlas"),
-                                    shiny::tags$dd(ann_var_names[atlas]),
-                                    shiny::tags$dt("Region"),
-                                    shiny::tags$dd(make_pretty_label(region)),
-                                    shiny::tags$dt("Hemisphere"),
-                                    shiny::tags$dd(stringr::str_to_title(hemisphere))
-                     )
-          )
-        ),
-
-        # MIDDLE: Distribution plot
-        shiny::column(
-          width = 5, class = "cb-col cb-divider-left",
-          shiny::div(class = "cb-card",
-                     shiny::h4("Score distribution (current)"),
-                     shiny::plotOutput("plot_region_score_distr")
-          )
-        ),
-
-        # RIGHT: New score (legend-style buttons, colored via your JS)
-        shiny::column(
-          width = 4, class = "cb-col cb-divider-left",
-          shiny::div(class = "cb-card",
-                     shiny::h4("Select new score"),
-                     shiny::div(class = "cb-legend",
-                                shinyWidgets::radioGroupButtons(
-                                  inputId = "CBrescore",
-                                  label = NULL,
-                                  selected = character(),
-                                  choiceValues = unname(score_set_up$choices)[2:lc],
-                                  choiceNames  = names(score_set_up$choices)[2:lc],
-                                  direction = "vertical",
-                                  justified  = TRUE,
-                                  individual = FALSE,
-                                  size = "normal",
-                                  width = "100%"
-                                )
-                     ),
-                     # Apply your color mapping to the buttons (uses your `java_script`)
-                     shiny::tags$script(shiny::HTML(glue::glue("
-            $(function() {{
-              var inputID = 'CBrescore';
-              function colorizeButtons(){{
-                {java_script}  // <-- your generated lines set background-color + text color
-              }}
-              // Initial apply + after Shiny updates/changes
-              colorizeButtons();
-              $(document).on('shiny:inputchanged', function(e) {{
-                if (e.name === inputID) setTimeout(colorizeButtons, 0);
-              }});
-              // Selection highlight (keeps your colors, just adds emphasis)
-              $(document).on('change', \"input:radio[name='\" + inputID + \"']\", function() {{
-                var $all = $(\"input:radio[name='\" + inputID + \"']\").parent();
-                $all.removeClass('active');
-                $(this).parent().addClass('active');
-              }});
-            }});
-          ")))
-          )
-        )
-      ),
-
-      # Note
-      shiny::fluidRow(
-        shiny::column(
-          width = 12, align = "center",
-          shiny::helpText("This window allows quick rescoring of whole brain regions. For fine-grained voxel edits, use the Adjust tab.")
-        )
-      ),
-
-      # Footer
-      footer = shiny::tagList(
-        shiny::fluidRow(
-          shiny::column(width = 2),
-          shiny::column(
-            width = 4, align = "center",
-            shiny::actionButton("rescore_confirm", "Confirm", width = "80%", disabled = TRUE)
-          ),
-          shiny::column(
-            width = 4, align = "center",
-            shiny::actionButton("rescore_cancel", "Cancel", width = "80%")
-          ),
-          shiny::column(width = 2)
-        )
-      )
-    )
-  )
-
-}
 
 showModalQuickRescore <- function(atlas, region, hemisphere){
 
@@ -4312,6 +4368,9 @@ showModalQuickRescore <- function(atlas, region, hemisphere){
       .x = score_set_up$choices[2:lc],
       .y = score_set_up$colors[2:lc],
       .f = function(value, color){
+
+        if(value == "Not resectable"){ value <- "High (Not resectable)"}
+
         glue::glue(
           "$(\"input:radio[name='\" + inputID + \"'][value='{value}']\").parent().css({{ 'background-color': '{color}', 'color': 'black' }});"
         )
@@ -4323,7 +4382,7 @@ showModalQuickRescore <- function(atlas, region, hemisphere){
     shiny::modalDialog(
       size = "l",
       easyClose = FALSE,
-      title = "Change Resectability Score",
+      title = "Rescore",
 
       # Scoped styles (subtle cards, no background override on buttons)
       shiny::tags$style(shiny::HTML("
@@ -4420,8 +4479,9 @@ showModalQuickRescore <- function(atlas, region, hemisphere){
       # Note
       shiny::fluidRow(
         shiny::column(
-          width = 12, align = "center",
-          shiny::helpText("This window allows quick rescoring of whole brain regions. For fine-grained voxel edits, use the Adjust tab.")
+          #shiny::helpText("This window allows quick rescoring of whole brain regions. For fine-grained voxel edits, use the Adjust tab."),
+          width = 12,
+          align = "center"
         )
       ),
 

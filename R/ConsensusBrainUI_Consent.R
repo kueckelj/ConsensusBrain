@@ -89,6 +89,7 @@ ConsensusBrainUI_Consent <- function(project = ""){
           }
         ")
         ),
+        cssRiskScoreLegend(),
         shiny::tags$script(
           shiny::HTML(
             "
@@ -134,9 +135,26 @@ ConsensusBrainUI_Consent <- function(project = ""){
           shiny::fluidRow(
             shiny::column(
               width = 4,
+              align = "left",
               shinyWidgets::actionBttn(
-                inputId = "open_consent_intro",
+                inputId = "open_intro_consent",
                 label = "Intro Text",
+                style = "simple",
+                color = "primary",
+                icon = shiny::icon("book-open")
+              )
+            ),
+            shiny::column(
+              width = 4,
+              align = "center",
+              htmlRiskScoreLegend()
+              ),
+            shiny::column(
+              width = 4,
+              align = "right",
+              shinyWidgets::actionBttn(
+                inputId = "open_guide_consent",
+                label = "Guide",
                 style = "simple",
                 color = "primary",
                 icon = shiny::icon("book-open")
@@ -150,31 +168,65 @@ ConsensusBrainUI_Consent <- function(project = ""){
             )
           ),
           shiny::fluidRow(
-            shiny::column(width = 2),
+            shiny::column(width = 4),
             shiny::column(
               width = 4,
               align = "center",
               shiny::uiOutput(outputId = "submit_consent")
             ),
-            shiny::column(
-              width = 4,
-              align = "center",
-              shiny::uiOutput(outputId = "download_adjustments")
-            ),
-            shiny::column(width = 2)
+            shiny::column(width = 4)
           )
         ),
 
         # Adjust --------------------------------------------------------
 
-        # Workflow
         shinydashboard::tabItem(
           tabName = "tab_adjust",
-
-          moduleWorkflowMacroAreaUI(id = "adjust")
-
+          shiny::fluidRow(
+            shiny::column(
+              width = 4,
+              align = "left",
+              shinyWidgets::actionBttn(
+                inputId = "open_intro_adjust",
+                label = "Intro Text",
+                style = "simple",
+                color = "primary",
+                icon = shiny::icon("book-open")
+              )
+            ),
+            shiny::column(
+              width = 4,
+              align = "center",
+              htmlRiskScoreLegend()
+            ),
+            shiny::column(
+              width = 4,
+              align = "right",
+              shinyWidgets::actionBttn(
+                inputId = "open_guide_adjust",
+                label = "Guide",
+                style = "simple",
+                color = "primary",
+                icon = shiny::icon("book-open")
+              )
+            )
+          ),
+          shiny::fluidRow(
+            shiny::column(
+              width = 12,
+              moduleMriUI(id = "adjust")
+            )
+          ),
+          shiny::fluidRow(
+            shiny::column(width = 4),
+            shiny::column(
+              width = 4,
+              align = "center",
+              shiny::uiOutput(outputId = "download_adjustments")
+            ),
+            shiny::column(width = 4)
+          )
         )
-
       )
     )
   )

@@ -23,6 +23,7 @@ Imports:
     ggplot2,
     ggsci,
     glue,
+    later,
     magrittr,
     oro.nifti,
     plotly,

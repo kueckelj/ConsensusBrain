@@ -218,7 +218,7 @@ moduleMriControlServer <- function(id,
                 size = "normal",
                 onLabel = "Yes",
                 offLabel = "No",
-                value = FALSE,
+                value = isTRUE(mode_opts$highlight_hover),
                 width = "100%"
               )
             ),
