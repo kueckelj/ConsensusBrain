@@ -51,16 +51,24 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
 
   })
 
-  # after the session is flushed the first time, hop to Adjust and back
-  session$onFlushed(function() {
-    # jump to Adjust to trigger rendering
-    shinydashboard::updateTabItems(session, inputId = "sidebar_menu", selected = "tab_adjust")
+  # needs shinyjs or later (pick one approach)
+  library(later)
 
-    # after a small delay, go back to Consent
-    later::later(function() {
-      shinydashboard::updateTabItems(session, inputId = "sidebar_menu", selected = "tab_consent")
-    }, delay = 0.3)  # 300 ms is usually enough; tweak if needed
-  }, once = TRUE)
+  # Run once, after the UI is live and input$sidebar_menu has a value
+  observeEvent(input$sidebar_menu, {
+    if (identical(input$sidebar_menu, "tab_consent") && !isTRUE(session$userData$._prewarmed)) {
+      session$userData$._prewarmed <- TRUE
+
+      # give the client time to bind tabs (tweak 0.8–1.5s if needed on shinyapps.io)
+      later(function() {
+        shinydashboard::updateTabItems(session, "sidebar_menu", "tab_adjust")
+        # give Adjust time to render at least one flush
+        later(function() {
+          shinydashboard::updateTabItems(session, "sidebar_menu", "tab_consent")
+        }, delay = 1.0)
+      }, delay = 1.0)
+    }
+  }, ignoreInit = FALSE)
 
   shiny::observeEvent(input$open_intro_consent, {
 
