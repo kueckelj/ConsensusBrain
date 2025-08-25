@@ -3803,11 +3803,7 @@ showModalDownloadAdjustments <- function() {
         shiny::fluidRow(
           shiny::column(
             width = 6, align = "center",
-            shiny::downloadButton(
-              outputId = "download_adjustments_confirm",
-              label = "Download",
-              width = "80%"
-            )
+            shiny::uiOutput("download_adjustments_confirmX")
           ),
           shiny::column(
             width = 6, align = "center",
@@ -3821,11 +3817,27 @@ showModalDownloadAdjustments <- function() {
         )
       ),
       shiny::tagList(
-        shiny::p("Download your adjusted resectability map using the button below."),
-        shiny::tags$ul(
-          shiny::tags$li(shiny::HTML("The file will be named <code>CB_adjusted_consent.rds</code>")),
-          shiny::tags$li(
-            shiny::HTML("Please email the file to ", "philipp.karschnia@uk-erlangen.de!")
+        shiny::p("Download your adjusted resectability map using the button below. Please email the file to philipp.karschnia@uk-erlangen.de!"),
+        shiny::splitLayout(
+          cellWidths = c("50%", "50%"),
+          shiny::textInput(
+            inputId = "userInp_first_name",
+            label = "First Name"
+          ),
+          shiny::textInput(
+            inputId = "userInp_last_name",
+            label = "Last Name"
+          )
+        ),
+        shiny::splitLayout(
+          cellWidths = c("50%", "50%"),
+          shiny::textInput(
+            inputId = "userInp_email",
+            label = shiny::tagList(shiny::icon("envelope"), "E-Mail:")
+          ),
+          shiny::textInput(
+            inputId = "userInp_email_confirm",
+            label = shiny::tagList(shiny::icon("envelope"), "E-Mail (Confirm):")
           )
         ),
         shiny::tags$hr(),
@@ -3835,7 +3847,6 @@ showModalDownloadAdjustments <- function() {
   )
 
 }
-
 
 showModalFinalized <- function(){
 
@@ -4356,7 +4367,6 @@ showModalNewUser <- function(session, project = ""){
   }
 
 }
-
 
 showModalQuickRescore <- function(atlas, region, hemisphere){
 

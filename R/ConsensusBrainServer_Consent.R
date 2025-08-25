@@ -148,6 +148,12 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
 
   # - input validation
   iv <- shinyvalidate::InputValidator$new()
+  iv$add_rule("userInp_first_name", shinyvalidate::sv_required())
+  iv$add_rule("userInp_first_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
+  iv$add_rule("userInp_first_name", ~ if(!valid_name_symbols(.)) "Only letters are allowed.")
+  iv$add_rule("userInp_last_name", shinyvalidate::sv_required())
+  iv$add_rule("userInp_last_name", ~ if(!valid_name_length(.)) "Two or more letters required.")
+  iv$add_rule("userInp_last_name", ~ if(!valid_name_symbols(.)) "Only letters are allowed.")
   iv$add_rule("userInp_email", shinyvalidate::sv_required())
   iv$add_rule("userInp_email", shinyvalidate::sv_email())
   iv$add_rule("userInp_email_confirm", shinyvalidate::sv_required())
@@ -300,6 +306,24 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
         block = TRUE
       )
     )
+
+  })
+
+  output$download_adjustments_confirmX <- shiny::renderUI({
+
+    if(iv$is_valid()){
+
+      shiny::downloadButton(
+        outputId = "download_adjustments_confirm",
+        label = "Download",
+        width = "100%"
+      )
+
+    } else {
+
+      shiny::helpText("Please enter your credentials.")
+
+    }
 
   })
 
@@ -476,14 +500,18 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
   output$download_adjustments_confirm <- shiny::downloadHandler(
     filename = function() {
 
-      download_adjustments_clicked({ download_adjustments_clicked()+1 })
+      scm <- submit_consent_meta()
 
-      "CB_adjusted_consent.rds"
+      paste0("CB_adjusted_", scm$first_name, "_", scm$last_name, ".RDS")
 
     },
     content = function(file) {
 
-      saveRDS(cb_df()[,c("x", "y", "z", "CBscore", "CBscore_smooth")], file)
+      # download
+      output <- cb_df()[,c("x", "y", "z", "CBscore")]
+      download_adjustments_clicked({ download_adjustments_clicked()+1 })
+
+      saveRDS(output, file)
 
     }
   )
@@ -494,11 +522,37 @@ ConsensusBrainServer_Consent <- function(input, output, session, nifti_object, p
 
       shiny::removeModal()
 
+      # send by mail
+      output <- cb_df()[,c("x", "y", "z", "CBscore")]
+      scm <- submit_consent_meta()
+      file <- paste0("CB_adjusted_", scm$first_name, "_", scm$last_name, ".RDS")
+      tf <- file.path(tempdir(), file)
+      saveRDS(output, file = tf)
+
+      send_mail(
+        subject = glue::glue("Adjusted Consent: {scm$first_name} {scm$last_name}"),
+        text = glue::glue("Received adjusted consent from {scm$first_name} {scm$last_name} (E-Mail: {scm$email})."),
+        to = "jankueckelhaus@gmx.de",
+        password = Sys.getenv("GMX_PASS"),
+        attachment_path = tf
+      )
+
+      send_mail(
+        subject = glue::glue("Adjusted Consent: {scm$first_name} {scm$last_name}"),
+        text = glue::glue("Received adjusted consent from {scm$first_name} {scm$last_name} (E-Mail: {scm$email})."),
+        to = "philipp.karschnia@uk-erlangen.de",
+        password = Sys.getenv("GMX_PASS"),
+        attachment_path = tf
+      )
+
+      unlink(tf)
+
+      # give feedback
       shinyWidgets::sendSweetAlert(
         session = session,
-        title = "Adjustments downloaded!",
+        title = "Almost done!",
         text = tags$html(
-          "Please email the file to philipp.karschnia@uk-erlangen.de."
+          "Please email the file you downloaded to philipp.karschnia@uk-erlangen.de."
         ),
         type = "success"
       )
